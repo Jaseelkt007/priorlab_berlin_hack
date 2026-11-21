@@ -95,8 +95,7 @@ def draw(scn, k, log, meas, pred, errors, start=0):
         line(scn, now, ahead, 0.012, BLUE)
         add(scn, mujoco.mjtGeom.mjGEOM_SPHERE, [0.08] * 3, ahead, BLUE)
         bubble(scn, ahead, cov[k, hi[AHEAD]], BUBBLE)
-    doing = BEHAVIOURS[log["behaviour"][k]] if "behaviour" in log else "flown by you"
-    texts = [f"t = {log['t'][k]:5.1f} s   doing: {doing}",
+    texts = [f"t = {log['t'][k]:5.1f} s   doing: {BEHAVIOURS[log['behaviour'][k]]}",
              f"REAL now          x y z: {fmt(now)}"]
     if k >= lag and ok[k - lag]:
         said = mean[k - lag, hi[CHECK]]

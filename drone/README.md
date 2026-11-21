@@ -62,7 +62,6 @@ From the repo root, in the `priorlab` conda env. First get the drone models: see
 python drone/view_drones.py                 # fly the two drones with the keyboard
 python drone/intruder.py --view 8           # watch an intruder flight (any number)
 python drone/intruder.py --drone cf2 --view 8
-python drone/fly_intruder.py                # YOU fly the intruder; the IMM predicts you live
 python drone/demo_imm.py --view radar       # a test flight: real vs IMM-predicted position, live
 python drone/demo_imm.py --view radar --record data/demo_radar_54.mp4   # the same as a video  (needs: pip install imageio-ffmpeg)
 ```
@@ -92,6 +91,5 @@ python drone/compare.py                              # the results table
 | `tabpfn_model.py` | TabPFN: predicts positions with a range, and the alarm |
 | `compare.py` | scores IMM and TabPFN on the same test rows |
 | `demo_imm.py` | the 3D demo: real vs predicted position, alarm, video recording |
-| `fly_intruder.py` | fly the intruder yourself, with the IMM predicting you live |
 | `view_drones.py` | keyboard flying |
 | `EXPERIMENTS.md` | full detail, results by manoeuvre, everything we tried |

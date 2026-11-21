@@ -5,3 +5,6 @@ __pycache__/
 .ipynb_checkpoints/
 *:Zone.Identifier
 third_party/
+.venv-jax/
+jax_tabpfn/golden/
+*.safetensors

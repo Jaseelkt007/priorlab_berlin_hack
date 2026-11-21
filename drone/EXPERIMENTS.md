@@ -16,46 +16,88 @@ Every flight is a random intruder flown by a script (`intruder.py`): an **intent
 
 Crashed flights are dropped. Crazyflie flights use different random seeds, so they never repeat an X2 flight's plan.
 
-## 2. The table
+## 2. The table: every input and output
 
-One row per radar reading, from **radar data only** (never the true position, never the flight clock).
+Each radar reading becomes **one row**. A row answers: *"given what the radar has seen up to now, where will the drone be 1, 1.5 and 2 s from now, and will it enter the zone within 2 s?"*
 
-**Inputs (16):**
+**The example row** used below is a real one: small-drone test flight #100000 at 10.2 s, in the middle of a zigzag, 48 m from the zone. The radar had just lost it for most of the last second (7 of 10 readings missing).
 
-| Group | Features |
-|---|---|
-| Where it is | `range`, `height`, `zone_fwd`, `zone_left` (where the zone is, seen from the drone's heading) |
-| How it moves | `speed`, `climb`, `acc_fwd`, `acc_left`, `acc_up`, `turn_rate` |
-| Short memory | `speed_1s`, `turn_rate_1s`, `climb_1s`, `turn_rate_2s` (1 s and 2 s ago) |
-| Radar quality | `n_missing` (gaps in the last 1 s), `fit_error` (noise) |
+### How the radar dots become numbers
 
-**Outputs:**
+The radar gives only a dot (x, y, z) every 0.1 s, noisy and sometimes missing. From the recent dots we estimate:
+- **position and velocity**: a straight line through the last 1.5 s of dots (why: experiment 4);
+- **acceleration**: a curve through the last 2 s of dots;
+- **heading**: the direction the drone is flying.
 
-| | |
-|---|---|
-| `x_1s y_1s z_1s`, `x_1.5s …`, `x_2s …` | where the drone really is 1, 1.5, 2 s later (world coordinates, used for all scoring) |
-| `breach_2s` | 1 if it enters the zone within 2 s (the alarm) |
+Many inputs are measured **from the drone's point of view**: *forward* = the way it is flying, *left* = to its left, *up* = up. Then an attack from the north and one from the south look the same, so a model learns from fewer examples.
 
-Models may learn the same answers in the drone's own direction (forward, left, up), which is easier to learn; `to_world` converts back exactly.
+### Inputs (16)
 
-**Why no time input:** every flight starts at the arena edge, so "time since start" would let a model cheat, and a real radar does not know when a flight started.
+| # | Name | What it means | How it is computed | Unit | Example | Why it helps |
+|---|---|---|---|---|---|---|
+| 1 | `range` | how far the drone is from the zone centre, along the ground | distance from (0, 0) to the estimated position | m | 47.8 | close drones matter more and are measured more precisely |
+| 2 | `height` | how high it flies | estimated z | m | 20.6 | the zone is 30 m high; above it the drone cannot breach |
+| 3 | `zone_fwd` | how far ahead of the drone the zone centre is | zone centre in the drone's view, forward part | m | 46.7 | positive and large = flying toward the zone |
+| 4 | `zone_left` | how far to the drone's left the zone centre is | zone centre in the drone's view, sideways part | m | -10.1 (to its right) | near zero = aimed straight at the zone; large = passing by |
+| 5 | `speed` | how fast it flies over the ground | size of the horizontal velocity | m/s | 2.66 | the main driver of where it will be |
+| 6 | `climb` | how fast it goes up (+) or down (-) | vertical velocity | m/s | +1.73 | dives and climbs |
+| 7 | `acc_fwd` | is it speeding up (+) or slowing down (-) | acceleration along its heading | m/s² | +1.94 | a dash starts with this |
+| 8 | `acc_left` | is it being pushed sideways, i.e. turning | acceleration to its left | m/s² | +0.26 | the start of a turn or zigzag leg |
+| 9 | `acc_up` | is its climb speeding up or slowing down | vertical acceleration | m/s² | -1.82 | a climb or dive about to stop |
+| 10 | `turn_rate` | how fast its heading is turning | sideways acceleration ÷ speed | rad/s | 0.10 | circling and zigzags |
+| 11 | `speed_1s` | its speed 1 s ago | `speed` of the row 1 s earlier | m/s | 1.45 | speed now vs then = speeding up or not |
+| 12 | `turn_rate_1s` | its turn rate 1 s ago | `turn_rate` 1 s earlier | rad/s | 0.03 | |
+| 13 | `climb_1s` | its climb 1 s ago | `climb` 1 s earlier | m/s | 3.02 | climb is fading (3.0 → 1.7) |
+| 14 | `turn_rate_2s` | its turn rate 2 s ago | `turn_rate` 2 s earlier | rad/s | -1.01 | a turn the other way 2 s ago = a zigzag rhythm |
+| 15 | `n_missing` | how many of the last 10 radar readings were lost | count of gaps in the last 1 s | 0-10 | 7 | tells the model how much to trust the other numbers |
+| 16 | `fit_error` | how noisy the recent dots are | spread of the dots around the fitted line | m | 0.72 | noise grows with distance |
 
-**Split:** always by flight, never by row.
+Inputs 11-14 are empty (NaN) in the first seconds of a track, when there is no "1 s ago" yet. TabPFN handles empty cells.
+
+**Not an input: time.** Every flight starts at the arena edge, so "seconds since the flight started" would let a model cheat (it would learn the script, not the motion), and a real radar does not know when a flight started.
+
+**Not an input: anything true.** The true position, true speed, the manoeuvre name and the intent are known in the simulation but never given to a model. They are only used for scoring.
+
+### Outputs
+
+| Name | What it means | Unit | Example (real) |
+|---|---|---|---|
+| `x_1s`, `y_1s`, `z_1s` | where the drone really was 1 s later | m | 19.6, -42.6, 22.3 |
+| `x_1.5s`, `y_1.5s`, `z_1.5s` | … 1.5 s later | m | 19.2, -42.5, 23.2 |
+| `x_2s`, `y_2s`, `z_2s` | … 2 s later | m | 19.3, -42.2, 24.1 |
+| `breach_2s` | 1 if it entered the zone within 2 s, else 0 (the alarm) | 0 / 1 | 0 |
+
+In the example the drone was at (19.9, -43.4, 20.6) and still climbing, so 2 s later it is 3.5 m higher and has barely moved sideways.
+
+**What a model gives back:** for each position, a best guess plus a 5%-95% range (the cone); for the alarm, a probability (e.g. "8% chance of a breach within 2 s").
+
+**How models learn the positions:** as movement from the current estimate in the drone's view (forward, left, up), e.g. here 1.31 m forward, 0.21 m right, 3.50 m up after 2 s. That is easier to learn; it converts back to x, y, z exactly (`to_world`), and all scoring is done in x, y, z.
+
+### Rules
+
+- **Split by flight, never by row:** rows of one flight are near copies, so mixing them between learning and testing would leak answers.
+- **Learn on the big drone, test on the small one.**
+- To look at the table yourself: `python drone/features.py --drone cf2 --preview 2000` writes a CSV with named columns.
 
 ## 3. Results
 
 We predict **1, 1.5 and 2 s ahead** (team decision: short-term predictions are what a defence system can act on, and much further ahead nobody can predict a drone that changes its mind).
 
-Median error (m) between the predicted position and where the drone really was, on the Crazyflie test flights. Lower is better.
+**Test set:** the 250 Crazyflie flights after the first 50 (those 50 are kept for "adapting" TabPFN, version B), one row per 0.5 s: 22,020 position rows, 22,973 alarm rows (428 breaches). Scored by `python drone/compare.py`; every model is scored on exactly these rows.
+
+**Position:** median error (m) between the predicted and the real position. Lower is better.
 
 | Model | 1 s ahead | 1.5 s ahead | 2 s ahead |
 |---|---|---|---|
 | IMM (tuned on X2 flights) | 1.55 | 2.19 | 2.88 |
-| TabPFN | *needs token* | | |
+| TabPFN A (learned from X2 only) | *needs token* | | |
+| TabPFN B (X2 + rows from 50 other Crazyflie flights) | *needs token* | | |
 
-**How honest is the IMM's cone?** A good 90% cone should contain the real position about 90% of the time. The IMM's holds it 86-87% of the time: close, slightly too narrow.
+**Cone:** how often the real position is inside the 5%-95% range, per direction (should be 90%). IMM: 89% / 89% / 90%, so its cone is honest.
 
-**Where the IMM goes wrong:** when the drone keeps doing the same thing (e.g. a steady dive) it is about 1-1.5 m off at 1 s; right after the drone changes what it is doing (dive → hover → climb) its error roughly doubles, because it keeps predicting the old motion for a moment. Those switch moments are where a model that learned from examples can help.
+**Alarm** ("will it enter the zone within 2 s?"): AUC (1.0 = perfect, 0.5 = coin flip) and the share of breaches caught when we accept 1 false alarm per 20 safe moments. IMM: **AUC 0.989, 99% caught**. The alarm is nearly solved by plain physics: 2 s ahead, a slow drone cannot surprise anyone much. TabPFN can at best match it here.
+
+**Where the IMM goes wrong:** in single flights it is often off right after the drone changes what it is doing (dive → hover → climb). Over all test rows, though, rows with a manoeuvre change ahead are *not* worse (1.49 vs 1.55 m at 1 s): many changes barely change the motion within 2 s (e.g. straight → zigzag). So TabPFN's chance is not one obvious weak spot; it has to be a little better almost everywhere.
 
 ## 4. Experiments
 

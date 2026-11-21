@@ -38,7 +38,7 @@ We compare it with what real radar trackers use: an **IMM**, three Kalman-type f
 | Data: 2,000 X2 flights, 300 Crazyflie flights | done |
 | Tables | done |
 | IMM tracker (what real radars use) | done: tuned on X2, tested on Crazyflie |
-| TabPFN | **next** (needs `TABPFN_TOKEN` in `.env`) |
+| TabPFN | code ready (`tabpfn_model.py`); runs once `TABPFN_TOKEN` is in `.env` |
 | TabPFN fine-tuned | if the GPU allows |
 | Demo: prediction cone + alarm in the viewer | planned |
 
@@ -49,9 +49,10 @@ Median error between the predicted and the real position, on the small-drone tes
 | Model | 1 s ahead | 1.5 s ahead | 2 s ahead |
 |---|---|---|---|
 | IMM (what real radars use) | 1.55 m | 2.19 m | 2.88 m |
-| TabPFN | *needs token* | | |
+| TabPFN A (learned from X2 only) | *needs token* | | |
+| TabPFN B (X2 + a few Crazyflie flights) | *needs token* | | |
 
-The IMM is good while the drone keeps doing the same thing, and about twice as far off right after it changes (e.g. dive → climb). That is where TabPFN can win.
+The IMM is a strong opponent: its 90% cone is honest (89-90%), and its 2 s alarm catches 99% of breaches. `python drone/compare.py` scores every model on the same test rows.
 
 ## Try it
 
@@ -71,6 +72,9 @@ python drone/intruder.py --drone cf2 --flights 300   # Crazyflie flights, 15 min
 python drone/features.py                             # tables, 30 s each
 python drone/features.py --drone cf2
 python drone/features.py --preview 2000              # a CSV you can open in Excel
+python drone/imm.py --drone cf2                      # IMM predictions, 25 s
+python drone/tabpfn_model.py                         # TabPFN predictions (needs TABPFN_TOKEN)
+python drone/compare.py                              # the results table
 ```
 
 ## Files
@@ -82,5 +86,7 @@ python drone/features.py --preview 2000              # a CSV you can open in Exc
 | `intruder.py` | the random intruder, wind, radar, data recording |
 | `features.py` | radar readings → tables |
 | `imm.py` | the IMM tracker (the baseline to beat) |
+| `tabpfn_model.py` | TabPFN: predicts positions with a range, and the alarm |
+| `compare.py` | scores IMM and TabPFN on the same test rows |
 | `view_drones.py` | keyboard flying |
 | `EXPERIMENTS.md` | full detail, results by manoeuvre, everything we tried |

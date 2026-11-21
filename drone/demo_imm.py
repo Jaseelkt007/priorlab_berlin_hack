@@ -37,7 +37,8 @@ FRAME = 0.02  # s between played-back frames (50 per second)
 CHASE_CAM = 5.0  # m: camera distance in the chase view (close enough to see the 10 cm Crazyflie itself)
 ZNEAR = 0.0005  # fraction of the model extent
 INSET = (400, 300)  # px: close-up of the drone in recorded videos
-RADAR_CAM = 5.0  # m: in the radar view, the camera sits this far from the drone, toward the radar
+SITE_CAMERA = np.array([0.0, 0.0, 3.0])  # m: the radar view's camera, on the radar post at the zone centre
+SITE_SPAN = 4.0  # m of the scene shown around the drone in the radar view (the camera zooms)
 
 GREEN, WHITE, BLUE, BUBBLE, YELLOW = (
     [0.1, 0.9, 0.2, 0.9], [1, 1, 1, 0.9], [0.2, 0.5, 1.0, 0.9], [0.3, 0.6, 1.0, 0.12], [1.0, 0.85, 0.1, 1.0])
@@ -123,17 +124,18 @@ def predictions(meas):
     return mean, cov, ok, p_alarm, hi, round(CHECK / 0.1)
 
 
-def radar_view(cam, drone):
-    """Camera on the line from the radar (zone centre, 2 m up) to the drone, at most RADAR_CAM m from it."""
-    radar = np.array([0.0, 0.0, 2.0])
-    d = drone - radar
+def radar_view(cam, model, drone):
+    """A camera fixed on the radar post at the zone centre, turning and zooming to follow the drone,
+    so the drone and the 1 s prediction around it fill about SITE_SPAN metres of the picture."""
+    d = drone - SITE_CAMERA
     dist = np.linalg.norm(d)
     f = d / dist
     cam.type = mujoco.mjtCamera.mjCAMERA_FREE
     cam.lookat[:] = drone
-    cam.distance = min(dist, RADAR_CAM)
+    cam.distance = dist
     cam.azimuth = np.degrees(np.arctan2(f[1], f[0]))
     cam.elevation = np.degrees(np.arcsin(f[2]))
+    model.vis.global_.fovy = np.clip(np.degrees(2 * np.arctan(SITE_SPAN / 2 / dist)), 2.0, 45.0)
 
 
 def set_camera(cam, view, flight):
@@ -142,7 +144,7 @@ def set_camera(cam, view, flight):
         cam.trackbodyid = flight.pilot.body
         cam.distance, cam.elevation, cam.azimuth = CHASE_CAM, -20, 135
     else:
-        radar_view(cam, flight.data.xpos[flight.pilot.body])
+        radar_view(cam, flight.model, flight.data.xpos[flight.pilot.body])
 
 
 def record(flight, frames, log, meas, pred, view, out, fps=30, size=(1280, 720)):
@@ -176,7 +178,9 @@ def record(flight, frames, log, meas, pred, view, out, fps=30, size=(1280, 720))
                      start=renderer.scene.ngeom)
         k_drawn = k
         img = Image.fromarray(renderer.render())
+        zoom, flight.model.vis.global_.fovy = flight.model.vis.global_.fovy, 45.0  # close-up: normal lens
         inset.update_scene(flight.data, close)
+        flight.model.vis.global_.fovy = zoom
         x0, y0 = size[0] - INSET[0] - 14, size[1] - INSET[1] - 44
         img.paste(Image.fromarray(inset.render()), (x0, y0))
         d = ImageDraw.Draw(img)

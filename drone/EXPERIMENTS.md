@@ -48,8 +48,10 @@ Median error (m) between the predicted position and where the drone really was, 
 
 | Model | 1 s ahead | 3 s ahead | 5 s ahead |
 |---|---|---|---|
-| IMM (tuned on X2 flights) | *running* | | |
+| IMM (tuned on X2 flights) | 1.55 | 4.28 | 7.04 |
 | TabPFN | *needs token* | | |
+
+**How honest is the IMM's cone?** A good 90% cone should contain the real position about 90% of the time. The IMM's: 85% at 1 s, 90% at 3 s, 95% at 5 s, so it is well calibrated. It is hardest on dives, climbs and dashes (8.4, 8.3, 7.8 m at 5 s) and easiest on straight flight and circling (6.3 m).
 
 ## 4. Experiments
 
@@ -111,8 +113,10 @@ Each experiment in four lines: what happened, why, what we changed, and the resu
 | turning | turning (73%) | 8.4 m |
 
 ### 7. Tuning the IMM
-- **What:** the IMM has five settings (how jumpy each tracker expects the drone to be, how often it switches). We search them on 150 big-drone flights for the smallest error 3 s ahead. It never sees the small-drone test flights.
-- **Result:** *running.*
+- **What:** the IMM has five settings (how jumpy each tracker expects the drone to be, how often it switches). We searched them on 150 big-drone flights for the smallest error 3 s ahead. It never sees the small-drone test flights.
+- **What happened:** the first search ended with several best values at the edge of the range we tried, so the real best could lie further out.
+- **Changed:** searched again past those edges.
+- **Result:** error 3 s ahead on the big drone went 9.7 → 8.0 → **7.7 m**; the last widening only gained 0.3 m, so the settings are close to the best. The tuned IMM expects the drone to keep its current behaviour for a while (99.5% chance per reading) and trusts steady acceleration and steady turns.
 
 ## 5. Known limits
 

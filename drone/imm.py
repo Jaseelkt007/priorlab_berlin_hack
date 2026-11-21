@@ -271,7 +271,9 @@ def tune(n_flights):
     return best[1]
 
 
-TUNED = Settings()  # replaced by the --tune result, see EXPERIMENTS.md
+# Best settings from tuning on 150 X2 flights (--tune, then a wider search past the grid edges;
+# EXPERIMENTS.md, experiment 7). X2 median error 1/3/5 s: 2.17 / 7.74 / 13.97 m.
+TUNED = Settings(q_cv=1.0, q_ca=0.003, q_ct=0.05, q_turn=0.003, p_stay=0.995)
 
 
 def main():

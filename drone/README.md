@@ -37,7 +37,7 @@ We compare it with what real radar trackers use: an **IMM**, three Kalman-type f
 | Simulation, both drones, intruder flights | done |
 | Data: 2,000 X2 flights, 300 Crazyflie flights | done |
 | Tables | done |
-| IMM tracker (what real radars use) | built and checked; tuning now |
+| IMM tracker (what real radars use) | done: tuned on X2, tested on Crazyflie |
 | TabPFN | **next** (needs `TABPFN_TOKEN` in `.env`) |
 | TabPFN fine-tuned | if the GPU allows |
 | Demo: prediction cone + alarm in the viewer | planned |
@@ -48,7 +48,7 @@ Median error between the predicted and the real position, on the small-drone tes
 
 | Model | 1 s ahead | 3 s ahead | 5 s ahead |
 |---|---|---|---|
-| IMM (what real radars use) | *tuning* | | |
+| IMM (what real radars use) | 1.55 m | 4.28 m | 7.04 m |
 | TabPFN | *needs token* | | |
 
 ## Try it

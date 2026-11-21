@@ -56,12 +56,48 @@ def selftest(names):
             print(f"{name:3s} {label:9s}: pos {np.round(pos, 2)}  speed {np.linalg.norm(vel):.2f} m/s  heading {yaw:6.1f} deg")
 
 
+class Keyboard:
+    """Held keys -> command (forward, left, up, yaw), read from a Tk window."""
+
+    def __init__(self, root, on_key=None):
+        self.held, self._presses, self._releases, self.root, self.on_key = set(), {}, {}, root, on_key
+        root.bind("<KeyPress>", self._press)
+        root.bind("<KeyRelease>", self._release)
+        root.bind("<Tab>", self._press)
+
+    def command(self):
+        command = np.zeros(4)
+        for key in self.held:
+            index, value = KEYS[key]
+            command[index] += value
+        return command
+
+    def _key(self, event):
+        return event.keysym if event.keysym in KEYS else event.keysym.lower()
+
+    def _press(self, event):
+        key = self._key(event)
+        if key in KEYS:
+            self.held.add(key)
+            self._presses[key] = self._presses.get(key, 0) + 1
+        elif self.on_key:
+            return self.on_key(key)
+
+    # Holding a key makes the system send repeated release+press pairs, so a release only
+    # counts if no new press follows within 60 ms.
+    def _release(self, event):
+        key = self._key(event)
+        if key in KEYS:
+            self._releases[key] = self._presses.get(key, 0)
+            self.root.after(60, lambda: self.held.discard(key)
+                            if self._presses.get(key, 0) == self._releases[key] else None)
+
+
 def fly(model, names):
     data = mujoco.MjData(model)
     mujoco.mj_forward(model, data)
     pilots = controllers(model, names)
     active = [0]  # index into names
-    held, presses, releases = set(), {}, {}
 
     viewer = mujoco.viewer.launch_passive(model, data)
 
@@ -85,29 +121,15 @@ def fly(model, names):
     status = tk.Label(root, justify="left", font=("monospace", 11, "bold"), fg="#1f5fa8")
     status.pack(padx=12, pady=(0, 10), anchor="w")
 
-    # Holding a key makes the system send repeated release+press pairs, so a release only
-    # counts if no new press follows within 60 ms.
-    def on_press(event):
-        key = event.keysym if event.keysym in KEYS else event.keysym.lower()
+    def on_key(key):
         if key == "tab":
             active[0] = (active[0] + 1) % len(names)
             follow()
             return "break"
         if key == "r":
             reset()
-        if key in KEYS:
-            held.add(key)
-            presses[key] = presses.get(key, 0) + 1
 
-    def on_release(event):
-        key = event.keysym if event.keysym in KEYS else event.keysym.lower()
-        if key in KEYS:
-            releases[key] = presses.get(key, 0)
-            root.after(60, lambda: held.discard(key) if presses.get(key, 0) == releases[key] else None)
-
-    root.bind("<KeyPress>", on_press)
-    root.bind("<KeyRelease>", on_release)
-    root.bind("<Tab>", on_press)
+    keyboard = Keyboard(root, on_key)
 
     follow()
     start = time.time() - data.time
@@ -116,10 +138,7 @@ def fly(model, names):
         if not viewer.is_running():
             root.destroy()
             return
-        command = np.zeros(4)
-        for key in held:
-            index, value = KEYS[key]
-            command[index] += value
+        command = keyboard.command()
         for i, name in enumerate(names):
             pilots[name].command[:] = command if i == active[0] else 0
         with viewer.lock():

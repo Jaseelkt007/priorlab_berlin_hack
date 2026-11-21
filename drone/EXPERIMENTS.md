@@ -177,6 +177,11 @@ Each experiment in four lines: what happened, why, what we changed, and the resu
 - **Changed:** the flight is computed first, exactly as in the dataset, then played back. Checked: all 216 radar readings of flight 54 match the recording.
 - **Result:** flight 54 (an attack): the IMM is about 1.5-2 m off 1 s ahead (1.68 m median) and the alarm comes on 2.4 s before the breach.
 
+### 11. Fly the intruder yourself
+- **Why:** the test flights are flown by our script. Does the prediction still work when a person flies, with habits the script does not have?
+- **What:** `fly_intruder.py`: keyboard flying of the Crazyflie with the intruder's limits (3 m/s, 12° tilt), starting 35 m from the zone; the same radar model; the IMM runs live, one reading at a time (`imm.Tracker`, which gives exactly the same predictions as the batch run: checked on all 300 Crazyflie flights).
+- **Result:** a fixed keyboard course (straight, climb, diagonal, stop, dive through the zone): IMM 1 s ahead off by 1.88 m median, close to its 1.54 m on scripted flights; it is worst right after sudden stops and turns. The IMM uses no learned habits, so it does not care who flies. TabPFN learned the script's habits: hand-flown flights are its real test.
+
 ## 5. Known limits
 
 - All data is simulated; no real radar or drone.

@@ -113,45 +113,45 @@ def predict(model, m, P, t, st):
     return move(model, m, t), F @ P @ np.swapaxes(F, -1, -2) + noise(model, t, st)
 
 
-def run(meas, lengths, st, horizons=HORIZONS):
-    """Run the IMM over a batch of padded radar tracks.
+P0_INIT = np.diag([0, 0, 0, 100, 100, 100, 25, 25, 25, 0.25]).astype(float)
 
-    meas (B, T, 3) with NaN for missing readings; lengths (B,). Returns the blended prediction after
-    every reading: mean (B, T, H, 3), covariance (B, T, H, 3, 3), and model probabilities (B, T, 3).
-    Before a flight's first reading the outputs are NaN.
-    """
-    B, T, _ = meas.shape
-    H = len(horizons)
-    PI = transition(st.p_stay)
-    m = np.zeros((B, 3, N))
-    P = np.tile(np.eye(N), (B, 3, 1, 1))
-    mu = np.full((B, 3), 1 / 3)
-    started = np.zeros(B, bool)
-    out_mean = np.full((B, T, H, 3), np.nan, np.float32)
-    out_cov = np.full((B, T, H, 3, 3), np.nan, np.float32)
-    out_mu = np.full((B, T, 3), np.nan, np.float32)
-    P0_init = np.diag([0, 0, 0, 100, 100, 100, 25, 25, 25, 0.25]).astype(float)
 
-    for k in range(T):
-        z = meas[:, k]
-        alive = k < lengths
+class Tracker:
+    """The IMM for B tracks at once, one radar reading at a time (live use: B = 1)."""
+
+    def __init__(self, B, st, horizons=HORIZONS):
+        self.st, self.horizons, self.PI = st, horizons, transition(st.p_stay)
+        self.m = np.zeros((B, 3, N))
+        self.P = np.tile(np.eye(N), (B, 3, 1, 1))
+        self.mu = np.full((B, 3), 1 / 3)
+        self.started = np.zeros(B, bool)
+
+    def step(self, z, alive=None):
+        """Take one reading per track: z (B, 3), NaN if missing; alive (B,) marks tracks still running.
+        Returns the blended prediction at each horizon: mean (B, H, 3), covariance (B, H, 3, 3),
+        model probabilities (B, 3); NaN for tracks without a first reading yet."""
+        B, H = len(z), len(self.horizons)
+        alive = np.ones(B, bool) if alive is None else alive
+        out_mean = np.full((B, H, 3), np.nan)
+        out_cov = np.full((B, H, 3, 3), np.nan)
+        out_mu = np.full((B, 3), np.nan)
         seen = alive & ~np.isnan(z[:, 0])
         sigma = RADAR_NOISE + 0.01 * np.linalg.norm(np.nan_to_num(z), axis=1)
 
-        new = seen & ~started  # first reading of a flight: start every model there
+        new = seen & ~self.started  # first reading of a flight: start every model there
         if new.any():
-            m[new] = 0
-            m[new, :, 0:3] = z[new][:, None]
-            P[new] = P0_init
-            P[new, :, 0:3, 0:3] = (sigma[new] ** 2)[:, None, None, None] * np.eye(3)
-            mu[new] = 1 / 3
-            started |= new
-        step = alive & started & ~new
+            self.m[new] = 0
+            self.m[new, :, 0:3] = z[new][:, None]
+            self.P[new] = P0_INIT
+            self.P[new, :, 0:3, 0:3] = (sigma[new] ** 2)[:, None, None, None] * np.eye(3)
+            self.mu[new] = 1 / 3
+            self.started |= new
+        step = alive & self.started & ~new
         if step.any():
             # 1. mix: each model starts from a blend of all models, weighted by switching chances
-            c = mu[step] @ PI  # (b, j)
-            w = mu[step][:, :, None] * PI[None] / c[:, None, :]  # (b, i, j)
-            ms, Ps = m[step], P[step]
+            c = self.mu[step] @ self.PI  # (b, j)
+            w = self.mu[step][:, :, None] * self.PI[None] / c[:, None, :]  # (b, i, j)
+            ms, Ps = self.m[step], self.P[step]
             m0 = np.zeros_like(ms)
             P0 = np.zeros_like(Ps)
             for j in range(3):
@@ -169,7 +169,7 @@ def run(meas, lengths, st, horizons=HORIZONS):
                 P0[:, j] = np.einsum("bi,binm->bnm", w[:, :, j], src_P + d[..., :, None] * d[..., None, :])
             # 2. predict one radar interval
             for j in range(3):
-                m0[:, j], P0[:, j] = predict(j, m0[:, j], P0[:, j], DT, st)
+                m0[:, j], P0[:, j] = predict(j, m0[:, j], P0[:, j], DT, self.st)
             # 3. update with the reading, if there is one
             zs, ok = z[step], seen[step]
             loglik = np.zeros((len(zs), 3))
@@ -188,22 +188,39 @@ def run(meas, lengths, st, horizons=HORIZONS):
             lw = np.log(np.maximum(c, 1e-300)) + loglik
             lw -= lw.max(1, keepdims=True)
             mu_new = np.exp(lw)
-            m[step], P[step], mu[step] = m0, P0, mu_new / mu_new.sum(1, keepdims=True)
+            self.m[step], self.P[step], self.mu[step] = m0, P0, mu_new / mu_new.sum(1, keepdims=True)
 
-        live = alive & started
+        live = alive & self.started
         if live.any():
-            ml, Pl, mul = m[live], P[live], mu[live]
-            mean_h = np.zeros((live.sum(), H, 3))
+            ml, Pl, mul = self.m[live], self.P[live], self.mu[live]
             comp_m = np.zeros((live.sum(), 3, H, 3))
             comp_P = np.zeros((live.sum(), 3, H, 3, 3))
             for j in range(3):
-                for hi, h in enumerate(horizons):
-                    mj, Pj = predict(j, ml[:, j], Pl[:, j], h, st)
+                for hi, h in enumerate(self.horizons):
+                    mj, Pj = predict(j, ml[:, j], Pl[:, j], h, self.st)
                     comp_m[:, j, hi], comp_P[:, j, hi] = mj[:, 0:3], Pj[:, 0:3, 0:3]
             mean_h = np.einsum("bj,bjhn->bhn", mul, comp_m)
             dm = comp_m - mean_h[:, None]
             cov_h = np.einsum("bj,bjhnm->bhnm", mul, comp_P + dm[..., :, None] * dm[..., None, :])
-            out_mean[live, k], out_cov[live, k], out_mu[live, k] = mean_h, cov_h, mul
+            out_mean[live], out_cov[live], out_mu[live] = mean_h, cov_h, mul
+        return out_mean, out_cov, out_mu
+
+
+def run(meas, lengths, st, horizons=HORIZONS):
+    """Run the IMM over a batch of padded radar tracks.
+
+    meas (B, T, 3) with NaN for missing readings; lengths (B,). Returns the blended prediction after
+    every reading: mean (B, T, H, 3), covariance (B, T, H, 3, 3), and model probabilities (B, T, 3).
+    Before a flight's first reading the outputs are NaN.
+    """
+    B, T, _ = meas.shape
+    H = len(horizons)
+    tracker = Tracker(B, st, horizons)
+    out_mean = np.full((B, T, H, 3), np.nan, np.float32)
+    out_cov = np.full((B, T, H, 3, 3), np.nan, np.float32)
+    out_mu = np.full((B, T, 3), np.nan, np.float32)
+    for k in range(T):
+        out_mean[:, k], out_cov[:, k], out_mu[:, k] = tracker.step(meas[:, k], k < lengths)
     return out_mean, out_cov, out_mu
 
 

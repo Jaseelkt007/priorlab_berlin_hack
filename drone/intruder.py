@@ -151,6 +151,25 @@ def outcome_of(pos):
     return None
 
 
+class Radar:
+    """The radar at the zone centre: noisy position readings with single dropouts and blackout bursts."""
+
+    def __init__(self, rng):
+        self.rng, self._burst = rng, 0
+
+    def __call__(self, pos):
+        rng = self.rng
+        if self._burst == 0 and rng.random() < BURST_P:
+            self._burst = rng.integers(3, 11)
+        if self._burst > 0:
+            self._burst -= 1
+            return np.full(3, np.nan)
+        if rng.random() < DROPOUT_P:
+            return np.full(3, np.nan)
+        sigma = RADAR_NOISE + 0.01 * np.linalg.norm(pos)
+        return pos + rng.normal(0, sigma, 3)
+
+
 class Flight:
     """One intruder flight in its own MuJoCo world. Step it, read its state; `record` keeps the radar log."""
 
@@ -173,19 +192,7 @@ class Flight:
         self.log = {k: [] for k in ["t", "true", "vel", "meas", "behaviour", "wind"]}
         self._next_policy = 0.0
         self._next_radar = 0.0
-        self._burst = 0
-
-    def _radar(self, pos):
-        rng = self.rng
-        if self._burst == 0 and rng.random() < BURST_P:
-            self._burst = rng.integers(3, 11)
-        if self._burst > 0:
-            self._burst -= 1
-            return np.full(3, np.nan)
-        if rng.random() < DROPOUT_P:
-            return np.full(3, np.nan)
-        sigma = RADAR_NOISE + 0.01 * np.linalg.norm(pos)
-        return pos + rng.normal(0, sigma, 3)
+        self.radar = Radar(self.rng)  # shares the flight's random stream, so recorded flights replay exactly
 
     def step(self):
         """Advance one physics step. Returns False once the flight has ended."""
@@ -200,7 +207,7 @@ class Flight:
             log["t"].append(d.time)
             log["true"].append(pos)
             log["vel"].append(vel)
-            log["meas"].append(self._radar(pos))
+            log["meas"].append(self.radar(pos))
             log["behaviour"].append(BEHAVIOURS.index(self.policy.behaviour))
             log["wind"].append(d.xfrc_applied[self.pilot.body, :2].copy())
             self._next_radar += RADAR_EVERY

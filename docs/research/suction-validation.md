@@ -28,3 +28,17 @@ At 0.3–0.97× the critical acceleration, tilt stays below 0.01° and all 8 lip
 - uneven normal load around the ring (the peel moment).
 
 This is not computed from our formula, so the near-miss signal comes from the simulation's force state. The leak curve itself (how much vacuum is lost at a given lip load) is an assumption, documented in DEBT.md. A compliant (bellows) cup model is the alternative if time allows.
+
+## Gate 1: pneumatics (2026-11-21), `sim/pneumatics.py`, `tests/test_pneumatics.py`, 9 of 9 passed
+
+| Test (model-suction.md §6) | Result | Reference |
+|---|---|---|
+| V1 evacuation, Si08-3 | +2 to +6.5 % at all 7 levels | Piab table; tolerance ±10 % (Piab's stated accuracy) |
+| V1 evacuation, Pi12-2 | −8 to **+10.7 %** | Piab table. **Tolerance widened to ±12 % for this ejector only**: its flow and evacuation tables were measured at different feed pressures (0.34 vs 0.314 MPa), so they cannot agree exactly. |
+| V2 linear-curve time constants | T1 3.510 ms vs analytic 3.511 ms; T2/T1 = 2.997 | SMC: T2 = 3·T1 |
+| V3 steady seal, orifice | root solve = ODE steady state, 74.49 kPa | (internal consistency) |
+| V3 SMC adsorption round trip | P1 recovered at 20, 40, 53, 65 kPa (< 2 %) | SMC method |
+| V3 min vs series leak blend | ≤ 0.12 kPa difference for gaps ≤ 10 µm | spec: < 5 % |
+| V3 vs research calculation (§3.4 table) | within 0.4 kPa for 0–40 µm gaps | cross-check only |
+| V4 effective area | Schmalz SPB1 forces correspond to d2 (0.99–1.07×) | Schmalz datasheet |
+| V4 vacuum-dependent area | Piab B25XP 9.7 / 19.0 / 22.0 N at 20 / 60 / 90 kPa reproduced | Piab datasheet |

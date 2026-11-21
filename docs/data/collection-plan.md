@@ -18,6 +18,9 @@ Every flight runs from its first step to its last, without a random start, so th
 | 3 | `pass3_noise_b` | same, seed 2 | same |
 | 4 | `pass4_weak_wing` | left wing yaw, roll and pitch actuator gains × 0.7 | adaptation with no retraining |
 | 5 | `pass5_heavy` | all body masses × 1.2 | adaptation with no retraining |
+| 6 | `pass6_noise_strong` | Gaussian noise on the applied action, 2.0 × the policy's own std, seed 3 | closed-loop copying: the fly drifts 1–11 mm from the ghost (21% of steps beyond 1 mm, vs 3% in passes 2–3), so the context shows recoveries from bigger mistakes. 2.5× crashes most flights. |
+
+**Re-collected 21 Nov 2026 (evening).** The first collection had a bug: flybody's `before_step` adds the wingbeat pattern to the six wing actions *in place*, and the collector stored the arrays after `env.step()`. So passes 1, 4 and 5 stored policy + pattern as `action_mean`, and passes 2–3 stored it in `action_applied`. The collector now passes a copy to `env.step()`. The buggy files have been deleted.
 
 The exact settings for each pass are written to `meta.json`.
 

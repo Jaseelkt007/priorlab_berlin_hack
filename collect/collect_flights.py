@@ -28,6 +28,8 @@ PASSES = {
     3: dict(name="noise_b", noise=0.5, seed=2, left_wing_gain=1.0, mass_scale=1.0),
     4: dict(name="weak_wing", noise=0.0, seed=0, left_wing_gain=0.7, mass_scale=1.0),
     5: dict(name="heavy", noise=0.0, seed=0, left_wing_gain=1.0, mass_scale=1.2),
+    # Stronger noise so the fly drifts further from the ghost: recovery rows for closed-loop control.
+    6: dict(name="noise_strong", noise=2.0, seed=3, left_wing_gain=1.0, mass_scale=1.0),
 }
 OBS_KEYS = ["walker/accelerometer", "walker/actuator_activation", "walker/gyro", "walker/joints_pos",
             "walker/joints_vel", "walker/ref_displacement", "walker/ref_root_quat",
@@ -96,7 +98,9 @@ def _run_flight(flight):
         t = physics.data.time
         ref = task._ref_qpos[step]
 
-        timestep = env.step(applied)
+        # flybody's before_step adds the wingbeat pattern to the wing actions IN PLACE, so pass a
+        # copy: otherwise the stored action_mean/action_applied include the pattern (bug in passes 1-5).
+        timestep = env.step(applied.copy())
         # Pattern-generator target and frequency used during this step.
         wpg = task._wbpg.get_last_angles().copy()
         freq = float(task._wbpg._ctrl_freq)

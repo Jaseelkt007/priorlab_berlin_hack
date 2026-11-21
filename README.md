@@ -44,7 +44,7 @@ conda run -n flybody python collect/view_flight.py --traj 0
 Collect the TabPFN data (plan and column layout: [`docs/data/collection-plan.md`](docs/data/collection-plan.md)); output goes to `data/flights/`:
 
 ```sh
-for p in 1 2 3 4 5; do MUJOCO_GL=egl conda run -n flybody python collect/collect_flights.py --pass-id $p; done
+for p in 1 2 3 4 5 6; do MUJOCO_GL=egl conda run -n flybody python collect/collect_flights.py --pass-id $p; done
 ```
 
 ## TabPFN experiments (uv)
@@ -70,3 +70,17 @@ Data plan and columns: [`docs/data/collection-plan.md`](docs/data/collection-pla
 | D | TabPFN flies the fly (closed loop) | `MUJOCO_GL=egl conda run -n flybody python collect/closed_loop.py --context-steps 1500 --flights 3 --video` |
 
 D needs `torch` (CUDA) and `tabpfn` in the flybody env (`pip install torch --index-url https://download.pytorch.org/whl/cu126 "tabpfn>=10,<11"`) and the TabPFN 3.5 licence accepted at https://ux.priorlabs.ai/accept-license?hf_repo_id=tabpfn_3_5. A 3 GB GPU fits only a 256-step context; use the 6 GB RTX 4050 for 1,000+.
+
+## Cloud GPU (big contexts)
+
+For contexts beyond what a laptop GPU holds (we use a Nebius H100, 80 GB), set up the machine with one script. It builds `.venv-fly` with the same versions as the `flybody` conda env:
+
+```sh
+# from your machine: code, data, key and TabPFN weights (data/ and .env are not in git)
+rsync -a --exclude data/ --exclude third_party/ --exclude .venv/ --exclude '*.mp4' ./ <host>:priorlab_berlin_hack/
+rsync -a data/flights data/policies data/flight-imitation <host>:priorlab_berlin_hack/data/
+rsync -a ~/.cache/tabpfn/tabpfn-v3.5-fast-*.safetensors <host>:.cache/tabpfn/
+# on the GPU machine
+cd priorlab_berlin_hack && bash scripts/setup_gpu_box.sh
+MUJOCO_GL=egl .venv-fly/bin/python collect/synthetic_paths.py --controller tabpfn --context-steps 4096 --paths curve --no-video
+```

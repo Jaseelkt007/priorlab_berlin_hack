@@ -1,0 +1,370 @@
+<title>How TabPFN Flies the Fly</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: white technical explainer; each section = a question, one large diagram, two or three lines. Single light theme by design. */
+:root {
+  color-scheme: light;
+  --bg: #ffffff; --panel: #f7f8fa; --ink: #0f172a; --ink-2: #475569; --ink-3: #94a3b8; --line: #e2e8f0; --line-2: #cbd5e1;
+  --pol: #0f766e; --pol-soft: #d5efec;   /* RL policy, the teacher */
+  --tab: #2563eb; --tab-soft: #dbe7fd;   /* TabPFN */
+  --sim: #7c3aed; --sim-soft: #ece4fd;   /* physics engine */
+  --tgt: #ea580c; --tgt-soft: #fde8d9;   /* the predicted column */
+  --f-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--f-sans); }
+.wrap { max-width: 1060px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 44px 64px; display: grid; gap: 64px; }
+h1, h2 { margin: 0; text-wrap: balance; letter-spacing: -0.015em; }
+h1 { font-size: clamp(1.9rem, 4.4vw, 2.6rem); font-weight: 700; line-height: 1.1; }
+h2 { font-size: 1.3rem; font-weight: 650; line-height: 1.25; }
+p { margin: 0; }
+.kicker { font: 500 12px/1.2 var(--f-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
+.sec { display: grid; gap: 16px; }
+.sec > header { display: grid; gap: 6px; max-width: 76ch; }
+.ans { color: var(--ink-2); max-width: 76ch; }
+.ans b { color: var(--ink); }
+figure { margin: 0; border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 10px; min-width: 0; }
+figcaption { font-size: 13px; color: var(--ink-2); max-width: 82ch; }
+.scroll { overflow-x: auto; }
+svg { display: block; max-width: 100%; height: auto; }
+svg text { font-family: var(--f-sans); fill: var(--ink); }
+svg .m { font-family: var(--f-mono); }
+svg .t2 { fill: var(--ink-2); } svg .t3 { fill: var(--ink-3); }
+
+.hero { display: grid; gap: 18px; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
+.hero .ans { font-size: 1.05rem; }
+.quick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.q { border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 4px; align-content: start; min-width: 0; }
+.q .k { font: 500 11px/1.3 var(--f-mono); text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); }
+.q .v { font: 650 1.35rem/1.15 var(--f-sans); letter-spacing: -0.01em; }
+.q .n { font-size: 13px; color: var(--ink-2); }
+@media (max-width: 860px) { .quick { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 440px) { .quick { grid-template-columns: 1fr; } }
+.key { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--ink-2); }
+.key span { display: inline-flex; align-items: center; gap: 7px; }
+.key i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; border: 1px solid; }
+
+.faq { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.fq { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 6px; min-width: 0; }
+.fq .qq { font-weight: 600; }
+.fq .aa { font-size: 14px; color: var(--ink-2); }
+.fq .aa b { color: var(--ink); }
+@media (max-width: 760px) { .faq { grid-template-columns: 1fr; } }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 860px) { .two { grid-template-columns: 1fr; } }
+.tag { display: inline-block; font: 600 11px/1 var(--f-mono); letter-spacing: .05em; text-transform: uppercase; padding: 4px 8px; border-radius: 999px; }
+.tag.now { background: var(--tab-soft); color: var(--tab); }
+.tag.could { background: var(--panel); color: var(--ink-2); border: 1px solid var(--line-2); }
+footer { color: var(--ink-3); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 14px; }
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="kicker">Explainer · Prior Labs track · fruit-fly flight</div>
+  <h1>What TabPFN sees, what it predicts, and when</h1>
+  <p class="ans">TabPFN never trains. It reads a table of examples recorded from the RL policy, then fills in one missing column for new rows. Here is exactly which table, which column, how many rows, and how its answer drives the physics.</p>
+  <div class="quick">
+    <div class="q"><span class="k">Context comes from</span><span class="v">RL policy</span><span class="n">its recorded flights in MuJoCo</span></div>
+    <div class="q"><span class="k">Columns predicted</span><span class="v">1</span><span class="n">the value of one action</span></div>
+    <div class="q"><span class="k">Rows per decision</span><span class="v">12</span><span class="n">same input, only the action ID differs</span></div>
+    <div class="q"><span class="k">How often</span><span class="v">every step</span><span class="n">every 0.2 ms of simulated flight</span></div>
+  </div>
+  <div class="key">
+    <span><i style="background:var(--pol-soft);border-color:var(--pol)"></i>RL policy (the teacher)</span>
+    <span><i style="background:var(--tab-soft);border-color:var(--tab)"></i>TabPFN</span>
+    <span><i style="background:var(--sim-soft);border-color:var(--sim)"></i>Physics engine (MuJoCo)</span>
+    <span><i style="background:var(--tgt-soft);border-color:var(--tgt)"></i>The column TabPFN fills in</span>
+  </div>
+</header>
+
+<!-- 1. Where the context comes from -->
+<section class="sec">
+  <header><div class="kicker">Question 1</div><h2>Where does the table in TabPFN's context come from?</h2>
+    <p class="ans">From the trained <b>RL policy</b>. We let it fly 272 recorded flights in MuJoCo, six times with variations, and log every 0.2 ms step: what the fly sensed and what the policy did. Those logged steps are the examples TabPFN reads.</p></header>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 250" role="img" aria-label="The RL policy flies the simulator; each step's sensors and the policy's actions are logged into a table; a random sample of those rows becomes TabPFN's context.">
+      <defs>
+        <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker>
+        <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker>
+        <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#0f766e"/></marker>
+        <marker id="av" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#7c3aed"/></marker>
+        <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#ea580c"/></marker>
+      </defs>
+      <rect x="20" y="30" width="190" height="80" rx="10" fill="#d5efec" stroke="#0f766e"/>
+      <text x="115" y="62" text-anchor="middle" font-weight="600">RL policy</text>
+      <text x="115" y="84" text-anchor="middle" font-size="12" class="t2">trained network, 104 → 12</text>
+      <rect x="20" y="150" width="190" height="80" rx="10" fill="#ece4fd" stroke="#7c3aed"/>
+      <text x="115" y="182" text-anchor="middle" font-weight="600">MuJoCo fly</text>
+      <text x="115" y="204" text-anchor="middle" font-size="12" class="t2">272 flights × 6 passes</text>
+      <path d="M100,112 V148" stroke="#0f766e" stroke-width="2" marker-end="url(#ag)"/><text x="92" y="135" text-anchor="end" font-size="12" fill="#0f766e">12 actions</text>
+      <path d="M130,148 V112" stroke="#7c3aed" stroke-width="2" marker-end="url(#av)"/><text x="138" y="135" font-size="12" fill="#7c3aed">104 sensors</text>
+      <path d="M212,150 C270,150 270,110 318,110" fill="none" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/>
+      <text x="268" y="100" text-anchor="middle" font-size="12" class="t2">log every step</text>
+      <!-- recorded log -->
+      <text x="330" y="24" class="m t3" font-size="11">RECORDED LOG · 1.5 MILLION STEPS</text>
+      <g font-size="11" class="m">
+        <rect x="330" y="34" width="300" height="20" fill="#f7f8fa"/><rect x="630" y="34" width="110" height="20" fill="#d5efec"/>
+        <text x="480" y="48" text-anchor="middle" class="t2">104 sensor values</text><text x="685" y="48" text-anchor="middle" fill="#0f766e">12 policy actions</text>
+        <g fill="#fff" stroke="#e2e8f0"><rect x="330" y="56" width="410" height="18"/><rect x="330" y="76" width="410" height="18"/><rect x="330" y="96" width="410" height="18"/><rect x="330" y="116" width="410" height="18"/></g>
+        <text x="338" y="69" class="t3">step 1  ·  flight 45  ·  t = 0.0 ms</text><text x="338" y="89" class="t3">step 2  ·  t = 0.2 ms</text><text x="338" y="109" class="t3">step 3  ·  t = 0.4 ms</text><text x="535" y="129" text-anchor="middle" class="t3">⋮</text>
+      </g>
+      <path d="M742,90 C790,90 790,150 836,150" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#ab)"/>
+      <text x="790" y="186" text-anchor="middle" font-size="12" fill="#2563eb">random sample</text>
+      <rect x="840" y="110" width="140" height="80" rx="10" fill="#dbe7fd" stroke="#2563eb"/>
+      <text x="910" y="142" text-anchor="middle" font-weight="600">Context</text>
+      <text x="910" y="162" text-anchor="middle" font-size="12" class="t2">16,384 steps</text>
+      <text x="910" y="178" text-anchor="middle" font-size="12" class="t2">= 196,608 rows</text>
+    </svg>
+    </div>
+    <figcaption>The policy is the <b>teacher</b>: its actions are the answers in every example. TabPFN's job is to give the same answers for new sensor readings, by analogy with the examples. No weights are changed.</figcaption>
+  </figure>
+</section>
+
+<!-- 2. Table anatomy -->
+<section class="sec">
+  <header><div class="kicker">Question 2</div><h2>What does one context row look like, and which column is the answer?</h2>
+    <p class="ans">Each recorded step is unrolled into <b>12 rows</b>, one per action. The rows share the same 104 sensor values and differ in one column, <b>action_id</b>. The last column, <b>y</b>, holds the policy's value for that action. That is the only column TabPFN ever predicts.</p></header>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 330" role="img" aria-label="One recorded step becomes 12 rows: identical 104 sensor columns, action_id 0 to 11, and y holding that action's value from the policy.">
+      <text x="20" y="24" class="m t3" font-size="11">ONE RECORDED STEP</text>
+      <rect x="20" y="36" width="170" height="44" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="105" y="63" text-anchor="middle" font-size="13">104 sensors</text>
+      <rect x="20" y="88" width="170" height="44" rx="8" fill="#d5efec" stroke="#0f766e"/><text x="105" y="115" text-anchor="middle" font-size="13">12 policy actions</text>
+      <path d="M192,84 C240,84 240,120 270,120" fill="none" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/>
+      <text x="230" y="70" text-anchor="middle" font-size="12" class="t2">unroll</text>
+      <!-- table -->
+      <text x="280" y="24" class="m t3" font-size="11">BECOMES 12 CONTEXT ROWS</text>
+      <g font-size="11" class="m">
+        <rect x="280" y="36" width="420" height="22" fill="#f7f8fa"/><rect x="700" y="36" width="110" height="22" fill="#eef2f7"/><rect x="810" y="36" width="170" height="22" fill="#fde8d9"/>
+        <text x="490" y="51" text-anchor="middle" class="t2">accel · gyro · joints · ghost offset … (104)</text><text x="755" y="51" text-anchor="middle" class="t2">action_id</text><text x="895" y="51" text-anchor="middle" fill="#ea580c" font-weight="600">y  (target)</text>
+      </g>
+      <g id="rowsA"></g>
+      <rect x="280" y="62" width="420" height="250" fill="none" stroke="#2563eb" stroke-dasharray="5 4" rx="4"/>
+      <text x="490" y="326" text-anchor="middle" font-size="12" fill="#2563eb">identical in all 12 rows</text>
+    </svg>
+    </div>
+    <figcaption>Pooling the 12 actions into one column lets one model handle every action, and lets the actions share what they learn. The <b>action_id</b> column is categorical: it tells TabPFN which of the 12 answers a row is asking about.</figcaption>
+  </figure>
+</section>
+
+<!-- 3. Query -->
+<section class="sec">
+  <header><div class="kicker">Question 3</div><h2>At decision time: one row in, one row out, or many?</h2>
+    <p class="ans"><b>Twelve rows in, twelve numbers out.</b> We take the fly's live sensors, copy them 12 times, set action_id to 0 … 11, and leave y empty. TabPFN fills in y for every row in one call. Read top to bottom, the 12 answers are the full action vector. This is the "same input, change one column" idea, with the action ID as the column we vary.</p></header>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 330" role="img" aria-label="The live sensor reading is copied into 12 query rows that differ only in action_id; TabPFN fills the empty y column; the 12 values form the action vector.">
+      <rect x="20" y="130" width="150" height="56" rx="10" fill="#ece4fd" stroke="#7c3aed"/><text x="95" y="155" text-anchor="middle" font-weight="600">live sensors</text><text x="95" y="174" text-anchor="middle" font-size="12" class="t2">104 values, now</text>
+      <path d="M172,158 H206" stroke="#7c3aed" stroke-width="2" marker-end="url(#av)"/>
+      <text x="215" y="24" class="m t3" font-size="11">12 QUERY ROWS</text>
+      <g font-size="11" class="m">
+        <rect x="215" y="36" width="250" height="22" fill="#f7f8fa"/><rect x="465" y="36" width="80" height="22" fill="#eef2f7"/><rect x="545" y="36" width="90" height="22" fill="#fde8d9"/>
+        <text x="340" y="51" text-anchor="middle" class="t2">same 104 values</text><text x="505" y="51" text-anchor="middle" class="t2">action_id</text><text x="590" y="51" text-anchor="middle" fill="#ea580c" font-weight="600">y</text>
+      </g>
+      <g id="rowsQ"></g>
+      <path d="M638,180 H676" stroke="#2563eb" stroke-width="2" marker-end="url(#ab)"/>
+      <rect x="680" y="140" width="120" height="80" rx="10" fill="#dbe7fd" stroke="#2563eb"/><text x="740" y="172" text-anchor="middle" font-weight="600">TabPFN</text><text x="740" y="192" text-anchor="middle" font-size="12" class="t2">one call</text><text x="740" y="208" text-anchor="middle" font-size="12" class="t2">~42 ms (H100)</text>
+      <path d="M802,180 H836" stroke="#ea580c" stroke-width="2" marker-end="url(#ao)"/>
+      <text x="840" y="24" class="m t3" font-size="11">ACTION VECTOR</text>
+      <g id="vec"></g>
+    </svg>
+    </div>
+    <figcaption>TabPFN actually returns a full probability distribution for each y. We use its <b>mean</b>. It is <b>not</b> predicting several future steps: every call answers "what should the fly do right now?".</figcaption>
+  </figure>
+</section>
+
+<!-- 4. Loop -->
+<section class="sec">
+  <header><div class="kicker">Question 4</div><h2>When is TabPFN called, and does its answer drive the physics?</h2>
+    <p class="ans"><b>Yes, every control step.</b> The 12 predicted actions go straight into MuJoCo, which advances the fly by 0.2 ms (four 0.05 ms physics steps). The new sensor reading becomes the next query. One second of flight is 5,000 TabPFN calls.</p></header>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 300" role="img" aria-label="Closed loop: sensors to 12 query rows to TabPFN to 12 actions to MuJoCo, which advances 0.2 ms and produces new sensors; repeated 5,000 times per simulated second.">
+      <!-- loop boxes on a rounded rectangle path -->
+      <rect x="60" y="40" width="200" height="70" rx="12" fill="#ece4fd" stroke="#7c3aed"/><text x="160" y="70" text-anchor="middle" font-weight="600">1 · Read sensors</text><text x="160" y="90" text-anchor="middle" font-size="12" class="t2">104 values at time t</text>
+      <rect x="400" y="40" width="200" height="70" rx="12" fill="#f7f8fa" stroke="#cbd5e1"/><text x="500" y="70" text-anchor="middle" font-weight="600">2 · Build 12 rows</text><text x="500" y="90" text-anchor="middle" font-size="12" class="t2">copy × 12, action_id 0–11</text>
+      <rect x="740" y="40" width="200" height="70" rx="12" fill="#dbe7fd" stroke="#2563eb"/><text x="840" y="70" text-anchor="middle" font-weight="600">3 · TabPFN predicts y</text><text x="840" y="90" text-anchor="middle" font-size="12" class="t2">against the cached context</text>
+      <rect x="740" y="190" width="200" height="70" rx="12" fill="#fde8d9" stroke="#ea580c"/><text x="840" y="220" text-anchor="middle" font-weight="600">4 · 12 actions</text><text x="840" y="240" text-anchor="middle" font-size="12" class="t2">head · wings · abdomen · beat</text>
+      <rect x="400" y="190" width="200" height="70" rx="12" fill="#ece4fd" stroke="#7c3aed"/><text x="500" y="220" text-anchor="middle" font-weight="600">5 · MuJoCo steps</text><text x="500" y="240" text-anchor="middle" font-size="12" class="t2">4 × 0.05 ms = 0.2 ms</text>
+      <rect x="60" y="190" width="200" height="70" rx="12" fill="#fff" stroke="#cbd5e1"/><text x="160" y="220" text-anchor="middle" font-weight="600">6 · t → t + 0.2 ms</text><text x="160" y="240" text-anchor="middle" font-size="12" class="t2">fly has moved</text>
+      <path d="M262,75 H396" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/>
+      <path d="M602,75 H736" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/>
+      <path d="M840,112 V186" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/>
+      <path d="M738,225 H604" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/>
+      <path d="M398,225 H264" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/>
+      <path d="M160,188 V114" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/>
+      <text x="500" y="158" text-anchor="middle" font-size="13" font-weight="600">repeat 5,000 × per second of flight</text>
+      <text x="500" y="178" text-anchor="middle" font-size="12" class="t2">the simulator waits for each prediction</text>
+      <text x="170" y="152" font-size="11" class="m t3">next query</text>
+      <rect x="740" y="128" width="200" height="40" rx="8" fill="#fff" stroke="#2563eb" stroke-dasharray="4 3"/><text x="840" y="146" text-anchor="middle" font-size="11" class="m" fill="#2563eb">context: fitted once,</text><text x="840" y="160" text-anchor="middle" font-size="11" class="m" fill="#2563eb">never changes in flight</text>
+    </svg>
+    </div>
+    <figcaption>The context is read once before the flight and cached (TabPFN's <b>fit_with_cache</b>), so each call only processes the 12 new rows. The policy is not in this loop at all. It only provided the examples.</figcaption>
+  </figure>
+</section>
+
+<!-- 5. Inside TabPFN -->
+<section class="sec">
+  <header><div class="kicker">Question 5</div><h2>What happens inside TabPFN during one call?</h2>
+    <p class="ans">TabPFN is a transformer pre-trained on millions of synthetic tables. It treats every cell as a token, lets columns and rows attend to each other, and lets the <b>query rows attend to the context rows</b>, never the other way. The output for each query row is a distribution over y.</p></header>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 300" role="img" aria-label="Inside TabPFN: cells are embedded, attention runs across columns within each row, then across rows where query rows read the context rows, and the head outputs a distribution whose mean is the prediction.">
+      <!-- stage 1: cells -->
+      <text x="20" y="24" class="m t3" font-size="11">1 · EVERY CELL BECOMES A VECTOR</text>
+      <g id="cells"></g>
+      <!-- stage 2 -->
+      <text x="270" y="24" class="m t3" font-size="11">2 · COLUMNS TALK (within a row)</text>
+      <rect x="270" y="56" width="200" height="26" rx="4" fill="#dbe7fd"/>
+      <g fill="#2563eb"><circle cx="290" cy="69" r="5"/><circle cx="330" cy="69" r="5"/><circle cx="370" cy="69" r="5"/><circle cx="410" cy="69" r="5"/><circle cx="450" cy="69" r="5"/></g>
+      <path d="M290,62 Q370,36 450,62" fill="none" stroke="#2563eb" stroke-width="1.3"/><path d="M330,62 Q370,46 410,62" fill="none" stroke="#2563eb" stroke-width="1.3"/>
+      <text x="370" y="104" text-anchor="middle" font-size="12" class="t2">e.g. "gyro and ghost offset</text><text x="370" y="120" text-anchor="middle" font-size="12" class="t2">together mean: turn left"</text>
+      <!-- stage 3 -->
+      <text x="510" y="24" class="m t3" font-size="11">3 · QUERY ROWS READ CONTEXT ROWS</text>
+      <g id="rowattn"></g>
+      <!-- stage 4 -->
+      <text x="790" y="24" class="m t3" font-size="11">4 · DISTRIBUTION OVER y</text>
+      <g id="dist"></g>
+      <!-- flow arrows -->
+      <path d="M238,160 H262" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/>
+      <path d="M478,160 H502" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/>
+      <path d="M758,160 H782" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/>
+      <text x="500" y="290" text-anchor="middle" font-size="12" class="t2">24 layers · width 1024 · 16 heads (TabPFN 3.5). No gradient steps: the "learning" is attention over the context.</text>
+    </svg>
+    </div>
+    <figcaption>Step 3 is the in-context learning: a query row looks for context rows with similar sensor values and the same action_id, and combines their y values. Step 4 gives a full spread, so we could also read off uncertainty or quantiles.</figcaption>
+  </figure>
+</section>
+
+<!-- 6. What we predict vs what we could -->
+<section class="sec">
+  <header><div class="kicker">Question 6</div><h2>Could we vary other columns to get many possible outcomes?</h2>
+    <p class="ans">Yes, and that is a real design lever. Today we vary one column, <b>action_id</b>, to get all 12 actions. The same trick works for other columns if the target changes. Two variations we could add:</p></header>
+  <div class="two">
+    <figure>
+      <span class="tag now">Used now</span>
+      <svg viewBox="0 0 460 210" role="img" aria-label="Used now: vary action_id across 12 rows to get 12 actions.">
+        <g font-size="11" class="m">
+          <rect x="10" y="10" width="200" height="22" fill="#f7f8fa"/><rect x="210" y="10" width="90" height="22" fill="#eef2f7"/><rect x="300" y="10" width="140" height="22" fill="#fde8d9"/>
+          <text x="110" y="25" text-anchor="middle" class="t2">sensors now</text><text x="255" y="25" text-anchor="middle" class="t2">action_id</text><text x="370" y="25" text-anchor="middle" fill="#ea580c">y = action value</text>
+          <g fill="#fff" stroke="#e2e8f0"><rect x="10" y="36" width="430" height="22"/><rect x="10" y="62" width="430" height="22"/><rect x="10" y="114" width="430" height="22"/></g>
+          <text x="110" y="51" text-anchor="middle" class="t3">same</text><text x="255" y="51" text-anchor="middle" fill="#2563eb">0</text><text x="370" y="51" text-anchor="middle">?</text>
+          <text x="110" y="77" text-anchor="middle" class="t3">same</text><text x="255" y="77" text-anchor="middle" fill="#2563eb">1</text><text x="370" y="77" text-anchor="middle">?</text>
+          <text x="255" y="103" text-anchor="middle" class="t3">⋮</text>
+          <text x="110" y="129" text-anchor="middle" class="t3">same</text><text x="255" y="129" text-anchor="middle" fill="#2563eb">11</text><text x="370" y="129" text-anchor="middle">?</text>
+        </g>
+        <text x="10" y="166" font-size="13" font-weight="600">→ 12 rows give the full action vector</text>
+        <text x="10" y="186" font-size="12" class="t2">One decision, one step ahead.</text>
+      </svg>
+    </figure>
+    <figure>
+      <span class="tag could">Could add · plan ahead</span>
+      <svg viewBox="0 0 460 210" role="img" aria-label="Could add: vary a candidate action and predict the outcome, then pick the safest candidate.">
+        <g font-size="11" class="m">
+          <rect x="10" y="10" width="160" height="22" fill="#f7f8fa"/><rect x="170" y="10" width="130" height="22" fill="#eef2f7"/><rect x="300" y="10" width="140" height="22" fill="#fde8d9"/>
+          <text x="90" y="25" text-anchor="middle" class="t2">sensors now</text><text x="235" y="25" text-anchor="middle" class="t2">candidate action</text><text x="370" y="25" text-anchor="middle" fill="#ea580c">y = drift in 5 ms</text>
+          <g fill="#fff" stroke="#e2e8f0"><rect x="10" y="36" width="430" height="22"/><rect x="10" y="62" width="430" height="22"/><rect x="10" y="88" width="430" height="22"/></g>
+          <text x="90" y="51" text-anchor="middle" class="t3">same</text><text x="235" y="51" text-anchor="middle" fill="#2563eb">A</text><text x="370" y="51" text-anchor="middle">0.4 mm</text>
+          <text x="90" y="77" text-anchor="middle" class="t3">same</text><text x="235" y="77" text-anchor="middle" fill="#2563eb">B</text><text x="370" y="77" text-anchor="middle" font-weight="600" fill="#15803d">0.1 mm ✓</text>
+          <text x="90" y="103" text-anchor="middle" class="t3">same</text><text x="235" y="103" text-anchor="middle" fill="#2563eb">C</text><text x="370" y="103" text-anchor="middle">0.9 mm</text>
+        </g>
+        <text x="10" y="146" font-size="13" font-weight="600">→ pick the candidate with the best outcome</text>
+        <text x="10" y="166" font-size="12" class="t2">DuckPFN did this to choose a posture, using the</text>
+        <text x="10" y="182" font-size="12" class="t2">lower tail of the predicted distribution.</text>
+      </svg>
+    </figure>
+  </div>
+  <figure>
+    <span class="tag could">Could add · several future steps in one call</span>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 150" role="img" aria-label="Could add: vary a horizon column to predict position several steps ahead in one call.">
+      <g font-size="11" class="m">
+        <rect x="20" y="14" width="300" height="22" fill="#f7f8fa"/><rect x="320" y="14" width="140" height="22" fill="#eef2f7"/><rect x="460" y="14" width="220" height="22" fill="#fde8d9"/>
+        <text x="170" y="29" text-anchor="middle" class="t2">sensors + planned actions now</text><text x="390" y="29" text-anchor="middle" class="t2">horizon</text><text x="570" y="29" text-anchor="middle" fill="#ea580c">y = position then</text>
+        <g fill="#fff" stroke="#e2e8f0"><rect x="20" y="40" width="660" height="22"/><rect x="20" y="66" width="660" height="22"/><rect x="20" y="92" width="660" height="22"/></g>
+        <text x="170" y="55" text-anchor="middle" class="t3">same</text><text x="390" y="55" text-anchor="middle" fill="#2563eb">1 wingbeat</text><text x="570" y="55" text-anchor="middle">?</text>
+        <text x="170" y="81" text-anchor="middle" class="t3">same</text><text x="390" y="81" text-anchor="middle" fill="#2563eb">3 wingbeats</text><text x="570" y="81" text-anchor="middle">?</text>
+        <text x="170" y="107" text-anchor="middle" class="t3">same</text><text x="390" y="107" text-anchor="middle" fill="#2563eb">10 wingbeats</text><text x="570" y="107" text-anchor="middle">?</text>
+      </g>
+      <text x="710" y="60" font-size="13" font-weight="600">→ a short forecast of the path</text>
+      <text x="710" y="80" font-size="12" class="t2">Experiment A predicts these horizons today,</text>
+      <text x="710" y="96" font-size="12" class="t2">but as separate tables, one per target.</text>
+    </svg>
+    </div>
+  </figure>
+</section>
+
+<!-- 7. FAQ -->
+<section class="sec">
+  <header><div class="kicker">In short</div><h2>Your questions, one line each</h2></header>
+  <div class="faq">
+    <div class="fq"><span class="qq">Is the context from the RL policy?</span><span class="aa"><b>Yes.</b> Every y in the context is the policy's action in that recorded state.</span></div>
+    <div class="fq"><span class="qq">How many columns does TabPFN predict?</span><span class="aa"><b>One</b>, called y. Which action it means is set by the action_id column.</span></div>
+    <div class="fq"><span class="qq">One row in, one row out?</span><span class="aa"><b>Twelve in, twelve out</b>, per decision. Same sensors, action_id 0 to 11.</span></div>
+    <div class="fq"><span class="qq">Is it called at every step?</span><span class="aa"><b>Yes</b>, every 0.2 ms of simulated flight: 5,000 calls per second of flight.</span></div>
+    <div class="fq"><span class="qq">Does its output go into the physics engine?</span><span class="aa"><b>Yes, directly.</b> The 12 values are the actions MuJoCo applies for the next 0.2 ms.</span></div>
+    <div class="fq"><span class="qq">Does it predict several future steps?</span><span class="aa"><b>No</b>, one step at a time. Future positions are a separate offline experiment (A).</span></div>
+    <div class="fq"><span class="qq">Does the context change during flight?</span><span class="aa"><b>No.</b> It is fitted once and cached; only the 12 query rows are new each step.</span></div>
+    <div class="fq"><span class="qq">How big is the context?</span><span class="aa">256 steps (3k rows) on a laptop; <b>16,384 steps (197k rows)</b> on the H100, up to 1M rows tested.</span></div>
+  </div>
+</section>
+
+<footer>Code: collect/closed_loop.py (TabPFNController) · collect/showreel.py · docs/project-status.html for results</footer>
+</div>
+
+<script>
+const NS = "http://www.w3.org/2000/svg";
+function el(t, a, p) { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; }
+function tx(p, x, y, s, a = {}) { const t = el("text", { x, y, ...a }, p); t.textContent = s; return t; }
+const ACT = ["head_abduct", "head_twist", "head", "wing_yaw_L", "wing_roll_L", "wing_pitch_L", "wing_yaw_R", "wing_roll_R", "wing_pitch_R", "abdomen_abd", "abdomen", "beat_freq"];
+const VAL = [0.009, -0.804, -0.097, -0.206, -0.006, 0.021, 0.055, 0.047, -0.113, -0.081, -0.132, 0.001];
+
+(function () { // context rows
+  const g = document.getElementById("rowsA");
+  ACT.forEach((n, i) => { const y = 62 + i * 20.8;
+    el("rect", { x: 280, y, width: 700, height: 19, fill: i % 2 ? "#fff" : "#fbfcfd", stroke: "#eef2f7" }, g);
+    tx(g, 490, y + 14, "0.43  −0.17  2490  …  −0.019", { "text-anchor": "middle", class: "m t3", "font-size": 11 });
+    tx(g, 755, y + 14, i, { "text-anchor": "middle", class: "m", "font-size": 11, fill: "#2563eb" });
+    tx(g, 895, y + 14, `${VAL[i].toFixed(3)}  ${n}`, { "text-anchor": "middle", class: "m", "font-size": 11, fill: "#ea580c" }); });
+})();
+(function () { // query rows + vector
+  const g = document.getElementById("rowsQ"), v = document.getElementById("vec");
+  ACT.forEach((n, i) => { const y = 62 + i * 21;
+    el("rect", { x: 215, y, width: 420, height: 19, fill: i % 2 ? "#fff" : "#fbfcfd", stroke: "#eef2f7" }, g);
+    tx(g, 340, y + 14, "live values", { "text-anchor": "middle", class: "m t3", "font-size": 11 });
+    tx(g, 505, y + 14, i, { "text-anchor": "middle", class: "m", "font-size": 11, fill: "#2563eb" });
+    tx(g, 590, y + 14, "?", { "text-anchor": "middle", class: "m", "font-size": 12, fill: "#ea580c", "font-weight": 600 });
+    el("rect", { x: 840, y, width: 150, height: 19, rx: 3, fill: "#fde8d9" }, v);
+    tx(v, 848, y + 14, n, { class: "m", "font-size": 10.5, fill: "#9a3412" }); });
+})();
+(function () { // cells
+  const g = document.getElementById("cells");
+  for (let r = 0; r < 6; r++) for (let c = 0; c < 6; c++) {
+    const q = r >= 4, last = c === 5;
+    el("rect", { x: 20 + c * 36, y: 40 + r * 36, width: 30, height: 30, rx: 4, fill: last ? (q ? "#fff" : "#fde8d9") : (q ? "#ece4fd" : "#f7f8fa"), stroke: last ? "#ea580c" : (q ? "#7c3aed" : "#cbd5e1"), "stroke-dasharray": last && q ? "3 2" : "" }, g);
+    if (last && q) tx(g, 20 + c * 36 + 15, 40 + r * 36 + 20, "?", { "text-anchor": "middle", fill: "#ea580c", "font-weight": 600 });
+  }
+  tx(g, 20, 270, "grey: context rows", { "font-size": 11, class: "t2" }); tx(g, 20, 286, "purple: query rows", { "font-size": 11, fill: "#7c3aed" });
+})();
+(function () { // row attention
+  const g = document.getElementById("rowattn"), cx = [530, 570, 610, 650, 690, 730];
+  [0, 1, 2, 3].forEach(i => el("rect", { x: 520, y: 44 + i * 30, width: 220, height: 22, rx: 4, fill: "#f7f8fa", stroke: "#cbd5e1" }, g));
+  tx(g, 630, 186, "context rows (cached)", { "text-anchor": "middle", "font-size": 11, class: "t2" });
+  el("rect", { x: 520, y: 206, width: 220, height: 24, rx: 4, fill: "#ece4fd", stroke: "#7c3aed" }, g);
+  tx(g, 630, 222, "query row", { "text-anchor": "middle", "font-size": 11, fill: "#7c3aed" });
+  [0, 1, 2, 3].forEach(i => el("path", { d: `M630,204 L${560 + i * 50},${66 + i * 30}`, stroke: "#2563eb", "stroke-width": i === 1 ? 2.6 : 1, opacity: i === 1 ? 1 : .5, fill: "none" }, g));
+  tx(g, 630, 252, "attends to similar rows", { "text-anchor": "middle", "font-size": 11, fill: "#2563eb" });
+})();
+(function () { // distribution
+  const g = document.getElementById("dist"), h = [2, 4, 9, 16, 26, 34, 28, 18, 10, 5, 3, 1], x0 = 790, base = 210, bw = 15;
+  h.forEach((v, i) => el("rect", { x: x0 + i * (bw + 2), y: base - v * 4, width: bw, height: v * 4, rx: 2, fill: i === 5 ? "#2563eb" : "#bcd0f8" }, g));
+  el("line", { x1: x0, x2: x0 + h.length * (bw + 2), y1: base, y2: base, stroke: "#cbd5e1" }, g);
+  el("line", { x1: x0 + 5.5 * (bw + 2), x2: x0 + 5.5 * (bw + 2), y1: 60, y2: base, stroke: "#ea580c", "stroke-width": 2, "stroke-dasharray": "4 3" }, g);
+  tx(g, x0 + 5.5 * (bw + 2) + 6, 72, "mean → action", { "font-size": 12, fill: "#ea580c", "font-weight": 600 });
+  tx(g, x0, 232, "possible values of y", { "font-size": 11, class: "t2" });
+})();
+</script>

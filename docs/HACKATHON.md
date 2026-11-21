@@ -28,6 +28,17 @@ Source: the organisers' Notion page, pasted 2026-11-21. Coupon and activation co
 - **Prior Labs deck:** [`HackLab_Berlin_x_TabPFN_Prior_Labs.pdf`](HackLab_Berlin_x_TabPFN_Prior_Labs.pdf).
 - **Judging criteria:** not published on the page. Ask Prior Labs on site or in Discord. Until we hear, aim for: a working demo, a clear use of TabPFN's in-context learning (few-shot, no training loop), and a spatial or robotics story that reads quickly.
 
+### What Prior Labs' deck says (Diana Kriuchkova, Product @ Prior Labs)
+
+- Their framing: **"Robots run on tables."** Every sensor tick is a row; past steps are the context. **"Change these rows and you change the behaviour."** Possible targets: a joint action, a gesture, a fall in the next 0.5 s, a movement mode, a grasp outcome.
+- The track text stresses **calibrated predictions**. Projects they cite: the robot duck walking (duckpfn), **"snakes to roam"**, **bots playing badminton**, and **Breakout**.
+- They highlight two previous winners: sEMG (held-out users, beats SVM and LDA) and duckpfn (57k-row context, 0 gradient steps, 50 Hz).
+- **Their four lessons, effectively the rubric:**
+  1. **Mind the loop rate:** size rows and features to your control loop (local model, cached context).
+  2. **Choose the rows you show:** retrieve relevant context per query. Breakout used the 256 most similar teacher states per frame.
+  3. **Features before raw data:** summarise signals and images first (PCA beat raw pixels 0.87 m vs 0.28 m).
+  4. **Test on what you haven't seen:** hold out users, starting states or robots.
+
 ### Setup (required)
 
 1. Free account at https://platform.priorlabs.ai, then accept the model license under **Licenses**.

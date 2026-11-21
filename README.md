@@ -16,4 +16,4 @@ HackLab #2 Berlin, Prior Labs track: **TabPFN for spatial awareness**. The brief
    sh ~/potato-skills/install.sh
    ```
    Optional: the pstack skills it mentions, via `npx skills add backnotprop/pstack -g`.
-3. Open Claude Code in this folder. The coding rules are already in `CLAUDE.md` (hackathon mode) and load automatically. **Don't re-run `/potato-start`, and never with another mode**: the block is shared, and changing it changes the rules for the whole team.
+3. Open Claude Code in this folder. The coding rules are already in `CLAUDE.md` (hackathon mode) and load automatically. Running `/potato-start hackathon` again is safe and changes nothing. **Never run it with another mode**: the block is shared, so a different mode changes the rules for the whole team.

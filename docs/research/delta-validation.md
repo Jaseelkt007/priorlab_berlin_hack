@@ -22,3 +22,35 @@
    - After `mj_step`, `site_xpos` describes the pre-integration state, so tracking error must be measured against ref(t), not ref(t + dt). The wrong comparison measured v·dt ≈ 2.75 mm of fake error.
 
 Torques use the prior inertias (Gnad et al. scaled) and are not yet calibrated. Next: motion planner, cycle-time calibration (V5), held-out check (V6), base loads (V7).
+
+## Part 2: motion planning, calibration to ABB cycle times, base loads (2026-11-21), 10 passed + 1 known gap
+
+**Planner** (`sim/delta_motion.py`). The path is a quintic B-spline over the up–across–down polygon, curvature-continuous and leaving and arriving vertically (Gnad et al.'s B-spline U-turn). Time scaling is TOPP-RA (time-optimal under linear constraints, as ABB documents for QuickMove), under these limits:
+- |TCP speed| ≤ 10 m/s and arm speed |θ̇| ≤ θ̇_max;
+- |TCP acceleration| ≤ 150 m/s², as a 400-normal inner polytope of the ball (99 % tight);
+- motor torque (lumped ⅔/⅓ model plus the identified friction) ≤ 0.9 τ_max;
+- **dynamic base force ≤ ABB's foundation loads** (Fx 330, Fy 260, Fz 170 N), from a lumped momentum model.
+
+Jerk is limited with Biagiotti & Melchiorri's FIR filter (length 2a/j). Each limit is re-checked on the filtered profile and backed off by its own factor until all hold.
+
+**Calibration** (`scripts/calibrate_delta.py`, results in `delta-calibration.json`):
+
+| Cycle | Ours | ABB PS §1.7.1 | Error | Role |
+|---|---|---|---|---|
+| 25/305/25 @ 1.0 kg | 353.0 ms | 353 ms | 0.0 % | fit: τ_max = **123.9 N·m** |
+| 90/400/90 @ 0.1 kg | 444.0 ms | 444 ms | 0.0 % | fit: θ̇_max = **622 °/s** (prior 1088) |
+| **90/400/90 @ 1.0 kg** | 487.7 ms | 500 ms | **−2.5 %** | **held out, passes ±5 %** |
+| 25/305/25 @ 0.1 kg | 320.0 ms | 300 ms | +6.7 % | unfitted check, **known gap** (strict xfail) |
+
+| V7 base loads, full closed chain, 1 kg | Fx | Fy | dyn Fz | Mz | TCP tracking |
+|---|---|---|---|---|---|
+| 25/305/25 | 231 N | 0 | 171 N | 0 | 0.049 mm |
+| 90/400/90 | 213 N | 0 | 169 N | 0 | 0.036 mm |
+| ABB limit | 330 N | 260 N | 170 N | 100 N·m | AT 0.51 mm |
+
+**How we got there, and why the plan changed (model-delta.md §5.5).**
+1. **The planned fit (j_max on 25/305/25 @ 0.1 kg) is impossible.** Jerk and corner rounding saturate: with a full-arch path and j ≥ 1.6e5, the cycle is still 309–312 ms. They are set non-binding (r_c = full arch, j = 1.6e5) and reported, not fitted.
+2. **Without base-load limits the robot is unrealistically violent.** The first fit produced 314–322 N of dynamic Fz, against ABB's 170 N. QuickMove limits "torque or force in critical structural parts" (Björkman et al. 2008), and ABB publishes the foundation loads, so the planner enforces them. With them, the held-out cycle moved from −7 % to −3 %.
+3. **The 90-to-25 cycle ratio (ABB 1.48) identifies the speed limit.** Our ratio stayed at 1.29–1.34 under every acceleration interpretation (norm or per axis), zone, jerk and moving-mass scale (×1–2.5). Only a speed-type limit makes the long, speed-dominated cycle relatively slower. The arm-speed limit is unpublished for the 1130, so it is fitted on one point (622 °/s). Torque is fitted on another. The held-out point then lands at −2.5 %.
+4. **Known gap:** 25/305/25 at 0.1 kg is 6.7 % slow. With every calibratable limit non-binding the floor is 309 ms (+3 %), so the residual is ABB's unpublished PickMaster path geometry or dwell timing (activation can overlap the approach), not the dynamics. Effect on our use: at light, short picks our cycle time is a few percent pessimistic. The accelerations the suction cup sees (the 150 m/s² cap, the jerk) are the same.
+5. **Lumped vs exact.** Base loads planned with the lumped model are within 1 % on the full chain (171 vs 170 N). V7 allows 2 % for that.

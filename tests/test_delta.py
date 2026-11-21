@@ -132,3 +132,48 @@ def test_v4_feedforward_quality():
     T, e_tcp, viol, tilt, tau_pk, fb_pk = run_move(DeltaParams(m_tool=0.1), exact_ff=True)
     print(f"V4 exact closed-chain feedforward: feedback {fb_pk:.2f} N·m = {fb_pk / tau_pk * 100:.1f} % of peak {tau_pk:.1f}; TCP {e_tcp * 1e3:.3f} mm")
     assert fb_pk / tau_pk < 0.05
+
+
+# ---------------- V5–V7: ABB cycle times and base loads (calibrated: τ_max, θ̇_max; scripts/calibrate_delta.py)
+from sim.delta_motion import ABB_CYCLES, MoveSpec, base_loads, cycle_time  # noqa: E402
+
+import pytest  # noqa: E402
+
+
+def _cycle(cyc, kg):
+    t, _ = cycle_time(DeltaParams(m_tool=kg), cyc, MoveSpec())
+    ref_t = ABB_CYCLES[(cyc, kg)]
+    print(f"\n{cyc} @ {kg} kg: {t * 1e3:.1f} ms vs ABB {ref_t * 1e3:.0f} ms ({(t / ref_t - 1) * 100:+.1f} %)")
+    return t, ref_t
+
+
+@pytest.mark.parametrize("cyc,kg", [("90/400/90", 0.1), ("25/305/25", 1.0)])
+def test_v5_fitted_cycles_reproduced(cyc, kg):
+    """The two calibration points: arm speed limit on 90/400/90 @ 0.1 kg, torque limit on 25/305/25 @ 1 kg."""
+    t, ref_t = _cycle(cyc, kg)
+    assert abs(t / ref_t - 1) < 0.01
+
+
+def test_v6_heldout_cycle():
+    """Held out (not used in any fit): 90/400/90 @ 1 kg, ±5 % (ABB rounds ppm to 5 and calls figures approximate)."""
+    t, ref_t = _cycle("90/400/90", 1.0)
+    assert abs(t / ref_t - 1) < 0.05
+
+
+@pytest.mark.xfail(strict=True, reason="Known gap: the short 25 mm-lift cycle at 0.1 kg is ~7 % slow. Even with every "
+                   "calibratable limit non-binding, our path needs ≥ 309 ms (+3 %); the residual is ABB's unpublished "
+                   "PickMaster path shape / dwell timing (docs/research/delta-validation.md).")
+def test_v6_unfitted_short_cycle_light():
+    t, ref_t = _cycle("25/305/25", 0.1)
+    assert abs(t / ref_t - 1) < 0.05
+
+
+@pytest.mark.parametrize("cyc", ["25/305/25", "90/400/90"])
+def test_v7_base_loads_full_chain(cyc):
+    """Full closed chain, 1 kg, exact feedforward: base loads vs ABB PS §1.3.3. The planner enforces the limits with the
+    lumped momentum model; the full chain may exceed them by the lumped model's error, bounded here at 2 %."""
+    bl = base_loads(DeltaParams(m_tool=1.0), cyc, MoveSpec())
+    print(f"\nV7 {cyc} @ 1 kg: Fx {bl['Fx']:.0f}/330 N, Fy {bl['Fy']:.0f}/260 N, dyn Fz {bl['Fz_dyn']:.0f}/170 N, Mz {bl['Mz']:.1f}/100 N·m; "
+          f"TCP tracking {bl['tcp_err_mm']:.3f} mm, peak τ {bl['tau_peak']:.1f} N·m")
+    assert bl["Fx"] <= 330 * 1.02 and bl["Fy"] <= 260 * 1.02 and bl["Fz_dyn"] <= 170 * 1.02 and bl["Mz"] <= 100
+    assert bl["tcp_err_mm"] < 0.51

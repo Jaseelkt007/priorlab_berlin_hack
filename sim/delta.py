@@ -42,7 +42,7 @@ class DeltaParams:
     fric_coulomb: float = 4.7  # N·m at the gearbox output (Gnad et al.); smooth law F_c·tanh(θ̇/v_s), applied by plant_friction()
     fric_vs: float = 0.01      # rad/s, smoothing velocity of the Coulomb term
     fric_viscous: float = 1.6  # N·m·s/rad
-    tau_max: float = 200.0    # N·m at the gearbox output: NOT published, calibrated (V5)
+    tau_max: float = 123.9    # N·m at the gearbox output: not published; calibrated on ABB 25/305/25 @ 1 kg (V5)
     r_elbow: float = 0.5      # strut mass share lumped at the elbow in Model B
     r_plat: float | None = None  # strut mass share lumped at the platform (default 1 − r_elbow). Chosen by test V4.
     # numerics
@@ -234,6 +234,25 @@ def plant_friction(m: mujoco.MjModel, d: mujoco.MjData, P: DeltaParams, arm_dof:
     """Gearbox Coulomb friction of the identified law (Gnad et al.: Coulomb + viscous), applied to the plant's
     motor joints. Viscous friction is the joints' `damping` (integrated implicitly). Call before every mj_step."""
     d.qfrc_applied[arm_dof] = -P.fric_coulomb * np.tanh(d.qvel[arm_dof] / P.fric_vs)
+
+
+def base_force_lumped(pw, vw, aw, P: DeltaParams, h: float = 1e-6) -> np.ndarray:
+    """Dynamic base force Σ m_i a_i (weight excluded) of the lumped model: arms (CoM on the arm), elbow masses
+    (r_elbow of the struts), platform + tool + the rest of the struts. Point accelerations on each arm come from
+    r(θ): a = r'(θ) θ̈ + r''(θ) θ̇²."""
+    th, thd, thdd = joint_state(pw, vw, aw, P)
+    r_plat = (1 - P.r_elbow) if P.r_plat is None else P.r_plat
+    F = (P.m_plat + P.m_tool + 6 * P.m_strut * r_plat) * np.asarray(aw, float)
+    m_el = 2 * P.m_strut * P.r_elbow
+    for i, ph in enumerate(PHI):
+        def pts(t):
+            Pm, E = arm_points(t, ph, P)
+            return Pm + P.c_arm / P.L * (E - Pm), E
+        (c0, e0), (cp, ep), (cm, em) = pts(th[i]), pts(th[i] + h), pts(th[i] - h)
+        for m_i, r0, rp, rm in ((P.m_arm, c0, cp, cm), (m_el, e0, ep, em)):
+            d1, d2 = (rp - rm) / (2 * h), (rp - 2 * r0 + rm) / h ** 2
+            F = F + m_i * (d1 * thdd[i] + d2 * thd[i] ** 2)
+    return F
 
 
 class Feedforward:

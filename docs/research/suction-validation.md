@@ -42,3 +42,30 @@ This is not computed from our formula, so the near-miss signal comes from the si
 | V3 vs research calculation (§3.4 table) | within 0.4 kPa for 0–40 µm gaps | cross-check only |
 | V4 effective area | Schmalz SPB1 forces correspond to d2 (0.99–1.07×) | Schmalz datasheet |
 | V4 vacuum-dependent area | Piab B25XP 9.7 / 19.0 / 22.0 N at 20 / 60 / 90 kPa reproduced | Piab datasheet |
+
+## Gate 2: compliant cup mechanics (2026-11-21), `sim/cup.py`, `tests/test_cup.py`, 10 of 10 passed
+
+Cup: Schmalz SPB1 20 class. 16 lip segments on spring slide joints (Dex-Net ring); vacuum force F = Δp·A_eff applied with `mj_applyFT` normal to the sealed face; pneumatics from gate 1. dt = 0.2 ms.
+
+| Test | Result | Reference | Tolerance |
+|---|---|---|---|
+| V5 lift, m = 0.2 / 0.5 kg | +1.5 % / +2.9 % | a* = F/m − g | ±4 % |
+| V6 shear, μ = 0.3 / 0.6, 1 mm slip | +4.4 % / +0.5 % | a* = μ(F − m·g)/m | ±5 % |
+| V7 torsion | +3.7 % | τ = r·μ·f_N | ±5 % |
+| V8 peel onset, lip springs, k_ring 4000 / 12000 N/m | +0.3 % / −0.1 % | M = r·f_N/2 (Dex-Net) | ±5 % |
+| V9 peel ultimate, pressure frozen | +0.5 % | M = r·f_N (rigid ring) | ±10 % |
+| V9b peel with pneumatics | lift-off 81.0, **dip onset 81.8**, failure 86.4 N·mm | failure in [55.7, 111.4]; dip at lift-off | ±5 % |
+| V13 convergence (dt/2, 2× sub-steps) | seal and failure unchanged | | < 2 % |
+
+### What it took (each fix is physics or MuJoCo semantics, not tuning)
+
+- **MuJoCo 4 `gap` semantics.** Contacts are detected up to margin + gap, and force acts only below margin. So the lip pairs use margin 0 and gap 3 mm. The research document described the old semantics.
+- **Vacuum force normal to the sealed face.** Pressure acts perpendicular to the surface. Applying it along the cup axis left a sideways force once the product tilted (≈ 9 % of the friction capacity). This was the cause of the early shear failure.
+- **`noslip_iterations = 10`** removes MuJoCo's soft-constraint creep inside the friction cone (8° of creep under torsion before the fix).
+- **Stiff lip end stops** (`solreflimit` 0.5 ms), so a lip cannot stretch past its free length.
+- **Failure criteria for a compliant cup:** detachment means every lip segment has lost contact. Elastic movement of up to about 2 mm is not failure.
+
+### Open items (not hidden; they go into calibration, test V15)
+
+- **Lateral lip compliance is not modelled.** The lips slide only along the cup axis. With a soft ring (4000 N/m) the product tilts about 11° before lift-off, and friction at the laterally rigid lips then carries extra moment. The external peel moment is +29 % above the linear-ring value (frozen pressure) and about +45 % with the pressure model on. With a stiffer ring (12000 N/m, 4° tilt) this drops to +0.6 %. Real bellows cups are compliant sideways, so the bellows tilt joints (spec §4.1) or lateral lip compliance should be added, and the ring stiffness calibrated.
+- **Speed.** With the pneumatics on, the Python sub-stepped ODE runs about 10× slower than real time (about 3 s wall per 0.3 s simulated). This must be optimised before bulk log generation (a vectorised or compiled ODE).

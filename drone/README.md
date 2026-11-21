@@ -38,7 +38,7 @@ We compare it with what real radar trackers use: an **IMM**, three Kalman-type f
 | Data: 2,000 X2 flights, 300 Crazyflie flights | done |
 | Tables | done |
 | IMM tracker (what real radars use) | done: tuned on X2, tested on Crazyflie |
-| TabPFN | code ready (`tabpfn_model.py`); runs once `TABPFN_TOKEN` is in `.env` |
+| TabPFN | done (run on an H100; 1 minute) |
 | TabPFN fine-tuned | if the GPU allows |
 | 3D demo: real vs predicted x, y, z + alarm, live or as video | done for the IMM; TabPFN next |
 
@@ -49,10 +49,10 @@ Small-drone test flights. Error = how far the prediction for 1 s ahead is from w
 | Model | Error 1 s ahead | Alarm: breaches caught |
 |---|---|---|
 | IMM (what real radars use) | 1.54 m | 99% |
-| TabPFN A (learned from X2 only) | *needs token* | |
-| TabPFN B (X2 + a few Crazyflie flights) | *needs token* | |
+| TabPFN A (examples from X2 only) | 1.70 m | 95% |
+| **TabPFN B (X2 + 1,000 rows from 50 other Crazyflie flights)** | **1.37 m** | 98% |
 
-The IMM is a strong opponent: its 90% range is honest (89%), and its 2 s alarm catches 99% of breaches at 1 false alarm per 20 safe moments. `python drone/compare.py` scores every model on the same test rows.
+**TabPFN B is 11% more accurate than the IMM, with no training and no tuning**: only examples in its context. Without any Crazyflie examples (A) it is 10% worse. Full analysis, charts and caveats: [`../results/README.md`](../results/README.md). `python drone/compare.py` scores every model on the same test rows.
 
 ## Try it
 
@@ -90,6 +90,7 @@ python drone/compare.py                              # the results table
 | `imm.py` | the IMM tracker (the baseline to beat) |
 | `tabpfn_model.py` | TabPFN: predicts positions with a range, and the alarm |
 | `compare.py` | scores IMM and TabPFN on the same test rows |
-| `demo_imm.py` | the 3D demo: real vs predicted position, alarm, video recording |
+| `demo_imm.py` | the 3D demo: real vs predicted position (IMM, and TabPFN with `--tabpfn`), alarm, video recording |
+| `report.py` | builds `results/`: tables, analysis, charts |
 | `view_drones.py` | keyboard flying |
 | `EXPERIMENTS.md` | full detail, results by manoeuvre, everything we tried |

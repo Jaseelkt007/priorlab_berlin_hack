@@ -86,8 +86,10 @@ We predict **one thing: where the drone will be 1 s from now (x, y, z)**, plus t
 | Model | Error 1 s ahead (median) | Truth inside its 90% range | Alarm AUC | Breaches caught (1 false alarm per 20) |
 |---|---|---|---|---|
 | IMM (tuned on X2 flights) | **1.54 m** | 89% | 0.989 | 99% |
-| TabPFN A (learned from X2 only) | *needs token* | | | |
-| TabPFN B (X2 + rows from 50 other Crazyflie flights) | *needs token* | | | |
+| TabPFN A (learned from X2 only) | 1.70 m | 93% | 0.989 | 95% |
+| TabPFN B (X2 + rows from 50 other Crazyflie flights) | **1.37 m** | 93% | 0.993 | 98% |
+
+Scored on all 112,501 test moments (every radar reading with a known future). Full analysis: `results/README.md`.
 
 **Error** = distance between the predicted and the real position. **Range:** how often the real position is inside the 5%-95% range, per direction (should be 90%): the IMM's range is honest.
 
@@ -176,6 +178,12 @@ Each experiment in four lines: what happened, why, what we changed, and the resu
 - **What happened:** flying the drone live inside the viewer gave a slightly different flight from the recorded one: the viewer touches the force we use for wind. The predictions then did not line up.
 - **Changed:** the flight is computed first, exactly as in the dataset, then played back. Checked: all 216 radar readings of flight 54 match the recording.
 - **Result:** flight 54 (an attack): the IMM is about 1.5-2 m off 1 s ahead (1.68 m median) and the alarm comes on 2.4 s before the breach.
+
+### 11. TabPFN against the IMM
+- **What:** TabPFN v3.5 (package 10.2.0), no training. Context: 4,000 random X2 rows (A), plus 1,000 rows from 50 Crazyflie flights that are never tested on (B). One regressor per movement (forward, left, up) with 5/50/95% quantiles, one classifier for the alarm.
+- **What happened:** on the laptop GPU (GTX 1650, 4 GB) it ran out of memory and took 3.5 min per model for a tenth of the data. Moved to an H100: the full run takes about 1 minute.
+- **Result:** A 1.70 m (10% worse than the IMM), **B 1.37 m (11% better)**; B is closer than the IMM at 62% of moments, better on straight, zigzag, orbit, hover and dash, slightly worse on dive and climb. Its 90% range holds the truth 93% of the time. Alarm: about a tie.
+- **Not yet fair in one respect:** B saw Crazyflie data, the IMM was tuned only on X2. Next check: re-tune the IMM on the same 50 Crazyflie flights.
 
 ## 5. Known limits
 

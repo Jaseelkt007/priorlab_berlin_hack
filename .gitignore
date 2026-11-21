@@ -4,3 +4,10 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 *:Zone.Identifier
+
+# Hackathon: external code and downloaded data stay local (large, separately licensed)
+third_party/
+data/
+*.mp4
+drone/models/mujoco_menagerie/
+MUJOCO_LOG.TXT

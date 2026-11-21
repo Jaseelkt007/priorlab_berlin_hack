@@ -244,8 +244,11 @@ def main():
     with mujoco.viewer.launch_passive(flight.model, flight.data, show_left_ui=False, show_right_ui=False) as viewer:
         set_camera(viewer.cam, args.view, flight)
         times = np.array([f[0] for f in frames])
-        start, k_drawn = time.time(), -1
+        start, k_drawn, replay = time.time(), -1, 1
         while viewer.is_running():
+            if (time.time() - start) * args.speed > times[-1] + 2.0:  # loop: restart 2 s after the end
+                start, k_drawn, errors, replay = time.time(), -1, [], replay + 1
+                print(f"replay {replay}", flush=True)
             # pick the frame by the clock, so a slow window skips frames instead of falling behind
             i = min(int(np.searchsorted(times, (time.time() - start) * args.speed)), len(frames) - 1)
             t, qpos, k = frames[i]
@@ -254,16 +257,19 @@ def main():
                 mujoco.mj_forward(flight.model, flight.data)
                 if args.view == "radar":
                     set_camera(viewer.cam, "radar", flight)
+                texts = None
                 if k != k_drawn and k < n:
                     k_drawn = k
                     texts = draw(viewer.user_scn, k, log, meas, pred, errors)
-                    viewer.set_texts([(mujoco.mjtFontScale.mjFONTSCALE_150, mujoco.mjtGridPos.mjGRID_TOPLEFT,
-                                       "\n".join(texts), None),
-                                      (None, mujoco.mjtGridPos.mjGRID_BOTTOMLEFT, legend, None)])
+                    texts[0] += f"   (replay {replay}, loops until you close the window)"
+            if texts:  # set_texts outside the lock: inside it, it waits for the lock forever (deadlock)
+                viewer.set_texts([(mujoco.mjtFontScale.mjFONTSCALE_150, mujoco.mjtGridPos.mjGRID_TOPLEFT,
+                                   "\n".join(texts), None),
+                                  (None, mujoco.mjtGridPos.mjGRID_BOTTOMLEFT, legend, None)])
             viewer.sync()
             if i == len(frames) - 1 and errors:
                 print(f"{flight.outcome} at {t:.1f} s; IMM 1 s ahead was off by {np.median(errors):.2f} m "
-                      f"(median over this flight). Close the window.")
+                      f"(median over this flight); replaying in 2 s.", flush=True)
                 errors = []
             time.sleep(FRAME / 2)
 

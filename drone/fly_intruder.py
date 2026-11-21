@@ -95,7 +95,8 @@ def main():
 
     root = tk.Tk()
     root.title("Intruder controls")
-    root.geometry("+40+40")
+    root.geometry("+20+20")
+    root.attributes("-topmost", True)  # stays above the 3D window, where key presses would be lost
     tk.Label(root, text=HELP, justify="left", font=("monospace", 11)).pack(padx=12, pady=8)
     status = tk.Label(root, justify="left", font=("monospace", 11, "bold"), fg="#1f5fa8")
     status.pack(padx=12, pady=(0, 10), anchor="w")
@@ -109,6 +110,7 @@ def main():
             start[0] = time.time()
 
     keyboard = Keyboard(root, on_key)
+    root.after(500, root.focus_force)  # take the keyboard once the window is up
     start = [time.time()]
 
     def tick():
@@ -135,6 +137,8 @@ def main():
             if new_k is not None:
                 log = {k: np.asarray(v) for k, v in ses.log.items()}
                 texts = draw(viewer.user_scn, new_k, log, ses.meas, ses.pred, ses.errors)
+                held = " ".join(sorted(keyboard.held)) or "none (click the 'Intruder controls' window)"
+                texts.insert(0, f"keys: {held}")
                 if ses.breach_time is not None:
                     texts.append(f"YOU BREACHED THE ZONE at {ses.breach_time:.1f} s (R to restart)")
                 viewer.set_texts([(mujoco.mjtFontScale.mjFONTSCALE_150, mujoco.mjtGridPos.mjGRID_TOPLEFT,

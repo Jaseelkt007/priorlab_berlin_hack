@@ -4,10 +4,15 @@ Shared by the keyboard viewer (view_drones.py) and the intruder dataset (intrude
 Setup: drone/models/README.md.
 """
 
+import os
 import warnings
 from pathlib import Path
 
-import mujoco
+# WSL on laptops with two GPUs: OpenGL otherwise draws on the built-in GPU, where the viewer window is slow
+# and crashes (X error BadDrawable). This picks the NVIDIA GPU; it only affects WSL's D3D12 graphics driver.
+os.environ.setdefault("MESA_D3D12_DEFAULT_ADAPTER_NAME", "NVIDIA")
+
+import mujoco  # noqa: E402
 
 from flight import FlightController
 

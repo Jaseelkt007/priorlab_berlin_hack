@@ -37,6 +37,8 @@ GAINS = {
     "cf2": Gains(max_speed=0.5, max_climb=0.5, max_yaw_rate=0.3, max_tilt=np.radians(8), pos_w=0.8, att_w=5.0),
     # The X2 as a fast intruder (the "x2" entry is kept gentle for keyboard flying).
     "x2_intruder": Gains(max_speed=10.0, max_climb=4.0, max_yaw_rate=1.5, max_tilt=np.radians(35), pos_w=2.0, att_w=10.0),
+    # The Crazyflie as an intruder: above ~12 deg tilt its weak moment motors cannot catch it and it flips.
+    "cf2_intruder": Gains(max_speed=3.0, max_climb=2.0, max_yaw_rate=0.3, max_tilt=np.radians(12), pos_w=0.8, att_w=5.0),
 }
 
 

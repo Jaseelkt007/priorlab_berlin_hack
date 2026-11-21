@@ -1,7 +1,9 @@
 """Random intruder flights toward the protected zone, recorded like a radar would see them.
 
-    python drone/intruder.py --view 7               # watch flight number 7 live in the viewer
-    python drone/intruder.py --flights 2000         # make the dataset -> data/intruder_x2.npz
+    python drone/intruder.py --view 7                          # watch X2 flight 7 live in the viewer
+    python drone/intruder.py --flights 2000                    # X2 training set -> data/intruder_x2.npz
+    python drone/intruder.py --drone cf2 --view 7              # watch a Crazyflie intruder
+    python drone/intruder.py --drone cf2 --flights 300         # Crazyflie test set -> data/intruder_cf2.npz
 
 Every flight is a different random intruder (the "policy"):
 - an intent: attack (heads into the zone), flyby (passes near it) or loiter (circles around it),
@@ -23,8 +25,10 @@ import numpy as np
 from flight import GAINS
 from sim import ARENA_RADIUS, ZONE_HEIGHT, ZONE_RADIUS, build, controllers
 
-DRONE = "x2"
-TIMESTEP = 0.005  # s, physics; the X2 alone is stable at this step
+# drone -> (physics timestep in s, controller gains, first seed). The Crazyflie needs the small step.
+# Crazyflie seeds start at 100000 so its test flights never reuse an X2 training flight's random plan.
+SETUP = {"x2": (0.005, "x2_intruder", 0), "cf2": (0.002, "cf2_intruder", 100_000)}
+X2_MASS = 1.325  # kg; wind is scaled by drone mass so every drone gets the same push per kg
 POLICY_EVERY = 0.02  # s, the intruder decides 50 times a second
 RADAR_EVERY = 0.1  # s, 10 Hz radar
 MAX_TIME = 60.0  # s
@@ -119,14 +123,17 @@ class IntruderPolicy:
 
 
 class Wind:
-    """Steady push plus gusts (an Ornstein-Uhlenbeck process), as a horizontal force in newtons."""
+    """Steady push plus gusts (an Ornstein-Uhlenbeck process), as a horizontal force in newtons.
 
-    def __init__(self, rng):
+    Sized for the X2 (up to 1.5 N steady); `scale` shrinks it for lighter drones.
+    """
+
+    def __init__(self, rng, scale=1.0):
         self.rng = rng
         angle = rng.uniform(0, 2 * np.pi)
-        self.mean = rng.uniform(0, 1.5) * np.array([np.cos(angle), np.sin(angle)])
+        self.mean = scale * rng.uniform(0, 1.5) * np.array([np.cos(angle), np.sin(angle)])
         self.gust = np.zeros(2)
-        self.sigma, self.tau = rng.uniform(0.2, 1.0), 2.0
+        self.sigma, self.tau = scale * rng.uniform(0.2, 1.0), 2.0
 
     def step(self, dt):
         self.gust += -self.gust / self.tau * dt + self.sigma * np.sqrt(2 * dt / self.tau) * self.rng.normal(size=2)
@@ -147,13 +154,14 @@ def outcome_of(pos):
 class Flight:
     """One intruder flight in its own MuJoCo world. Step it, read its state; `record` keeps the radar log."""
 
-    def __init__(self, seed, model=None):
+    def __init__(self, seed, drone="x2"):
+        timestep, gains, _ = SETUP[drone]
         self.rng = np.random.default_rng(seed)
-        self.model = model or build([DRONE], zone=True, timestep=TIMESTEP)
+        self.model = build([drone], zone=True, timestep=timestep)
         self.data = mujoco.MjData(self.model)
-        self.pilot = controllers(self.model, [DRONE], GAINS["x2_intruder"])[DRONE]
+        self.pilot = controllers(self.model, [drone], GAINS[gains])[drone]
         self.policy = IntruderPolicy(self.rng, self.pilot.g.max_speed)
-        self.wind = Wind(self.rng)
+        self.wind = Wind(self.rng, self.pilot.mass / X2_MASS)
 
         start = self.policy.start
         q, v = self.pilot.qpos, self.pilot.dof
@@ -202,8 +210,8 @@ class Flight:
         return self.outcome is None
 
 
-def simulate(seed):
-    flight = Flight(seed)
+def simulate(seed, drone):
+    flight = Flight(seed, drone)
     while flight.step():
         pass
     log = {k: np.asarray(v) for k, v in flight.log.items()}
@@ -212,10 +220,11 @@ def simulate(seed):
     return log, info
 
 
-def make_dataset(n, out, workers):
+def make_dataset(n, drone, out, workers):
     t0 = time.time()
+    first = SETUP[drone][2]
     with Pool(workers) as pool:
-        results = pool.map(simulate, range(n), chunksize=8)
+        results = pool.starmap(simulate, [(first + i, drone) for i in range(n)], chunksize=4)
     arrays = {k: [] for k in ["t", "true", "vel", "meas", "behaviour", "wind"]}
     flight_ids = []
     for (log, info) in results:
@@ -231,6 +240,7 @@ def make_dataset(n, out, workers):
         flight_seed=info[:, 0].astype(int), flight_intent=info[:, 1].astype(int),
         flight_outcome=info[:, 2].astype(int), flight_aggression=info[:, 3], flight_wind=info[:, 4],
         behaviours=np.array(BEHAVIOURS), intents=np.array(INTENTS), outcomes=np.array(OUTCOMES),
+        drone=np.array(drone),
     )
     outcomes = np.bincount(info[:, 2].astype(int), minlength=len(OUTCOMES))
     rows = sum(len(r[0]["t"]) for r in results)
@@ -240,16 +250,18 @@ def make_dataset(n, out, workers):
     print(f"radar dropouts: {np.isnan(meas[:, 0]).mean():.1%}")
 
 
-def view(seed):
+def view(index, drone):
+    """Watch flight number `index` of this drone's dataset (same seed, so the same flight)."""
     import mujoco.viewer
 
-    flight = Flight(seed)
+    seed = SETUP[drone][2] + index
+    flight = Flight(seed, drone)
     p = flight.policy
-    print(f"flight {seed}: intent {p.intent}, aggression {p.aggression:.2f}, wind {np.linalg.norm(flight.wind.mean):.1f} N")
+    print(f"{drone} flight {index} (seed {seed}): intent {p.intent}, aggression {p.aggression:.2f}, wind {np.linalg.norm(flight.wind.mean):.1f} N")
     with mujoco.viewer.launch_passive(flight.model, flight.data) as viewer:
         viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
         viewer.cam.trackbodyid = flight.pilot.body
-        viewer.cam.distance, viewer.cam.elevation = 25.0, -25
+        viewer.cam.distance, viewer.cam.elevation = (25.0 if drone == "x2" else 4.0), -25
         start = time.time()
         last = None
         while viewer.is_running():
@@ -268,15 +280,17 @@ def view(seed):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--view", type=int, metavar="SEED", help="watch one flight live")
+    parser.add_argument("--drone", choices=list(SETUP), default="x2")
+    parser.add_argument("--view", type=int, metavar="N", help="watch flight N of the dataset live")
     parser.add_argument("--flights", type=int, default=2000)
-    parser.add_argument("--out", type=Path, default=Path(__file__).resolve().parent.parent / "data" / "intruder_x2.npz")
+    parser.add_argument("--out", type=Path, help="default: data/intruder_<drone>.npz")
     parser.add_argument("--workers", type=int, default=4)
     args = parser.parse_args()
     if args.view is not None:
-        view(args.view)
+        view(args.view, args.drone)
     else:
-        make_dataset(args.flights, args.out, args.workers)
+        out = args.out or Path(__file__).resolve().parent.parent / "data" / f"intruder_{args.drone}.npz"
+        make_dataset(args.flights, args.drone, out, args.workers)
 
 
 if __name__ == "__main__":

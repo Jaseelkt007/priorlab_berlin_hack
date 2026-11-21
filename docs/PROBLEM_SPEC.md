@@ -62,7 +62,7 @@ The hidden part is why a fixed rule or a policy trained on assumed values fails,
 | 6 | `packaging` | category | item master data (cardboard / glossy / polybag) | maps to a μ range |
 | 7 | `lifts_since_pad_change` | count | cell counter | drives the pad-wear model |
 | 8 | `max_grip_N` | N | item master data (fragility) | sampled per item |
-| 9 | `alpha` | 0.1–1.0 | **action**: acceleration and velocity scaling | trajectory generator |
+| 9 | `alpha` | 0.1–0.8 | **action**: scales velocity, acceleration and jerk limits | ruckig trajectory generator (α = 0.8 already reaches the 13 m/s² Cartesian limit) |
 | 10 | `grip_N` | 20–70 | **action**: grasp force | gripper actuator force limit |
 
 **Optional physics hint (ablation):** `load_ratio = est_mass · (9.81 + alpha · 13) / (2 · grip_N)`. The friction coefficient is unknown, so this is a hint, not the answer. Test with and without.
@@ -130,3 +130,20 @@ TabPFN-3.5 limits (1M rows, thousands of features) are far above all of these.
 - **Contacts:** finger pads with `condim="4"` or `"6"` (torsional friction; with condim 3 the item pivots freely). Tune `solref`/`solimp`; consider `noslip_iterations`.
 - **Biggest risk: soft-contact creep.** MuJoCo can show slow slip even under a grip that should hold. **First spike (≤ 2 h):** a box held still must not creep, and it must start slipping close to m·(g + a) = 2μF. If that fails, fall back to the pushing scenario, which needs only sliding friction.
 - **Measurements:** box pose in the hand frame each step (slip, tilt); finger–box contacts (drop); F/T sensor at the hand site (test-lift wrench, plus noise to mimic the real estimate).
+
+## 10. Validated in simulation (2026-11-21)
+
+Scripts: `scripts/spike_track.py`, `scripts/spike_grip.py`, `scripts/spike_dynamic.py`.
+
+- **Arm tracking:**
+  - α 0.3–0.8: max joint error ≤ 1°, no torque saturation; peak TCP acceleration 5.2 / 10.8 / 12.7 m/s² at α 0.3 / 0.7 / 0.8.
+  - α ≥ 0.9: exceeds the 13 m/s² Cartesian limit and tracking breaks down, as a real Franka would abort.
+  - **Usable action range: α ∈ [0.1, 0.8].**
+- **Static grip:** the item drops at 0.95× the theoretical critical squeeze force (m·g / 2μ) and holds at 1.05×. The measured pad normal force equals the commanded force. Creep while holding: about 0.025 mm per 2 s, negligible. No-slip post-processing is not needed.
+- **Dynamic grip** (1 kg item, μ 0.5, 15 mm CoM offset):
+  - slip and tilt grow with α at a fixed grip;
+  - at 1.4× critical force the item holds at α 0.2–0.5 and drops at α 0.8; at 3× it holds everywhere;
+  - **rotation about the grip axis (tilt) from the CoM offset is the dominant failure mode**, as with real parallel grippers.
+- **Test-lift estimates:** mass within ±0.15 kg, CoM offset ±10 mm with Franka-like noise.
+- **Throughput trade-off:** transfer takes 6.6 / 2.9 / 2.0 s at α 0.2 / 0.5 / 0.8.
+- **Speed:** about 0.7 s wall time per episode on one core, so 500 rows take about 6 min.

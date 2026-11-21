@@ -16,4 +16,10 @@ HackLab #2 Berlin, Prior Labs track: **TabPFN for spatial awareness**. The brief
    sh ~/potato-skills/install.sh
    ```
    Optional: the pstack skills it mentions, via `npx skills add backnotprop/pstack -g`.
-3. Open Claude Code in this folder. The coding rules are already in `CLAUDE.md` (hackathon mode) and load automatically. Running `/potato-start hackathon` again is safe and changes nothing. **Never run it with another mode**: the block is shared, so a different mode changes the rules for the whole team.
+3. Simulation setup:
+   ```sh
+   ./scripts/fetch_assets.sh                 # official MuJoCo Menagerie Franka model, pinned commit
+   uv venv --python 3.12 && uv pip install -r pyproject.toml
+   .venv/bin/python scripts/spike_dynamic.py # one grid of real pick-and-place episodes
+   ```
+4. Open Claude Code in this folder. The coding rules are already in `CLAUDE.md` (hackathon mode) and load automatically. Running `/potato-start hackathon` again is safe and changes nothing. **Never run it with another mode**: the block is shared, so a different mode changes the rules for the whole team.

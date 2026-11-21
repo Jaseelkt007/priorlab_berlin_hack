@@ -1,0 +1,758 @@
+<title>Push, Predict, Adapt</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: a lab notebook page. Thesis + live side-by-side race up top, then the loop, RL comparison, uncertainty, use cases, proof plan. */
+:root {
+  --bg: #edf1f2;
+  --surface: #ffffff;
+  --ink: #142029;
+  --muted: #56646e;
+  --line: #d2dbdf;
+  --table: #e3eae6;
+  --table-edge: #9db0a7;
+  --grid: #cfdad4;
+  --tab: #0b7a7e;
+  --tab-soft: #d7eeee;
+  --rl: #bb5a19;
+  --rl-soft: #f6e3d6;
+  --target: #2b8a4b;
+  --danger: #b4332b;
+  --wood: #b8844c;
+  --ice: #8cc7e6;
+  --steel: #7c8790;
+  --f-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1418; --surface: #151d23; --ink: #e2e9ed; --muted: #95a3ad; --line: #263239;
+    --table: #1a252a; --table-edge: #3d5058; --grid: #24323a;
+    --tab: #3fc3c6; --tab-soft: #123236; --rl: #f0904d; --rl-soft: #3a2416;
+    --target: #5fcb80; --danger: #f07167; --wood: #c99460; --ice: #9fd3ef; --steel: #9aa5ae;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1418; --surface: #151d23; --ink: #e2e9ed; --muted: #95a3ad; --line: #263239;
+  --table: #1a252a; --table-edge: #3d5058; --grid: #24323a;
+  --tab: #3fc3c6; --tab-soft: #123236; --rl: #f0904d; --rl-soft: #3a2416;
+  --target: #5fcb80; --danger: #f07167; --wood: #c99460; --ice: #9fd3ef; --steel: #9aa5ae;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--f-body); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+.wrap { max-width: 1120px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(2.2rem, 5vw, 3.6rem); font-weight: 700; letter-spacing: -0.02em; }
+h2 { font-size: clamp(1.5rem, 3vw, 2.1rem); font-weight: 600; letter-spacing: -0.01em; }
+h3 { font-size: 1.1rem; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+.eyebrow { font-family: var(--f-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.tab { color: var(--tab); } .rl { color: var(--rl); }
+section { padding-block: 56px 8px; display: grid; gap: 20px; }
+
+/* hero */
+header.hero { padding-block: 40px 8px; display: grid; gap: 16px; }
+.hero .lede { font-size: 1.15rem; color: var(--muted); max-width: 62ch; }
+.hero .lede strong { color: var(--ink); font-weight: 600; }
+
+/* controls */
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.group .lbl { font-family: var(--f-mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+button {
+  font: 500 0.88rem var(--f-body); color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+button:focus-visible { outline: 2px solid var(--tab); outline-offset: 2px; }
+.tourline { font-family: var(--f-mono); font-size: 0.8rem; color: var(--muted); margin-left: auto; }
+
+.swap {
+  font-family: var(--f-display); font-weight: 600; font-size: 1.05rem;
+  padding: 10px 14px; border-radius: 10px; background: var(--surface); border: 1px dashed var(--line);
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+}
+.swap .chip { font-family: var(--f-mono); font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; background: var(--bg); color: var(--muted); }
+.swap.flash { animation: flash 1.6s ease-out; }
+@keyframes flash { 0% { background: var(--tab-soft); border-color: var(--tab); } 100% { background: var(--surface); border-color: var(--line); } }
+
+/* race */
+.race { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 820px) { .race { grid-template-columns: 1fr; } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.panel.rlp { border-top: 3px solid var(--rl); }
+.panel.tabp { border-top: 3px solid var(--tab); }
+.panel-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.panel-head .who { font-family: var(--f-mono); font-size: 0.75rem; color: var(--muted); }
+canvas { width: 100%; max-width: 100%; display: block; border-radius: 8px; }
+.now { font-size: 0.9rem; min-height: 3.1em; color: var(--ink); }
+.now b { font-weight: 600; }
+.belief { font-family: var(--f-mono); font-size: 0.78rem; color: var(--muted); padding: 8px 10px; border-radius: 8px; background: var(--bg); font-variant-numeric: tabular-nums; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.stat { display: grid; gap: 0; padding: 6px 8px; border-radius: 8px; background: var(--bg); min-width: 0; }
+.stat .k { font-family: var(--f-mono); font-size: 0.66rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.stat .v { font-family: var(--f-mono); font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.ctx-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.ctx { font-family: var(--f-mono); font-size: 0.74rem; }
+.ctx th, .ctx td { padding: 3px 6px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.ctx th { color: var(--muted); font-weight: 500; }
+.ctx th:nth-child(2), .ctx td:nth-child(2) { text-align: left; }
+.ctx th.out { color: var(--tab); }
+.ctx tr.fresh td { animation: rowin 1.4s ease-out; }
+@keyframes rowin { 0% { background: var(--tab-soft); } 100% { background: transparent; } }
+.ctx tr.div td { text-align: left; color: var(--tab); font-style: italic; }
+.frozen { font-family: var(--f-mono); font-size: 0.76rem; color: var(--muted); padding: 10px; border: 1px dashed var(--line); border-radius: 8px; display: grid; gap: 4px; }
+.frozen .w { letter-spacing: 1px; color: var(--rl); overflow: hidden; white-space: nowrap; }
+.note { font-size: 0.82rem; color: var(--muted); max-width: 90ch; }
+
+/* scoreboard */
+.score { font-size: 0.88rem; }
+.score th, .score td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: right; }
+.score th:first-child, .score td:first-child { text-align: left; }
+.score thead th { font-family: var(--f-mono); font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.score td { font-family: var(--f-mono); }
+.score td:first-child { font-family: var(--f-body); }
+.table-box { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 6px 10px; overflow-x: auto; }
+
+/* loop */
+.loop { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; position: relative; }
+@media (max-width: 820px) { .loop { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 460px) { .loop { grid-template-columns: 1fr; } }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 6px; align-content: start; transition: border-color .3s, transform .3s, box-shadow .3s; }
+.step .n { font-family: var(--f-mono); font-size: 0.75rem; color: var(--muted); }
+.step p { font-size: 0.9rem; color: var(--muted); }
+.step.on { border-color: var(--tab); box-shadow: 0 0 0 3px var(--tab-soft); transform: translateY(-2px); }
+.loopback { font-family: var(--f-mono); font-size: 0.8rem; color: var(--tab); }
+
+/* compare */
+.cmp td, .cmp th { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; font-size: 0.9rem; }
+.cmp thead th { font-family: var(--f-mono); font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.cmp tr.us td { background: var(--tab-soft); }
+.cmp .no { color: var(--danger); font-weight: 600; }
+.cmp .yes { color: var(--target); font-weight: 600; }
+.cmp .meh { color: var(--rl); font-weight: 600; }
+
+/* uncertainty */
+.unc { display: grid; grid-template-columns: 1.3fr 1fr; gap: 18px; align-items: center; }
+@media (max-width: 820px) { .unc { grid-template-columns: 1fr; } }
+.unc-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
+.readouts { display: grid; gap: 12px; }
+.readout { display: grid; gap: 4px; }
+.readout .k { font-family: var(--f-mono); font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.readout .v { font-family: var(--f-display); font-size: 1.6rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.bar { height: 10px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--tab); width: 10%; transition: width .5s ease; }
+.dots { display: flex; gap: 6px; }
+.dots span { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--tab); transition: background .3s; }
+.dots span.on { background: var(--tab); }
+
+/* use cases */
+.cases { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+@media (max-width: 720px) { .cases { grid-template-columns: 1fr; } }
+.case { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 8px; align-content: start; }
+.case p { font-size: 0.92rem; color: var(--muted); }
+.case .row { font-family: var(--f-mono); font-size: 0.75rem; color: var(--tab); background: var(--bg); padding: 6px 8px; border-radius: 6px; overflow-x: auto; white-space: nowrap; }
+.thread { background: var(--ink); color: var(--bg); border-radius: 12px; padding: 18px; display: grid; gap: 8px; }
+.thread p { max-width: 80ch; }
+
+/* proof */
+.proof { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+@media (max-width: 820px) { .proof { grid-template-columns: 1fr; } }
+.proof .case ul { margin: 0; padding-left: 18px; font-size: 0.9rem; color: var(--muted); display: grid; gap: 4px; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.82rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+@media (prefers-reduced-motion: reduce) { .step, .bar i, .swap.flash, .ctx tr.fresh td { transition: none; animation: none; } }
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">HackLab Berlin · Prior Labs track · TabPFN for spatial awareness</div>
+    <h1>Push, Predict, Adapt</h1>
+    <p class="lede">A robot arm has to push objects onto a target. Then we hand it an object it has never touched. <strong class="rl">The RL policy</strong> keeps pushing it like the old one. <strong class="tab">The TabPFN robot</strong> writes every push into a table, and after a few rows it knows how this object moves. Nothing is retrained.</p>
+  </header>
+
+  <section aria-labelledby="race-h" style="padding-top:20px">
+    <h2 id="race-h" class="sr" style="font-size:1.2rem">Watch both robots on the same objects</h2>
+    <div class="controls" role="group" aria-label="Simulation controls">
+      <div class="group"><span class="lbl">Object</span>
+        <button id="b-wood" data-obj="wood">Wooden block</button>
+        <button id="b-ice" data-obj="ice">Ice puck</button>
+        <button id="b-off" data-obj="off">Off-centre weight</button>
+      </div>
+      <div class="group"><span class="lbl">Run</span>
+        <button id="b-tour" aria-pressed="true">Auto tour</button>
+        <button id="b-play" aria-pressed="false">Pause</button>
+        <button id="b-speed">Speed 1×</button>
+        <button id="b-reset">Reset</button>
+      </div>
+      <span class="tourline" id="tourline"></span>
+    </div>
+    <div class="swap" id="swap" aria-live="polite"><span class="chip">On the table</span><span id="swap-text">Wooden block, the object both robots know</span></div>
+
+    <div class="race">
+      <article class="panel rlp">
+        <div class="panel-head"><h3 class="rl">RL policy</h3><span class="who">PPO, trained on the wooden block</span></div>
+        <canvas id="cv-rl" aria-label="Top-down view of the RL robot pushing the object"></canvas>
+        <div class="now" id="rl-now"></div>
+        <div class="belief" id="rl-belief"></div>
+        <div class="stats">
+          <div class="stat"><span class="k">Pushes</span><span class="v" id="rl-p">0</span></div>
+          <div class="stat"><span class="k">Reached</span><span class="v" id="rl-s">0</span></div>
+          <div class="stat"><span class="k">Fell off</span><span class="v" id="rl-f">0</span></div>
+          <div class="stat"><span class="k">Gave up</span><span class="v" id="rl-g">0</span></div>
+        </div>
+        <div class="frozen">
+          <span>What it knows lives in network weights, fixed after training:</span>
+          <span class="w" id="weights">0.41 −0.87 0.12 0.66 −0.23 0.09 0.75 −0.51 0.33 0.18 −0.64 0.27 0.92 −0.05 0.48</span>
+          <span>To learn a new object it needs a new training run: many thousands of episodes, in a simulator that already models that object.</span>
+        </div>
+      </article>
+
+      <article class="panel tabp">
+        <div class="panel-head"><h3 class="tab">TabPFN world model + planner</h3><span class="who">in-context, 0 gradient steps</span></div>
+        <canvas id="cv-tab" aria-label="Top-down view of the TabPFN robot pushing the object"></canvas>
+        <div class="now" id="tab-now"></div>
+        <div class="belief" id="tab-belief"></div>
+        <div class="stats">
+          <div class="stat"><span class="k">Pushes</span><span class="v" id="tab-p">0</span></div>
+          <div class="stat"><span class="k">Reached</span><span class="v" id="tab-s">0</span></div>
+          <div class="stat"><span class="k">Fell off</span><span class="v" id="tab-f">0</span></div>
+          <div class="stat"><span class="k">Gave up</span><span class="v" id="tab-g">0</span></div>
+        </div>
+        <div class="ctx-wrap">
+          <table class="ctx" aria-label="The context table TabPFN reads">
+            <thead><tr><th>#</th><th>object</th><th>x cm</th><th>y cm</th><th>aim °</th><th>force %</th><th class="out">→ dx cm</th><th class="out">→ dy cm</th></tr></thead>
+            <tbody id="ctx-body"></tbody>
+          </table>
+        </div>
+      </article>
+    </div>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--target)"></i>target, 4 cm radius</span>
+      <span><i class="sw" style="background:var(--tab)"></i>predicted landing spots (each dot is a sample)</span>
+      <span><i class="sw" style="background:var(--rl)"></i>where RL expects the object to stop</span>
+      <span><i class="sw" style="background:var(--ink)"></i>robot finger</span>
+    </div>
+
+    <div class="table-box">
+      <table class="score" aria-label="Live scoreboard">
+        <thead><tr><th>Object</th><th class="rl">RL reached</th><th class="rl">RL avg pushes</th><th class="rl">RL fell off</th><th class="tab">TabPFN reached</th><th class="tab">TabPFN avg pushes</th><th class="tab">TabPFN fell off</th></tr></thead>
+        <tbody id="score-body"></tbody>
+      </table>
+    </div>
+    <p class="note">This is a browser simulation that explains the idea. It is not a result. Here a small Bayesian model stands in for TabPFN: it learns from the table how far and in which direction an object slides, with a spread. The real project calls TabPFN-3.5 on MuJoCo rollouts, where the table can also hold contacts, orientation and object features, and TabPFN learns the shape of the relationship itself.</p>
+  </section>
+
+  <section aria-labelledby="loop-h">
+    <div class="eyebrow">How one decision works</div>
+    <h2 id="loop-h">Predict, plan, act, learn. The table is the memory.</h2>
+    <div class="loop" id="loop">
+      <div class="step"><span class="n">1 · Predict</span><h3>TabPFN reads the table</h3><p>Context rows are past pushes: where the object was, how it was pushed, where it went. For each of 136 candidate pushes, TabPFN predicts where the object will land, as a distribution, not one point.</p></div>
+      <div class="step"><span class="n">2 · Plan</span><h3>Pick the safest good push</h3><p>Score each candidate by expected distance to the target plus its spread. Reject any push whose 95% landing zone leaves the table. When unsure, a short push wins.</p></div>
+      <div class="step"><span class="n">3 · Act</span><h3>The arm pushes</h3><p>One push in MuJoCo, or on a real arm. The object slides with whatever physics it really has: heavier, slipperier, lopsided.</p></div>
+      <div class="step"><span class="n">4 · Learn</span><h3>Add one row</h3><p>The real outcome becomes a new row in the table. That is the whole learning step. No gradient, no retraining, about a second per decision.</p></div>
+    </div>
+    <div class="loopback">↻ back to step 1 with one more row of evidence</div>
+  </section>
+
+  <section aria-labelledby="unc-h">
+    <div class="eyebrow">The part RL does not give you</div>
+    <h2 id="unc-h">It knows when it does not know</h2>
+    <div class="unc">
+      <div class="unc-card"><canvas id="cv-unc" aria-label="Predicted landing cloud shrinking as rows are added"></canvas></div>
+      <div class="readouts">
+        <p>Same new object, the ice puck. Watch the predicted landing cloud as rows about it arrive. With no rows, the cloud is huge, so the planner chooses a <b>gentle probe push</b> that keeps even a bad outcome on the table. After a few rows the cloud is tight and the planner commits to the full push.</p>
+        <div class="readout"><span class="k">Rows about this object</span><div class="dots" id="unc-dots"><span></span><span></span><span></span><span></span><span></span></div></div>
+        <div class="readout"><span class="k">Prediction spread (90%)</span><span class="v mono" id="unc-spread">±0 cm</span></div>
+        <div class="readout"><span class="k">Chosen push force</span><span class="v mono" id="unc-force">0%</span><div class="bar"><i id="unc-bar"></i></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="rl-h">
+    <div class="eyebrow">Why RL fails at this exact moment</div>
+    <h2 id="rl-h">RL learns a reflex. We learn a model, live.</h2>
+    <p>An RL policy maps situation to action. It was optimised for the physics it trained on, so when the object changes, it keeps making the same move. On the ice puck that means pushing far too hard, again and again. It has no step where today's evidence can change tomorrow's action.</p>
+    <div class="table-box">
+      <table class="cmp">
+        <thead><tr><th>Approach</th><th>New object appears</th><th>Cost to adapt</th><th>Knows it is unsure?</th></tr></thead>
+        <tbody>
+          <tr><td>RL policy trained on the wooden block</td><td class="no">Same actions as before</td><td>A new training run</td><td class="no">No</td></tr>
+          <tr><td>Retrain RL on the new object</td><td class="meh">Works, later</td><td>Many thousands of simulated episodes, and a simulator that already models the new object</td><td class="no">No</td></tr>
+          <tr><td>Domain-randomised RL (trained on many objects)</td><td class="meh">One cautious compromise for every object</td><td>Large training run up front</td><td class="meh">Only implicitly</td></tr>
+          <tr class="us"><td><b>TabPFN world model + planner</b></td><td class="yes">Learns this object from its own pushes</td><td><b>A few real pushes, 0 gradient steps</b></td><td class="yes">Yes, every prediction has a spread</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Fair to say: meta-RL and online system identification can also adapt. They need a training pipeline built for that purpose. TabPFN brings in-context adaptation from its pre-training, and we compare against domain-randomised RL so the comparison is honest.</p>
+  </section>
+
+  <section aria-labelledby="use-h">
+    <div class="eyebrow">Where this matters outside the hackathon</div>
+    <h2 id="use-h">Real robots meet new physics every day</h2>
+    <div class="cases">
+      <div class="case"><h3>Warehouses and parcel handling</h3><p>Every parcel is a new object: different weight, contents, cardboard friction. A robot that sorts or nudges parcels has to adapt per item, with seconds, not hours, to learn.</p><div class="row">parcel_id · x · y · aim · force → dx · dy</div></div>
+      <div class="case"><h3>Home and service robots</h3><p>Mugs, bottles, toys, on wood, glass or tablecloth. Nobody can simulate every kitchen. A few pushes in the real home are the training data.</p><div class="row">object · surface · aim · force → slide distance</div></div>
+      <div class="case"><h3>Wear and damage</h3><p>A gripper pad wears out, a motor weakens, a wheel starts slipping. Same robot, new physics. Today's rows overrule assumptions from training without anyone retraining the robot.</p><div class="row">command · joint state → actual motion</div></div>
+      <div class="case"><h3>Field robots</h3><p>Rovers and farm robots on mud, sand or wet grass: the same command moves them a different distance. They need a calibrated "how far will this take me" before committing.</p><div class="row">terrain features · command → displacement ± spread</div></div>
+    </div>
+    <div class="thread">
+      <h3>What these cases share</h3>
+      <p>The physics changes after the robot is deployed. Data is scarce, because every real try costs time and risk. And the robot has to know when it is unsure. That combination is where an in-context model with calibrated uncertainty beats a trained policy, and it is exactly Prior Labs' brief: where things are, where they are going, what happens next.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="proof-h">
+    <div class="eyebrow">What we have to prove by Sunday 16:30</div>
+    <h2 id="proof-h">Claims we will measure, not assume</h2>
+    <div class="proof">
+      <div class="case"><h3>Hypotheses</h3><ul><li>On objects it has never seen, TabPFN reaches the target in fewer pushes than RL.</li><li>Its 90% prediction bands contain about 90% of real outcomes (calibrated).</li><li>Uncertainty-aware planning drops fewer objects off the table.</li></ul></div>
+      <div class="case"><h3>Baselines</h3><ul><li>PPO trained on the wooden block</li><li>Domain-randomised PPO (the strong one), trained fast in JAX/MJX</li><li>MLP-ensemble world model given the same rows</li></ul></div>
+      <div class="case"><h3>Tests and risks</h3><ul><li>Held-out objects, hundreds of seeded episodes, confidence intervals</li><li>Latency per decision with a cached context and batched candidates</li><li>Risk: push physics in MuJoCo is noisy, so we measure that noise first</li></ul></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const D2R = Math.PI / 180, NOM = 0.35, TW = 1, TH = 0.62, RS = 0.04, OBJ = 0.05, MAXP = 8;
+  const SPEEDS = [0.08, 0.15, 0.25, 0.35, 0.5, 0.65, 0.8, 1.0];
+  const OBJECTS = {
+    wood: { name: 'Wooden block', short: 'wood', k: 1.0, drift: 0, tok: '--wood', shape: 'sq' },
+    ice:  { name: 'Ice puck', short: 'ice', k: 2.6, drift: 0, tok: '--ice', shape: 'circ' },
+    off:  { name: 'Off-centre weight', short: 'off-ctr', k: 0.75, drift: 45 * D2R, tok: '--steel', shape: 'heavy' },
+  };
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function gauss(r) { let u = 0; while (!u) u = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * r()); }
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const ease = t => 1 - (1 - t) * (1 - t);
+
+  let C = {};
+  function readColors() {
+    const cs = getComputedStyle(document.documentElement);
+    ['--bg','--surface','--ink','--muted','--line','--table','--table-edge','--grid','--tab','--rl','--target','--danger','--wood','--ice','--steel']
+      .forEach(k => C[k] = cs.getPropertyValue(k).trim());
+  }
+  readColors();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+  new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  // ---------- physics ----------
+  function simulate(objKey, pos, theta, s, rng) {
+    const o = OBJECTS[objKey];
+    const k = o.k * Math.exp(gauss(rng) * 0.05);
+    const dr = o.drift + gauss(rng) * 0.035;
+    const L = k * s * NOM, N = 48;
+    const pts = [{ x: pos.x, y: pos.y }];
+    let x = pos.x, y = pos.y, fell = false;
+    for (let i = 1; i <= N; i++) {
+      const h = theta + 2 * dr * ((i - 0.5) / N);
+      x += L / N * Math.cos(h); y += L / N * Math.sin(h);
+      pts.push({ x, y });
+      if (x < 0 || x > TW || y < 0 || y > TH) {
+        fell = true;
+        for (let j = 1; j <= 10; j++) { x += 0.012 * Math.cos(h); y += 0.012 * Math.sin(h); pts.push({ x, y }); }
+        break;
+      }
+    }
+    return { pts, end: pts[pts.length - 1], fell };
+  }
+
+  // ---------- stand-in for TabPFN: Bayesian slide-factor + drift model ----------
+  const PRIOR = { lr: 0, ph: 0, slr: 0.55, sph: 0.5 }, NOISE = { lr: 0.08, ph: 0.07 };
+  function posterior(rows) {
+    let pl = 1 / PRIOR.slr ** 2, pp = 1 / PRIOR.sph ** 2, ml = PRIOR.lr * pl, mp = PRIOR.ph * pp;
+    for (const r of rows) {
+      if (r.fell || r.divider) continue;
+      const d = Math.hypot(r.dx, r.dy);
+      const lr = Math.log(Math.max(d, 1e-4) / (r.s * NOM));
+      const ph = wrap(Math.atan2(r.dy, r.dx) - r.theta);
+      ml += lr / NOISE.lr ** 2; pl += 1 / NOISE.lr ** 2;
+      mp += ph / NOISE.ph ** 2; pp += 1 / NOISE.ph ** 2;
+    }
+    return { lr: ml / pl, ph: mp / pp, slr: Math.sqrt(1 / pl + NOISE.lr ** 2), sph: Math.sqrt(1 / pp + NOISE.ph ** 2), n: rows.filter(r => !r.fell && !r.divider).length };
+  }
+  function predictMean(p, pos, th, s) { const r = Math.exp(p.lr) * s * NOM, a = th + p.ph; return { x: pos.x + r * Math.cos(a), y: pos.y + r * Math.sin(a), r }; }
+  function sample(p, pos, th, s, rng) { const r = Math.exp(p.lr + gauss(rng) * p.slr) * s * NOM, a = th + p.ph + gauss(rng) * p.sph; return { x: pos.x + r * Math.cos(a), y: pos.y + r * Math.sin(a) }; }
+  function plan(p, pos, tgt) {
+    const base = Math.atan2(tgt.y - pos.y, tgt.x - pos.x);
+    const cands = []; let best = null;
+    for (let j = -8; j <= 8; j++) for (const s of SPEEDS) {
+      const th = base + j * 7.5 * D2R;
+      const m = predictMean(p, pos, th, s);
+      let score = (m.x - tgt.x) ** 2 + (m.y - tgt.y) ** 2 + (m.r * p.slr) ** 2 + (m.r * p.sph) ** 2;
+      const far = Math.exp(p.lr + 1.64 * p.slr) * s * NOM;
+      let risky = false;
+      for (const dph of [-1.64 * p.sph, 0, 1.64 * p.sph]) {
+        const a = th + p.ph + dph, x = pos.x + far * Math.cos(a), y = pos.y + far * Math.sin(a);
+        if (x < 0.01 || x > TW - 0.01 || y < 0.01 || y > TH - 0.01) risky = true;
+      }
+      if (risky) score += 1;
+      const c = { th, s, m, score, risky }; cands.push(c);
+      if (!best || score < best.score) best = c;
+    }
+    return { cands, best };
+  }
+
+  // ---------- shared state ----------
+  const state = { object: 'wood', tour: true, tourIdx: 0, tourT: 0, playing: !reduce, speed: 1 };
+  const TOUR = [['wood', 14], ['ice', 42], ['off', 42], ['wood', 12], ['ice', 30]];
+  let epRng, episodes;
+  function episode(i) {
+    while (episodes.length <= i) episodes.push({
+      start: { x: 0.1 + epRng() * 0.26, y: 0.12 + epRng() * 0.38 },
+      target: { x: 0.6 + epRng() * 0.26, y: 0.12 + epRng() * 0.38 },
+    });
+    return episodes[i];
+  }
+  const DUR = { planTab: 1.25, planRl: 0.6, approach: 0.45, strike: 0.18, slide: 1.0, settle: 0.65, end: 1.0 };
+
+  // ---------- canvas helper ----------
+  function fitCanvas(cv, aspect) {
+    const pad = 10, w = cv.clientWidth || 400, sc = (w - 2 * pad) / TW, h = Math.round(2 * pad + TH * sc), dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.height = h + 'px'; }
+    const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, w, h, X: x => pad + x * sc, Y: y => pad + y * sc, S: v => v * sc };
+  }
+  function drawTable(g) {
+    const { ctx, X, Y, S } = g;
+    ctx.fillStyle = C['--surface']; ctx.fillRect(0, 0, g.w, g.h);
+    ctx.fillStyle = C['--table']; ctx.fillRect(X(0), Y(0), S(TW), S(TH));
+    ctx.strokeStyle = C['--grid']; ctx.lineWidth = 1; ctx.beginPath();
+    for (let x = 0.1; x < TW; x += 0.1) { ctx.moveTo(X(x), Y(0)); ctx.lineTo(X(x), Y(TH)); }
+    for (let y = 0.1; y < TH; y += 0.1) { ctx.moveTo(X(0), Y(y)); ctx.lineTo(X(TW), Y(y)); }
+    ctx.stroke();
+    ctx.strokeStyle = C['--table-edge']; ctx.lineWidth = 2; ctx.strokeRect(X(0), Y(0), S(TW), S(TH));
+    ctx.fillStyle = C['--muted']; ctx.font = '10px "IBM Plex Mono", monospace'; ctx.textAlign = 'right';
+    ctx.fillText('table 100 × 62 cm · grid 10 cm', X(TW) - 4, Y(TH) - 5);
+  }
+  function drawTarget(g, t) {
+    const { ctx, X, Y, S } = g;
+    ctx.strokeStyle = C['--target']; ctx.lineWidth = 2; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(X(t.x), Y(t.y), S(RS), 0, 7); ctx.stroke();
+    ctx.globalAlpha = 0.15; ctx.fillStyle = C['--target']; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.moveTo(X(t.x - 0.015), Y(t.y)); ctx.lineTo(X(t.x + 0.015), Y(t.y)); ctx.moveTo(X(t.x), Y(t.y - 0.015)); ctx.lineTo(X(t.x), Y(t.y + 0.015)); ctx.stroke();
+  }
+  function drawObject(g, key, p, alpha = 1) {
+    const { ctx, X, Y, S } = g, o = OBJECTS[key], r = S(OBJ / 2);
+    ctx.globalAlpha = alpha; ctx.fillStyle = C[o.tok]; ctx.strokeStyle = C['--ink']; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (o.shape === 'circ') ctx.arc(X(p.x), Y(p.y), r, 0, 7); else ctx.rect(X(p.x) - r, Y(p.y) - r, 2 * r, 2 * r);
+    ctx.fill(); ctx.stroke();
+    if (o.shape === 'heavy') { ctx.fillStyle = C['--ink']; ctx.beginPath(); ctx.arc(X(p.x) + r * 0.45, Y(p.y) - r * 0.45, r * 0.32, 0, 7); ctx.fill(); }
+    if (o.shape === 'circ') { ctx.strokeStyle = C['--surface']; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(X(p.x) - r * 0.25, Y(p.y) - r * 0.25, r * 0.4, 3.6, 5.2); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+  function drawFinger(g, f) {
+    const { ctx, X, Y, S } = g;
+    ctx.strokeStyle = C['--muted']; ctx.lineWidth = 3; ctx.globalAlpha = 0.5;
+    ctx.beginPath(); ctx.moveTo(X(0.5), Y(-0.02)); ctx.lineTo(X(f.x), Y(f.y)); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillStyle = C['--ink']; ctx.beginPath(); ctx.arc(X(f.x), Y(f.y), S(0.014), 0, 7); ctx.fill();
+  }
+  function stamp(g, text, color) {
+    const { ctx } = g; ctx.font = '600 15px "Space Grotesk", sans-serif'; ctx.textAlign = 'center';
+    const w = ctx.measureText(text).width + 20, x = g.w / 2, y = 30;
+    ctx.fillStyle = C['--surface']; ctx.globalAlpha = 0.92; ctx.fillRect(x - w / 2, y - 18, w, 26); ctx.globalAlpha = 1;
+    ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.strokeRect(x - w / 2, y - 18, w, 26);
+    ctx.fillStyle = color; ctx.fillText(text, x, y);
+  }
+
+  // ---------- panel ----------
+  class Panel {
+    constructor(kind) {
+      this.kind = kind; this.cv = document.getElementById('cv-' + kind);
+      this.el = id => document.getElementById(kind + '-' + id);
+      this.reset();
+    }
+    reset() {
+      this.rng = mulberry(this.kind === 'tab' ? 11 : 23); this.srng = mulberry(5);
+      this.ep = -1; this.rows = []; this.stats = {}; this.finger = { x: 0.5, y: 0.04 }; this.fresh = 0;
+      if (this.kind === 'tab') {
+        const r = mulberry(3);
+        for (let i = 0; i < 6; i++) {
+          const pos = { x: 0.2 + r() * 0.3, y: 0.2 + r() * 0.2 }, th = (r() - 0.5) * 1.2, s = 0.3 + r() * 0.5;
+          const sim = simulate('wood', pos, th, s, r);
+          this.rows.push({ obj: 'wood', x: pos.x, y: pos.y, theta: th, s, dx: sim.end.x - pos.x, dy: sim.end.y - pos.y, fell: false, seed: true });
+        }
+        this.lastObjRow = 'wood';
+      }
+      this.newEpisode();
+    }
+    st(o) { return this.stats[o] || (this.stats[o] = { tries: 0, solved: 0, fell: 0, gave: 0, pushesSolved: 0 }); }
+    newEpisode() {
+      this.ep++; const e = episode(this.ep);
+      this.obj = state.object; this.pos = { ...e.start }; this.target = e.target; this.pushes = 0;
+      this.trail = []; this.go('plan');
+    }
+    go(ph) { this.phase = ph; this.t = 0; if (ph === 'plan') this.planned = false; }
+    makePlan() {
+      const pos = this.pos, tgt = this.target, base = Math.atan2(tgt.y - pos.y, tgt.x - pos.x);
+      if (this.kind === 'rl') {
+        const d = Math.hypot(tgt.x - pos.x, tgt.y - pos.y), s = clamp(d / NOM, 0.05, 1);
+        this.cmd = { th: base, s };
+        this.expect = { x: pos.x + s * NOM * Math.cos(base), y: pos.y + s * NOM * Math.sin(base) };
+        this.msg = `<b>Policy output:</b> aim straight at the target, force ${Math.round(s * 100)}%. It expects the object to stop on the orange ring, because a wooden block would.`;
+      } else {
+        const rows = this.rows.filter(r => r.obj === this.obj);
+        this.post = posterior(rows);
+        const pl = plan(this.post, pos, tgt);
+        this.cands = pl.cands; this.cmd = { th: pl.best.th, s: pl.best.s }; this.pred = pl.best.m;
+        this.cloud = []; for (let i = 0; i < 60; i++) this.cloud.push(sample(this.post, pos, pl.best.th, pl.best.s, this.srng));
+        const spread = Math.round(1.64 * pl.best.m.r * Math.hypot(this.post.slr, this.post.sph) * 100);
+        this.msg = this.post.n === 0
+          ? `<b>No rows about the ${OBJECTS[this.obj].name.toLowerCase()} yet.</b> Predictions are wide (±${spread} cm), so the planner picks a gentle probe push (${Math.round(pl.best.s * 100)}%) that stays on the table even if it slides far.`
+          : `<b>${this.post.n} row${this.post.n > 1 ? 's' : ''} about this object.</b> Scored 136 candidate pushes; chosen force ${Math.round(pl.best.s * 100)}%, predicted landing ±${spread} cm.`;
+      }
+      this.planned = true;
+    }
+    behind(off) { return { x: this.pos.x - Math.cos(this.cmd.th) * off, y: this.pos.y - Math.sin(this.cmd.th) * off }; }
+    update(dt) {
+      this.t += dt;
+      const P = this.phase;
+      if (P === 'plan') {
+        if (!this.planned) {
+          if (this.obj !== state.object) { this.newEpisode(); return; }
+          this.makePlan(); this.fStart = { ...this.finger };
+        }
+        if (this.t >= (this.kind === 'tab' ? DUR.planTab : DUR.planRl)) this.go('approach');
+      } else if (P === 'approach') {
+        const b = this.behind(0.06), u = ease(clamp(this.t / DUR.approach, 0, 1));
+        this.finger = { x: lerp(this.fStart.x, b.x, u), y: lerp(this.fStart.y, b.y, u) };
+        if (this.t >= DUR.approach) this.go('strike');
+      } else if (P === 'strike') {
+        const a = this.behind(0.06), b = this.behind(0.032), u = clamp(this.t / DUR.strike, 0, 1);
+        this.finger = { x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u) };
+        if (this.t >= DUR.strike) {
+          this.pushes++;
+          this.sim = simulate(this.obj, this.pos, this.cmd.th, this.cmd.s, this.rng);
+          this.startPos = { ...this.pos }; this.go('slide');
+        }
+      } else if (P === 'slide') {
+        const u = ease(clamp(this.t / DUR.slide, 0, 1)), pts = this.sim.pts, f = u * (pts.length - 1), i = Math.floor(f), fr = f - i;
+        const p0 = pts[i], p1 = pts[Math.min(i + 1, pts.length - 1)];
+        this.pos = { x: lerp(p0.x, p1.x, fr), y: lerp(p0.y, p1.y, fr) };
+        this.trail.push({ ...this.pos }); if (this.trail.length > 400) this.trail.shift();
+        if (this.t >= DUR.slide) {
+          this.pos = { ...this.sim.end };
+          if (this.kind === 'tab') {
+            if (this.lastObjRow !== this.obj) { this.rows.push({ divider: true, obj: this.obj }); this.lastObjRow = this.obj; }
+            this.rows.push({ obj: this.obj, x: this.startPos.x, y: this.startPos.y, theta: this.cmd.th, s: this.cmd.s, dx: this.sim.end.x - this.startPos.x, dy: this.sim.end.y - this.startPos.y, fell: this.sim.fell });
+            this.fresh = 1; renderCtx();
+          }
+          this.go('settle');
+        }
+      } else if (P === 'settle') {
+        if (this.t >= DUR.settle) {
+          const s = this.st(this.obj), d = Math.hypot(this.pos.x - this.target.x, this.pos.y - this.target.y);
+          if (this.sim.fell) { s.tries++; s.fell++; this.result = 'fell'; this.go('end'); }
+          else if (d < RS) { s.tries++; s.solved++; s.pushesSolved += this.pushes; this.result = 'ok'; this.go('end'); }
+          else if (this.pushes >= MAXP) { s.tries++; s.gave++; this.result = 'gave'; this.go('end'); }
+          else this.go('plan');
+          renderScore();
+        }
+      } else if (P === 'end') {
+        if (this.t >= DUR.end) this.newEpisode();
+      }
+    }
+    draw() {
+      const g = fitCanvas(this.cv, (TH + 0.02) / TW), { ctx, X, Y, S } = g;
+      drawTable(g); drawTarget(g, this.target);
+      const showPlan = ['plan', 'approach', 'strike', 'slide', 'settle'].includes(this.phase) && this.planned;
+      if (showPlan && this.kind === 'tab') {
+        const fade = this.phase === 'plan' ? clamp(this.t / 0.4, 0, 1) : 1;
+        if (this.phase === 'plan' || this.phase === 'approach') {
+          ctx.fillStyle = C['--tab']; ctx.globalAlpha = 0.22 * fade;
+          for (const c of this.cands) { if (c.risky) continue; ctx.beginPath(); ctx.arc(X(c.m.x), Y(c.m.y), 1.6, 0, 7); ctx.fill(); }
+        }
+        const from = this.phase === 'slide' || this.phase === 'settle' ? this.startPos : this.pos;
+        ctx.globalAlpha = 0.55 * fade; ctx.fillStyle = C['--tab'];
+        for (const p of this.cloud) { ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), 2.4, 0, 7); ctx.fill(); }
+        ctx.globalAlpha = 0.9 * fade; ctx.strokeStyle = C['--tab']; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+        ctx.beginPath(); ctx.moveTo(X(from.x), Y(from.y)); ctx.lineTo(X(this.pred.x), Y(this.pred.y)); ctx.stroke(); ctx.setLineDash([]);
+        ctx.lineWidth = 2; const px = X(this.pred.x), py = Y(this.pred.y);
+        ctx.beginPath(); ctx.moveTo(px - 5, py - 5); ctx.lineTo(px + 5, py + 5); ctx.moveTo(px + 5, py - 5); ctx.lineTo(px - 5, py + 5); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      if (showPlan && this.kind === 'rl') {
+        const from = this.phase === 'slide' || this.phase === 'settle' ? this.startPos : this.pos;
+        ctx.strokeStyle = C['--rl']; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+        ctx.beginPath(); ctx.moveTo(X(from.x), Y(from.y)); ctx.lineTo(X(this.expect.x), Y(this.expect.y)); ctx.stroke(); ctx.setLineDash([]);
+        ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(this.expect.x), Y(this.expect.y), S(OBJ / 2) + 2, 0, 7); ctx.stroke();
+      }
+      if (this.trail.length > 1) {
+        ctx.strokeStyle = C['--ink']; ctx.globalAlpha = 0.35; ctx.lineWidth = 1.5; ctx.beginPath();
+        ctx.moveTo(X(this.trail[0].x), Y(this.trail[0].y)); for (const p of this.trail) ctx.lineTo(X(p.x), Y(p.y)); ctx.stroke(); ctx.globalAlpha = 1;
+      }
+      const off = this.pos.x < 0 || this.pos.x > TW || this.pos.y < 0 || this.pos.y > TH;
+      drawObject(g, this.obj, this.pos, off ? 0.35 : 1);
+      drawFinger(g, this.finger);
+      if (this.phase === 'end') {
+        if (this.result === 'ok') stamp(g, `Reached in ${this.pushes} push${this.pushes > 1 ? 'es' : ''}`, C['--target']);
+        else if (this.result === 'fell') stamp(g, 'Fell off the table', C['--danger']);
+        else stamp(g, `Gave up after ${MAXP} pushes`, C['--danger']);
+      }
+    }
+    ui() {
+      const s = this.st(this.obj), set = (id, v) => { const e = this.el(id); if (e.textContent !== String(v)) e.textContent = v; };
+      set('p', this.pushes); set('s', s.solved); set('f', s.fell); set('g', s.gave);
+      const now = this.el('now');
+      let m = this.msg || '';
+      if (this.phase === 'slide' || this.phase === 'settle') m = this.kind === 'rl' ? '<b>Pushing.</b> The object slides with its real physics, not the physics the policy was trained on.' : '<b>Pushing.</b> Compare the real landing with the teal cross, then the outcome becomes a new row.';
+      if (this.phase === 'end') m = this.result === 'ok' ? '<b>Target reached.</b> Next episode.' : this.result === 'fell' ? '<b>Object fell off the table.</b> Counted as a failure.' : '<b>Too many pushes.</b> Counted as a failure.';
+      if (now.innerHTML !== m) now.innerHTML = m;
+      const b = this.el('belief');
+      let bt;
+      if (this.kind === 'rl') bt = `Fixed belief: slides ×1.00, drifts 0°   (true ${OBJECTS[this.obj].name.toLowerCase()}: ${trueStr(this.obj)})`;
+      else {
+        const p = this.post || posterior(this.rows.filter(r => r.obj === this.obj));
+        bt = `Learned from ${p.n} row${p.n === 1 ? '' : 's'}: slides ×${Math.exp(p.lr).toFixed(2)}, drifts ${p.ph >= 0 ? '+' : ''}${Math.round(p.ph / D2R)}°   (true: ${trueStr(this.obj)})`;
+      }
+      if (b.textContent !== bt) b.textContent = bt;
+    }
+  }
+  function trueStr(o) { const ob = OBJECTS[o]; const chord = ob.drift ? ob.k * Math.sin(ob.drift) / ob.drift : ob.k; return `×${chord.toFixed(2)}, ${ob.drift ? '+' : ''}${Math.round(ob.drift / D2R)}°`; }
+
+  function init() { epRng = mulberry(42); episodes = []; }
+  init();
+  const rl = new Panel('rl'), tab = new Panel('tab');
+
+  // ---------- context table ----------
+  const ctxBody = document.getElementById('ctx-body');
+  function renderCtx() {
+    const real = tab.rows; const last = real.slice(-8);
+    let n = real.filter(r => !r.divider).length - last.filter(r => !r.divider).length;
+    const html = last.map((r, i) => {
+      if (r.divider) return `<tr class="div"><td colspan="8">now on the table: ${OBJECTS[r.obj].name.toLowerCase()} · its rows follow</td></tr>`;
+      n++;
+      const fresh = i === last.length - 1 && tab.fresh ? ' class="fresh"' : '';
+      const dx = r.fell ? 'off' : (r.dx * 100).toFixed(1), dy = r.fell ? 'table' : (r.dy * 100).toFixed(1);
+      return `<tr${fresh}><td>${n}</td><td>${OBJECTS[r.obj].short}${r.seed ? ' ·earlier' : ''}</td><td>${(r.x * 100).toFixed(0)}</td><td>${(r.y * 100).toFixed(0)}</td><td>${Math.round(r.theta / D2R)}</td><td>${Math.round(r.s * 100)}</td><td>${dx}</td><td>${dy}</td></tr>`;
+    }).join('');
+    ctxBody.innerHTML = html; tab.fresh = 0;
+  }
+  renderCtx();
+
+  // ---------- scoreboard ----------
+  const scoreBody = document.getElementById('score-body');
+  function cell(st) {
+    if (!st || !st.tries) return ['–', '–', '–'];
+    return [`${st.solved}/${st.tries}`, st.solved ? (st.pushesSolved / st.solved).toFixed(1) : '–', `${st.fell}`];
+  }
+  function renderScore() {
+    scoreBody.innerHTML = Object.keys(OBJECTS).map(k => {
+      const a = cell(rl.stats[k]), b = cell(tab.stats[k]);
+      return `<tr><td>${OBJECTS[k].name}</td><td>${a[0]}</td><td>${a[1]}</td><td>${a[2]}</td><td>${b[0]}</td><td>${b[1]}</td><td>${b[2]}</td></tr>`;
+    }).join('');
+  }
+  renderScore();
+
+  // ---------- controls ----------
+  const swapEl = document.getElementById('swap'), swapText = document.getElementById('swap-text');
+  const SWAPTXT = {
+    wood: 'Wooden block, the object both robots know',
+    ice: 'Ice puck: slides about 2.6× farther than wood. Neither robot has seen it.',
+    off: 'Off-centre weight: heavier and lopsided, so it curves about 45° to one side. Neither robot has seen it.',
+  };
+  function setObject(o, fromTour) {
+    if (state.object === o && !fromTour) return;
+    state.object = o;
+    swapText.textContent = SWAPTXT[o];
+    swapEl.classList.remove('flash'); void swapEl.offsetWidth; if (!reduce) swapEl.classList.add('flash');
+    document.querySelectorAll('[data-obj]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.obj === o)));
+  }
+  document.querySelectorAll('[data-obj]').forEach(b => b.addEventListener('click', () => { state.tour = false; syncButtons(); setObject(b.dataset.obj); }));
+  const bTour = document.getElementById('b-tour'), bPlay = document.getElementById('b-play'), bSpeed = document.getElementById('b-speed');
+  function syncButtons() {
+    bTour.setAttribute('aria-pressed', String(state.tour));
+    bPlay.textContent = state.playing ? 'Pause' : 'Play';
+    bPlay.setAttribute('aria-pressed', String(!state.playing));
+    bSpeed.textContent = `Speed ${state.speed}×`;
+  }
+  bTour.addEventListener('click', () => { state.tour = !state.tour; if (state.tour) { state.tourT = 0; setObject(TOUR[state.tourIdx][0], true); } syncButtons(); });
+  bPlay.addEventListener('click', () => { state.playing = !state.playing; syncButtons(); });
+  bSpeed.addEventListener('click', () => { state.speed = state.speed === 1 ? 2 : state.speed === 2 ? 4 : 1; syncButtons(); });
+  document.getElementById('b-reset').addEventListener('click', () => {
+    state.tourIdx = 0; state.tourT = 0; state.tour = true; init(); setObject('wood', true); rl.reset(); tab.reset(); renderCtx(); renderScore(); syncButtons();
+  });
+  setObject('wood', true); syncButtons();
+  const tourline = document.getElementById('tourline');
+
+  // ---------- loop diagram ----------
+  const steps = [...document.querySelectorAll('#loop .step')];
+  let stepIdx = 0, stepT = 0;
+  if (reduce) steps.forEach(s => s.classList.add('on')); else steps[0].classList.add('on');
+
+  // ---------- uncertainty mini-demo ----------
+  const unc = { n: 0, t: 0, rows: [], cloud: [], rng: mulberry(77), pos: { x: 0.16, y: 0.33 }, tgt: { x: 0.8, y: 0.33 } };
+  function uncStep() {
+    if (unc.n === 0) unc.rows = [];
+    else {
+      const r = unc.rng, pos = { x: 0.2 + r() * 0.2, y: 0.2 + r() * 0.2 }, th = (r() - 0.5) * 0.8, s = 0.12 + r() * 0.15;
+      const sim = simulate('ice', pos, th, s, r);
+      unc.rows.push({ obj: 'ice', x: pos.x, y: pos.y, theta: th, s, dx: sim.end.x - pos.x, dy: sim.end.y - pos.y, fell: false });
+    }
+    const p = posterior(unc.rows), pl = plan(p, unc.pos, unc.tgt);
+    unc.best = pl.best; unc.cloud = [];
+    for (let i = 0; i < 90; i++) unc.cloud.push(sample(p, unc.pos, pl.best.th, pl.best.s, unc.rng));
+    const spread = Math.round(1.64 * pl.best.m.r * Math.hypot(p.slr, p.sph) * 100);
+    document.getElementById('unc-spread').textContent = `±${spread} cm`;
+    document.getElementById('unc-force').textContent = `${Math.round(pl.best.s * 100)}%`;
+    document.getElementById('unc-bar').style.width = `${Math.round(pl.best.s * 100)}%`;
+    document.querySelectorAll('#unc-dots span').forEach((d, i) => d.classList.toggle('on', i < unc.n));
+  }
+  uncStep();
+  function drawUnc() {
+    const cv = document.getElementById('cv-unc'), g = fitCanvas(cv, (TH + 0.02) / TW), { ctx, X, Y } = g;
+    drawTable(g); drawTarget(g, unc.tgt);
+    const a = reduce ? 1 : clamp(unc.t / 0.5, 0, 1);
+    ctx.fillStyle = C['--tab']; ctx.globalAlpha = 0.5 * a;
+    for (const p of unc.cloud) { ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), 2.6, 0, 7); ctx.fill(); }
+    ctx.globalAlpha = 1; ctx.strokeStyle = C['--tab']; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(X(unc.pos.x), Y(unc.pos.y)); ctx.lineTo(X(unc.best.m.x), Y(unc.best.m.y)); ctx.stroke(); ctx.setLineDash([]);
+    drawObject(g, 'ice', unc.pos);
+    ctx.fillStyle = C['--ink']; ctx.font = '600 13px "Space Grotesk", sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(unc.n === 0 ? 'No rows: wide cloud, gentle probe' : unc.n < 3 ? `${unc.n} row${unc.n > 1 ? 's' : ''}: cloud tightening` : `${unc.n} rows: confident, full push`, X(0.02), Y(0.06));
+  }
+
+  // ---------- main loop ----------
+  let last = performance.now();
+  function frame(now) {
+    const raw = Math.min(0.05, (now - last) / 1000); last = now;
+    if (state.playing) {
+      const dt = raw * state.speed;
+      if (state.tour) {
+        state.tourT += dt;
+        if (state.tourT >= TOUR[state.tourIdx][1]) { state.tourT = 0; state.tourIdx = (state.tourIdx + 1) % TOUR.length; setObject(TOUR[state.tourIdx][0], true); }
+      }
+      rl.update(dt); tab.update(dt);
+      stepT += raw; if (!reduce && stepT > 1.6) { stepT = 0; steps[stepIdx].classList.remove('on'); stepIdx = (stepIdx + 1) % steps.length; steps[stepIdx].classList.add('on'); }
+      unc.t += raw; if (unc.t > 2.2) { unc.t = 0; unc.n = (unc.n + 1) % 6; uncStep(); }
+    }
+    tourline.textContent = state.tour
+      ? `Auto tour · next object in ${Math.max(0, Math.ceil(TOUR[state.tourIdx][1] - state.tourT))} s`
+      : 'Manual · pick an object';
+    rl.draw(); tab.draw(); drawUnc(); rl.ui(); tab.ui();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>

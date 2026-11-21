@@ -4,3 +4,4 @@ results/*.log
 results/mujoco_demo_rows.json
 results/stills_b64.json
 results/mujoco_frames.png
+results/closed_loop_run.json

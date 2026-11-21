@@ -28,6 +28,18 @@ Part of our Prior Labs entry ("TabPFN for spatial awareness"). Branch: `crane`.
 
 Video: `results/mujoco_demo.mp4`.
 
+**Closed loop, MuJoCo, in simulation:** before each move, the crane asks TabPFN (one batched call, 7 speeds × 4 anti-sway tunings) for the predicted swing and settle time, and takes the fastest move whose 99th-percentile swing clears the racks. Its real outcome becomes the next row. On 12 new loads on long slings:
+
+| Strategy | 12 moves | Moves / hour | Mean settle wait | Collisions |
+|---|---|---|---|---|
+| Industry anti-sway (set for 0.5 m sling) | 403 s | 107 | 19.9 s | 0 |
+| Slow and safe (40%) | 333 s | 130 | 1.5 s | 0 |
+| **TabPFN decides** | **261 s** | **166** | 7.4 s | 0 |
+
+Video: `results/closed_loop.mp4`. TabPFN still misjudged 3 of the 12 moves (long settles). No strategy collided, so the gain shown is time, not safety.
+
+**Playground** (page section 6c): 81 precomputed MuJoCo runs (rope × sling × payload × speed). TabPFN's 1-s error averages 0.8 cm vs 2.2 cm for physics; its 90% range holds 80%. To render any other combination: `render_clip.py --rope R --sling S --payload T --speed F`.
+
 **Caveats:**
 - The lab crane is about 10× smaller than an industrial one, with one run per condition and one seed.
 - The beam run has a single trolley move at the start.
@@ -44,6 +56,9 @@ crane/.venv/bin/python crane/exp1_real.py                 # 3 held-out tests, 4 
 crane/.venv/bin/python crane/exp2_real.py                 # adaptation curve + physics+TabPFN (~5 min)
 MUJOCO_GL=egl crane/.venv/bin/python crane/mujoco_crane.py --check --frame
 MUJOCO_GL=egl crane/.venv/bin/python crane/mujoco_demo.py # fleet data, held-out job, TabPFN, video (~5 min)
+MUJOCO_GL=egl crane/.venv/bin/python crane/mujoco_closed_loop.py   # closed loop, 3 strategies x 12 loads + video (~10 min)
+MUJOCO_GL=egl crane/.venv/bin/python crane/playground_precompute.py # page playground data + fleet rows (~2 min)
+MUJOCO_GL=egl crane/.venv/bin/python crane/render_clip.py --rope 5.2 --sling 2.8 --payload 0.7 --speed 0.9
 ```
 
 `python3 -I crane/exp1_real.py --no-ml` runs only the physics baselines, with the standard library.
@@ -55,6 +70,8 @@ MUJOCO_GL=egl crane/.venv/bin/python crane/mujoco_demo.py # fleet data, held-out
 | `real_data.py` | loads the lab-crane runs into 10 Hz rows (12 features, targets +0.5 s / +1.0 s); pendulum baseline |
 | `exp1_real.py`, `exp2_real.py` | real-data experiments; results in `results/*.json` |
 | `mujoco_crane.py`, `mujoco_demo.py` | MuJoCo overhead crane (rail, trolley, rope, hook, slings, beam), demo and video |
+| `mujoco_closed_loop.py` | closed loop: TabPFN chooses speed and anti-sway tuning per move, vs. industry anti-sway |
+| `playground_precompute.py`, `render_clip.py` | page playground (option A, 81 precomputed runs) and any-parameter MP4 clip (option B) |
 | `data_tools/` | dataset download, the period check (measured vs. textbook pendulum), an xlsx reader |
 | `sim-check/` | Node checks of the explainer page's in-browser simulation (`node crane/sim-check/test.js 30`) |
 | `DATASETS.md`, `LESSONS.md` | dataset search and citation; the four Prior Labs lessons with links |

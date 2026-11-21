@@ -1,0 +1,88 @@
+{
+ "rounds": {
+  "0": {
+   "context_recorded": 512,
+   "context_own_mistakes": 0,
+   "wall_s": 79.8,
+   "flown_ms": 150.4,
+   "drift_at": {
+    "20ms": 0.44,
+    "50ms": 1.05,
+    "100ms": 5.66
+   },
+   "mean": 5.088151592468812,
+   "max": 19.575132843359647
+  },
+  "1": {
+   "context_recorded": 256,
+   "context_own_mistakes": 256,
+   "wall_s": 36.3,
+   "flown_ms": 67.2,
+   "drift_at": {
+    "20ms": 0.47,
+    "50ms": 3.58
+   },
+   "mean": 2.268609726754834,
+   "max": 8.4389969823529
+  },
+  "2": {
+   "context_recorded": 256,
+   "context_own_mistakes": 256,
+   "wall_s": 42.1,
+   "flown_ms": 79.0,
+   "drift_at": {
+    "20ms": 0.09,
+    "50ms": 1.7
+   },
+   "mean": 1.8973636227951207,
+   "max": 8.200872353296136
+  },
+  "3": {
+   "context_recorded": 256,
+   "context_own_mistakes": 256,
+   "wall_s": 44.1,
+   "flown_ms": 83.20000000000002,
+   "drift_at": {
+    "20ms": 0.12,
+    "50ms": 2.49
+   },
+   "mean": 2.917986390916904,
+   "max": 11.402446698485878
+  },
+  "4": {
+   "context_recorded": 256,
+   "context_own_mistakes": 256,
+   "wall_s": 59.2,
+   "flown_ms": 115.4,
+   "drift_at": {
+    "20ms": 0.17,
+    "50ms": 2.41,
+    "100ms": 10.36
+   },
+   "mean": 4.4709238069109105,
+   "max": 14.36553620426845
+  }
+ },
+ "transfer": {
+  "smooth_then_saccade": {
+   "flown_ms": 114.8,
+   "drift_at": {
+    "20ms": 0.15,
+    "50ms": 2.39,
+    "100ms": 9.9
+   },
+   "mean": 4.251021125210524,
+   "max": 13.769775691529297
+  },
+  "saccade_then_smooth": {
+   "flown_ms": 146.6,
+   "drift_at": {
+    "20ms": 0.24,
+    "50ms": 1.31,
+    "100ms": 3.83
+   },
+   "mean": 2.1373761313495176,
+   "max": 6.98751155854621
+  }
+ }
+}

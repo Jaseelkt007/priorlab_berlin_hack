@@ -1,0 +1,45 @@
+{
+ "smooth": {
+  "steps": 682,
+  "sim_s": 0.1364,
+  "reached_end": false,
+  "saccade_t": null,
+  "wall_s": 82.4,
+  "drift_mm": {
+   "all": {
+    "mean": 3.9461944891377603,
+    "max": 15.448777550789874
+   }
+  }
+ },
+ "smooth_then_saccade": {
+  "steps": 355,
+  "sim_s": 0.07100000000000001,
+  "reached_end": false,
+  "saccade_t": 0.6,
+  "wall_s": 39.8,
+  "drift_mm": {
+   "all": {
+    "mean": 1.499025386965528,
+    "max": 7.113208151538065
+   }
+  }
+ },
+ "saccade_then_smooth": {
+  "steps": 629,
+  "sim_s": 0.1258,
+  "reached_end": false,
+  "saccade_t": 0.15,
+  "wall_s": 70.1,
+  "drift_mm": {
+   "all": {
+    "mean": 3.7500844352800966,
+    "max": 14.272556036665687
+   },
+   "before": {
+    "mean": 5.7232056964570655,
+    "max": 14.272556036665687
+   }
+  }
+ }
+}

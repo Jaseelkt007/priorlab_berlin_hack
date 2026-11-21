@@ -1,0 +1,78 @@
+{
+ "smooth": {
+  "steps": 4994,
+  "sim_s": 0.9988,
+  "reached_end": true,
+  "saccade_t": null,
+  "wall_s": 44.0,
+  "drift_mm": {
+   "all": {
+    "mean": 0.0593312139435871,
+    "max": 0.11874387165871955
+   }
+  }
+ },
+ "smooth_then_saccade": {
+  "steps": 4994,
+  "sim_s": 0.9988,
+  "reached_end": true,
+  "saccade_t": 0.6,
+  "wall_s": 43.3,
+  "drift_mm": {
+   "all": {
+    "mean": 0.1219880433728359,
+    "max": 1.143058098837448
+   },
+   "before": {
+    "mean": 0.0591557343733824,
+    "max": 0.08873101016347235
+   },
+   "saccade": {
+    "mean": 0.6159014340316581,
+    "max": 1.143058098837448
+   },
+   "after": {
+    "mean": 0.17656910560788452,
+    "max": 0.7078918366780073
+   }
+  }
+ },
+ "saccade_then_smooth": {
+  "steps": 4994,
+  "sim_s": 0.9988,
+  "reached_end": true,
+  "saccade_t": 0.15,
+  "wall_s": 43.6,
+  "drift_mm": {
+   "all": {
+    "mean": 0.1253365139879713,
+    "max": 1.1712251014575652
+   },
+   "before": {
+    "mean": 0.05891618342177675,
+    "max": 0.08897292736025306
+   },
+   "saccade": {
+    "mean": 0.6214511940549464,
+    "max": 1.1712251014575652
+   },
+   "after": {
+    "mean": 0.18975259684300336,
+    "max": 0.7468274386364466
+   }
+  }
+ },
+ "curve": {
+  "steps": 4994,
+  "sim_s": 0.9988,
+  "reached_end": true,
+  "saccade_t": null,
+  "wall_s": 175.1,
+  "drift_mm": {
+   "all": {
+    "mean": 0.12334045730555071,
+    "max": 0.23046286343768066
+   }
+  }
+ }
+}

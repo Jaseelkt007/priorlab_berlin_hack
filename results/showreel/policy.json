@@ -1,0 +1,39 @@
+{
+ "controller": "Trained policy (teacher)",
+ "context_steps": 4096,
+ "segments": [
+  {
+   "path": "tour",
+   "flew_ms": 4000.8,
+   "planned_ms": 4000.0,
+   "ended": "path end",
+   "drift_mean_mm": 0.155,
+   "drift_max_mm": 1.438
+  },
+  {
+   "path": "S-curve",
+   "flew_ms": 2000.8,
+   "planned_ms": 2000.0,
+   "ended": "path end",
+   "drift_mean_mm": 0.093,
+   "drift_max_mm": 0.288
+  },
+  {
+   "path": "tight curve",
+   "flew_ms": 1000.8,
+   "planned_ms": 1000.0,
+   "ended": "path end",
+   "drift_mean_mm": 0.124,
+   "drift_max_mm": 0.292
+  },
+  {
+   "path": "sudden turn, then smooth",
+   "flew_ms": 102.2,
+   "planned_ms": 1500.0,
+   "ended": "video full",
+   "drift_mean_mm": 0.12,
+   "drift_max_mm": 0.215
+  }
+ ],
+ "wall_s": 545
+}

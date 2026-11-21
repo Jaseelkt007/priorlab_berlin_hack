@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 import mujoco
 import numpy as np
 
-from .pneumatics import EJECTORS, P_ATM, LipLeak, VacuumCircuit, VacuumSensor
+from .pneumatics import EJECTORS, P_ATM, LipLeak, VacuumCircuit, VacuumSensor, step_lip_fast
 
 
 @dataclass
@@ -33,6 +33,14 @@ class CupConfig:
     zeta: float = 1.0                # lip damping ratio (critical)
     delta_max: float = 0.004         # m, lip compression range
     lip_r: float = 0.00075           # m, radius of the lip contact sphere
+    # bellows between effector and lip ring (model-suction.md §4.1). Axial stiffness: Schmalz upper bound
+    # F_suction/Z; tilt k_θ = k_bz·R²/2 and lateral k_lat = 6·k_bz·R²/L² from thin-walled-tube beam theory
+    # (fixed–guided beam, as in Hudoklin et al. 2022's beam model of cup bending).
+    bellows: bool = False
+    k_bz: float = 1240.0             # N/m (SPB1 20: ≤ 9.9 N / 8 mm)
+    R_b: float = 0.0088              # m, mean bellows radius ≈ (Ds + d2)/4 for SPB1 20 (21.4, 13.8 mm)
+    L_b: float = 0.012               # m, bellows length (not published; swept in V15)
+    Z_stroke: float = 0.008          # m, SPB1 20 stroke
     g_det: float = 0.003             # m, contact detection band (margin = gap)
     # pneumatics
     ejector: str = "Si08-3"
@@ -50,6 +58,7 @@ class CupConfig:
     # numerics
     dt: float = 2e-4
     n_sub: int = 10
+    fast_ode: bool = True            # compiled pneumatics (identical equations; see tests/test_pneumatics.py)
     solref: tuple = (0.002, 1.0)
     noslip: int = 10                 # MuJoCo noslip iterations: removes soft-constraint creep inside the friction cone
     limit_solref: tuple = (0.0005, 1.0)  # stiff lip end stop at free length (default 0.02 lets a lip stretch)
@@ -59,7 +68,7 @@ class CupCell:
     def __init__(self, cfg: CupConfig | None = None, seed: int = 0):
         self.cfg = c = cfg or CupConfig()
         sx, sy, sz = (s / 2 for s in c.size)
-        m_l = c.cup_mass / c.n_seg
+        m_l = (c.cup_mass / 2 if c.bellows else c.cup_mass) / c.n_seg
         k_l = c.k_ring / c.n_seg
         d_l = 2 * c.zeta * np.sqrt(k_l * m_l)
         lips, pairs = [], []
@@ -75,6 +84,26 @@ class CupCell:
             pairs.append(f'<pair geom1="lipg{i}" geom2="prod" condim="3" friction="{c.mu} {c.mu} 0.005 0.0001 0.0001" '
                          f'solref="{c.solref[0]} {c.solref[1]}" solimp="0.95 0.99 0.0005" margin="0" gap="{c.g_det}"/>')
         z0 = c.size[2] + c.lip_r + 0.001  # lips 1 mm above the product top at start
+        if c.bellows:
+            m_b = c.cup_mass / 2
+            k_t = c.k_bz * c.R_b ** 2 / 2
+            k_lat = 6 * c.k_bz * c.R_b ** 2 / c.L_b ** 2
+            I_b = m_b * c.L_b ** 2 / 3
+            zc = lambda k, mm: 2 * c.zeta * np.sqrt(k * mm)
+            cup_block = f'''<body name="cupbase" pos="0 0 {c.L_b}">
+        <joint name="blx" type="slide" axis="1 0 0" stiffness="{k_lat:.6g}" damping="{zc(k_lat, m_b):.6g}"/>
+        <joint name="bly" type="slide" axis="0 1 0" stiffness="{k_lat:.6g}" damping="{zc(k_lat, m_b):.6g}"/>
+        <joint name="bz" type="slide" axis="0 0 1" range="0 {c.Z_stroke}" limited="true" solreflimit="{c.limit_solref[0]} {c.limit_solref[1]}" stiffness="{c.k_bz}" damping="{zc(c.k_bz, m_b):.6g}"/>
+        <joint name="btx" type="hinge" axis="1 0 0" stiffness="{k_t:.6g}" damping="{zc(k_t, I_b):.6g}"/>
+        <joint name="bty" type="hinge" axis="0 1 0" stiffness="{k_t:.6g}" damping="{zc(k_t, I_b):.6g}"/>
+        <inertial pos="0 0 {-c.L_b / 2}" mass="{m_b:.6g}" diaginertia="{I_b:.4g} {I_b:.4g} {I_b:.4g}"/>
+        <body name="cupring" pos="0 0 {-c.L_b}">
+          <site name="cupc" pos="0 0 0"/>
+          {''.join(lips)}
+        </body>
+      </body>'''
+        else:
+            cup_block = f'<site name="cupc" pos="0 0 0"/>{"".join(lips)}'
         xml = f"""
 <mujoco model="cup">
   <option timestep="{c.dt}" integrator="implicitfast" cone="elliptic" impratio="10" noslip_iterations="{c.noslip}" gravity="0 0 -9.81"/>
@@ -85,8 +114,7 @@ class CupCell:
       <joint name="ey" type="slide" axis="0 1 0"/>
       <joint name="ez" type="slide" axis="0 0 1"/>
       <inertial pos="0 0 0.02" mass="0.5" diaginertia="1e-3 1e-3 1e-3"/>
-      <site name="cupc" pos="0 0 0"/>
-      {''.join(lips)}
+      {cup_block}
     </body>
     <body name="prod" pos="0 0 {sz}">
       <freejoint name="prod_free"/>
@@ -104,6 +132,9 @@ class CupCell:
         m = self.m
         self.lip_geoms = np.array([m.geom(f"lipg{i}").id for i in range(c.n_seg)])
         self.prod_geom, self.prod_body, self.eff_body = m.geom("prod").id, m.body("prod").id, m.body("eff").id
+        # the vacuum reaction acts on the cup's ceiling (the rigid fitting on the effector); the lips and bellows
+        # then carry the product's pull as compression ("lifting effect" of bellows cups)
+        self.ring_body = self.eff_body
         self.lip_qadr = np.array([m.jnt_qposadr[m.joint(f"lz{i}").id] for i in range(c.n_seg)])
         self.prod_qadr = m.jnt_qposadr[m.joint("prod_free").id]
         self.site = m.site("cupc").id
@@ -165,15 +196,18 @@ class CupCell:
             # pressure acts normal to the sealed face: the product's top-face normal (its local +z)
             axis = d.xmat[self.prod_body].reshape(3, 3)[:, 2].copy()
             mujoco.mj_applyFT(m, d, F_vac * axis, np.zeros(3), point, self.prod_body, d.qfrc_applied)
-            mujoco.mj_applyFT(m, d, -F_vac * axis, np.zeros(3), point, self.eff_body, d.qfrc_applied)
+            mujoco.mj_applyFT(m, d, -F_vac * axis, np.zeros(3), point, self.ring_body, d.qfrc_applied)
         if np.any(self.ext_force) or np.any(self.ext_torque):
             mujoco.mj_applyFT(m, d, self.ext_force, self.ext_torque, d.xipos[self.prod_body].copy(), self.prod_body, d.qfrc_applied)
         mujoco.mj_step(m, d)
         self.t += c.dt
         self.gaps = self.read_gaps()
         if c.frozen_dp is None:
-            gaps = self.gaps
-            self.vac.step(c.dt, lambda pc: self.leak.mdot(pc, gaps))
+            if c.fast_ode:
+                step_lip_fast(self.vac, c.dt, self.leak, self.gaps)
+            else:
+                gaps = self.gaps
+                self.vac.step(c.dt, lambda pc: self.leak.mdot(pc, gaps))
         self.sensor.update(self.t, c.dt, self.dp)
 
     def hold(self, T: float, p, rec=None):

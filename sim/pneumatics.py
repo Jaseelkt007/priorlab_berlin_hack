@@ -189,3 +189,96 @@ class VacuumSensor:
         if t >= self._t_next:
             self.readings.append((t, (self._y + self.rng.normal(0, self.sigma)) / 1e3))
             self._t_next += 1.0 / self.f_s
+
+
+# ---------------------------------------------------------------- compiled fast path (same equations, Numba)
+import numba as _nb
+
+_C_PER_M2 = float(sonic_conductance(1.0))
+
+
+@_nb.njit(cache=True)
+def _iso_nb(C, p_up, p_down, b):
+    ratio = p_down / p_up
+    if ratio < 0.0:
+        ratio = 0.0
+    if ratio > 1.0:
+        ratio = 1.0
+    base = C * RHO0 * p_up
+    if ratio <= b:
+        return base
+    x = 1.0 - ((ratio - b) / (1.0 - b)) ** 2
+    return base * np.sqrt(x) if x > 0.0 else 0.0
+
+
+@_nb.njit(cache=True)
+def _lip_leak_nb(p_c, gaps, g0, K_p, L_y, L_x, C_d, p_a, combine_min):
+    tot = 0.0
+    lam = MFP_AIR * P_ATM / (0.5 * (p_a + p_c))
+    dp2 = p_a * p_a - p_c * p_c
+    if dp2 < 0.0:
+        dp2 = 0.0
+    for i in range(gaps.shape[0]):
+        g = g0 + (gaps[i] if gaps[i] > 0.0 else 0.0)
+        if g <= 0.0:
+            continue
+        visc = (L_y / L_x) * dp2 * g ** 3 / (24.0 * ETA_AIR * R_AIR * T0) * (1.0 + (32.0 / np.pi) * lam / g)
+        orif = _iso_nb(_C_PER_M2 * C_d * L_y * g, p_a, p_c, B_IDEAL)
+        if combine_min:
+            tot += visc if visc < orif else orif
+        else:
+            tot += 1.0 / (1.0 / visc + 1.0 / orif)
+    return tot + K_p * dp2
+
+
+@_nb.njit(cache=True)
+def _ej_nb(dp, tab_dp, tab_q, dp_max):
+    if dp <= 0.0:
+        return RHO0 * tab_q[0]
+    if dp >= dp_max:
+        return 0.0
+    return RHO0 * np.interp(dp, tab_dp, tab_q)
+
+
+@_nb.njit(cache=True)
+def _deriv_nb(pc, pl, gaps, g0, K_p, L_y, L_x, C_d, p_a, cmin, tab_dp, tab_q, dp_max, V_cup, V_line, C_h, b_h, on, dVdt):
+    k = R_AIR * T0
+    leak = _lip_leak_nb(pc, gaps, g0, K_p, L_y, L_x, C_d, p_a, cmin)
+    if V_line <= 0.0:
+        ej = _ej_nb(p_a - pc, tab_dp, tab_q, dp_max) if on else 0.0
+        return k / V_cup * (leak - ej) - pc * dVdt / V_cup, 0.0
+    h = _iso_nb(C_h, pc, pl, b_h) if pc >= pl else -_iso_nb(C_h, pl, pc, b_h)
+    ej = _ej_nb(p_a - pl, tab_dp, tab_q, dp_max) if on else 0.0
+    return k / V_cup * (leak - h) - pc * dVdt / V_cup, k / V_line * (h - ej)
+
+
+@_nb.njit(cache=True)
+def _rk4_nb(pc, pl, dt, n_sub, gaps, g0, K_p, L_y, L_x, C_d, p_a, cmin, tab_dp, tab_q, dp_max, V_cup, V_line, C_h, b_h, on, dVdt):
+    h = dt / n_sub
+    lo = p_a - dp_max - 1.0
+    for _ in range(n_sub):
+        a1, b1 = _deriv_nb(pc, pl, gaps, g0, K_p, L_y, L_x, C_d, p_a, cmin, tab_dp, tab_q, dp_max, V_cup, V_line, C_h, b_h, on, dVdt)
+        a2, b2 = _deriv_nb(pc + 0.5 * h * a1, pl + 0.5 * h * b1, gaps, g0, K_p, L_y, L_x, C_d, p_a, cmin, tab_dp, tab_q, dp_max, V_cup, V_line, C_h, b_h, on, dVdt)
+        a3, b3 = _deriv_nb(pc + 0.5 * h * a2, pl + 0.5 * h * b2, gaps, g0, K_p, L_y, L_x, C_d, p_a, cmin, tab_dp, tab_q, dp_max, V_cup, V_line, C_h, b_h, on, dVdt)
+        a4, b4 = _deriv_nb(pc + h * a3, pl + h * b3, gaps, g0, K_p, L_y, L_x, C_d, p_a, cmin, tab_dp, tab_q, dp_max, V_cup, V_line, C_h, b_h, on, dVdt)
+        pc = min(max(pc + h / 6.0 * (a1 + 2 * a2 + 2 * a3 + a4), lo), p_a)
+        pl = min(max(pl + h / 6.0 * (b1 + 2 * b2 + 2 * b3 + b4), lo), p_a)
+    return pc, pl
+
+
+def _ej_table(ej: EjectorCurve, n: int = 4001):
+    dp = np.linspace(0.0, ej.dp_max, n)
+    return dp, np.asarray(ej.q_m3s(dp), float)
+
+
+def step_lip_fast(circ: VacuumCircuit, dt: float, leak: LipLeak, gaps, dVdt_cup: float = 0.0) -> float:
+    """Compiled equivalent of circ.step(dt, lambda p: leak.mdot(p, gaps), dVdt_cup)."""
+    if not hasattr(circ, "_tab"):
+        circ._tab = _ej_table(circ.ejector)
+    tdp, tq = circ._tab
+    L_y = 2 * np.pi * leak.r_lip / leak.n_seg
+    pc, pl = _rk4_nb(circ.p_cup, circ.p_line, dt, circ.n_sub, np.ascontiguousarray(gaps, dtype=np.float64), leak.g0, leak.K_p,
+                     L_y, leak.L_x, leak.C_d, circ.p_a, leak.combine == "min", tdp, tq, circ.ejector.dp_max,
+                     circ.V_cup, circ.V_line, circ.C_hose if circ.C_hose is not None else 0.0, circ.b_hose, circ.on, dVdt_cup)
+    circ.p_cup, circ.p_line = pc, pl
+    return circ.p_a - pc

@@ -119,3 +119,22 @@ def test_v4_force_with_vacuum_dependent_area():
     # and the d_eff trend the research reported: 24.8 -> 20.1 -> 17.6 mm
     d = np.sqrt(4 * A / np.pi) * 1e3
     assert np.allclose(d, [24.8, 20.1, 17.6], atol=0.15)
+
+
+# ---------------- compiled fast path must reproduce the reference integrator
+@pytest.mark.parametrize("two_node", [False, True])
+def test_fast_path_matches_reference(two_node):
+    from sim.pneumatics import step_lip_fast
+    rng = np.random.default_rng(1)
+    leak = LipLeak(g0=3e-6, K_p=1e-15)
+    kw = dict(V_line=4e-6, C_hose=float(sonic_conductance(2e-6))) if two_node else {}
+    a = VacuumCircuit(EJECTORS["Si08-3"], V_cup=4.2e-6, **kw)
+    b = VacuumCircuit(EJECTORS["Si08-3"], V_cup=4.2e-6, **kw)
+    worst = 0.0
+    for k in range(3000):
+        gaps = np.where(rng.random(16) < 0.2, rng.uniform(0, 60e-6, 16), 0.0) if k > 1500 else np.zeros(16)
+        a.step(2e-4, lambda p: leak.mdot(p, gaps))
+        step_lip_fast(b, 2e-4, leak, gaps)
+        worst = max(worst, abs(a.p_cup - b.p_cup), abs(a.p_line - b.p_line))
+    print(f"\nmax |Δp| fast vs reference: {worst:.3f} Pa (two_node={two_node})")
+    assert worst < 20.0  # Pa; differences come only from the dense ejector table vs PCHIP

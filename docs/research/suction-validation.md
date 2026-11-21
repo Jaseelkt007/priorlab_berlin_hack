@@ -69,3 +69,15 @@ Cup: Schmalz SPB1 20 class. 16 lip segments on spring slide joints (Dex-Net ring
 
 - **Lateral lip compliance is not modelled.** The lips slide only along the cup axis. With a soft ring (4000 N/m) the product tilts about 11° before lift-off, and friction at the laterally rigid lips then carries extra moment. The external peel moment is +29 % above the linear-ring value (frozen pressure) and about +45 % with the pressure model on. With a stiffer ring (12000 N/m, 4° tilt) this drops to +0.6 %. Real bellows cups are compliant sideways, so the bellows tilt joints (spec §4.1) or lateral lip compliance should be added, and the ring stiffness calibrated.
 - **Speed.** With the pneumatics on, the Python sub-stepped ODE runs about 10× slower than real time (about 3 s wall per 0.3 s simulated). This must be optimised before bulk log generation (a vectorised or compiled ODE).
+
+## Gate 3, in progress (2026-11-22)
+
+- **Speed:** the pneumatics are compiled with Numba (same equations). They match the reference integrator within 0.004 Pa (one and two nodes, `tests/test_pneumatics.py`) and run **12.6× faster**: the cup simulation went from 0.11× to 1.38× real time.
+- **Bellows compliance added** (`CupConfig(bellows=True)`): axial, tilt and lateral joints between the fitting and the lip ring.
+  - Axial: k_bz ≤ F_suction/Z (Schmalz bound), with an end stop at the 8 mm stroke.
+  - Tilt: k_θ = k_bz·R²/2.
+  - Lateral: k_lat = 6·k_bz·R²/L², from thin-walled-tube beam theory (fixed–guided beam, as in Hudoklin et al. 2022). We tried to verify the equivalent EJMA formulas by search and could not, so they are not cited.
+  - The vacuum reaction acts on the cup's ceiling (the fitting), so the bellows is compressed.
+  - **Check:** a hanging 200 g product compresses the bellows 6.5 mm against 6.4 mm predicted, which reproduces the "lifting effect".
+- **Finding:** with bellows compliance at the published stiffness bound, the cup and product tilt 30–37° before the first lip lifts off. The lip springs still meet the Dex-Net onset rule (+2 % / +8 %). At such tilts no closed-form reference exists for the external moment. This regime is therefore handled by the **V15 sensitivity sweep** (drop thresholds under pick accelerations across the sourced stiffness ranges), not by a single validated number.
+- All 21 gate-1 and gate-2 tests still pass (bellows off by default).

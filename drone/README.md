@@ -7,7 +7,7 @@ Full detail and every experiment: [`EXPERIMENTS.md`](EXPERIMENTS.md).
 
 A small drone flies toward a protected site. A radar sees it, but the readings are noisy and sometimes missing.
 
-**TabPFN predicts where the drone will be in 1, 1.5 and 2 seconds, with a range ("it will be somewhere in this cone"), and raises the alarm before it reaches the site.** It has never seen this kind of drone before; it adapts from a few radar readings, without retraining.
+**TabPFN predicts where the drone will be in 1 second, with a range ("it will be somewhere in this cone"), and raises the alarm before it reaches the site.** It has never seen this kind of drone before; it adapts from a few radar readings, without retraining.
 
 We compare it with what real radar trackers use: an **IMM**, three Kalman-type filters (straight, speeding up, turning) that switch automatically.
 
@@ -28,7 +28,7 @@ We compare it with what real radar trackers use: an **IMM**, three Kalman-type f
 
 **Inputs** (16 numbers, from the radar only): where the drone is relative to the zone, how fast it goes, whether it is turning, climbing or speeding up, the same a second or two ago, and how many radar readings were missing.
 
-**Outputs**: where it will be after 1, 1.5 and 2 s, as x, y, z (with a range), and **alarm**: will it enter the zone within 2 s?
+**Output**: where it will be in 1 s, as x, y, z (with a range), and **alarm**: will it enter the zone within 2 s?
 
 ## Status
 
@@ -40,19 +40,19 @@ We compare it with what real radar trackers use: an **IMM**, three Kalman-type f
 | IMM tracker (what real radars use) | done: tuned on X2, tested on Crazyflie |
 | TabPFN | code ready (`tabpfn_model.py`); runs once `TABPFN_TOKEN` is in `.env` |
 | TabPFN fine-tuned | if the GPU allows |
-| Demo: prediction cone + alarm in the viewer | planned |
+| 3D demo: real vs predicted x, y, z + alarm, live or as video | done for the IMM; TabPFN next |
 
 ## Results so far
 
-Median error between the predicted and the real position, on the small-drone test flights:
+Small-drone test flights. Error = how far the prediction for 1 s ahead is from where the drone really was (median):
 
-| Model | 1 s ahead | 1.5 s ahead | 2 s ahead |
-|---|---|---|---|
-| IMM (what real radars use) | 1.55 m | 2.19 m | 2.88 m |
-| TabPFN A (learned from X2 only) | *needs token* | | |
-| TabPFN B (X2 + a few Crazyflie flights) | *needs token* | | |
+| Model | Error 1 s ahead | Alarm: breaches caught |
+|---|---|---|
+| IMM (what real radars use) | 1.54 m | 99% |
+| TabPFN A (learned from X2 only) | *needs token* | |
+| TabPFN B (X2 + a few Crazyflie flights) | *needs token* | |
 
-The IMM is a strong opponent: its 90% cone is honest (89-90%), and its 2 s alarm catches 99% of breaches. `python drone/compare.py` scores every model on the same test rows.
+The IMM is a strong opponent: its 90% range is honest (89%), and its 2 s alarm catches 99% of breaches at 1 false alarm per 20 safe moments. `python drone/compare.py` scores every model on the same test rows.
 
 ## Try it
 
@@ -62,6 +62,8 @@ From the repo root, in the `priorlab` conda env. First get the drone models: see
 python drone/view_drones.py                 # fly the two drones with the keyboard
 python drone/intruder.py --view 8           # watch an intruder flight (any number)
 python drone/intruder.py --drone cf2 --view 8
+python drone/demo_imm.py --view radar       # a test flight: real vs IMM-predicted position, live
+python drone/demo_imm.py --view radar --record data/demo_radar_54.mp4   # the same as a video  (needs: pip install imageio-ffmpeg)
 ```
 
 Make the data again (it is not in git):
@@ -88,5 +90,6 @@ python drone/compare.py                              # the results table
 | `imm.py` | the IMM tracker (the baseline to beat) |
 | `tabpfn_model.py` | TabPFN: predicts positions with a range, and the alarm |
 | `compare.py` | scores IMM and TabPFN on the same test rows |
+| `demo_imm.py` | the 3D demo: real vs predicted position, alarm, video recording |
 | `view_drones.py` | keyboard flying |
 | `EXPERIMENTS.md` | full detail, results by manoeuvre, everything we tried |

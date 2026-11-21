@@ -18,7 +18,7 @@ Crashed flights are dropped. Crazyflie flights use different random seeds, so th
 
 ## 2. The table: every input and output
 
-Each radar reading becomes **one row**. A row answers: *"given what the radar has seen up to now, where will the drone be 1, 1.5 and 2 s from now, and will it enter the zone within 2 s?"*
+Each radar reading becomes **one row**. A row answers: *"given what the radar has seen up to now, where will the drone be 1 s from now, and will it enter the zone within 2 s?"*
 
 **The example row** used below is a real one: small-drone test flight #100000 at 10.2 s, in the middle of a zigzag, 48 m from the zone. The radar had just lost it for most of the last second (7 of 10 readings missing).
 
@@ -63,15 +63,13 @@ Inputs 11-14 are empty (NaN) in the first seconds of a track, when there is no "
 | Name | What it means | Unit | Example (real) |
 |---|---|---|---|
 | `x_1s`, `y_1s`, `z_1s` | where the drone really was 1 s later | m | 19.6, -42.6, 22.3 |
-| `x_1.5s`, `y_1.5s`, `z_1.5s` | … 1.5 s later | m | 19.2, -42.5, 23.2 |
-| `x_2s`, `y_2s`, `z_2s` | … 2 s later | m | 19.3, -42.2, 24.1 |
 | `breach_2s` | 1 if it entered the zone within 2 s, else 0 (the alarm) | 0 / 1 | 0 |
 
-In the example the drone was at (19.9, -43.4, 20.6) and still climbing, so 2 s later it is 3.5 m higher and has barely moved sideways.
+In the example the drone was at (19.9, -43.4, 20.6) and still climbing, so 1 s later it is 1.7 m higher and has barely moved sideways.
 
 **What a model gives back:** for each position, a best guess plus a 5%-95% range (the cone); for the alarm, a probability (e.g. "8% chance of a breach within 2 s").
 
-**How models learn the positions:** as movement from the current estimate in the drone's view (forward, left, up), e.g. here 1.31 m forward, 0.21 m right, 3.50 m up after 2 s. That is easier to learn; it converts back to x, y, z exactly (`to_world`), and all scoring is done in x, y, z.
+**How models learn the positions:** as movement from the current estimate in the drone's view (forward, left, up), e.g. here 0.89 m forward, 0.23 m right, 1.62 m up after 1 s. That is easier to learn; it converts back to x, y, z exactly (`to_world`), and all scoring is done in x, y, z.
 
 ### Rules
 
@@ -81,23 +79,23 @@ In the example the drone was at (19.9, -43.4, 20.6) and still climbing, so 2 s l
 
 ## 3. Results
 
-We predict **1, 1.5 and 2 s ahead** (team decision: short-term predictions are what a defence system can act on, and much further ahead nobody can predict a drone that changes its mind).
+We predict **one thing: where the drone will be 1 s from now (x, y, z)**, plus the alarm (experiment 9 says why).
 
-**Test set:** the 250 Crazyflie flights after the first 50 (those 50 are kept for "adapting" TabPFN, version B), one row per 0.5 s: 22,020 position rows, 22,973 alarm rows (428 breaches). Scored by `python drone/compare.py`; every model is scored on exactly these rows.
+**Test set:** the 250 Crazyflie flights after the first 50 (those 50 are kept for "adapting" TabPFN, version B), one row per 0.5 s: 22,501 position rows, 22,973 alarm rows (428 breaches). Scored by `python drone/compare.py`; every model is scored on exactly these rows.
 
-**Position:** median error (m) between the predicted and the real position. Lower is better.
+| Model | Error 1 s ahead (median) | Truth inside its 90% range | Alarm AUC | Breaches caught (1 false alarm per 20) |
+|---|---|---|---|---|
+| IMM (tuned on X2 flights) | **1.54 m** | 89% | 0.989 | 99% |
+| TabPFN A (learned from X2 only) | *needs token* | | | |
+| TabPFN B (X2 + rows from 50 other Crazyflie flights) | *needs token* | | | |
 
-| Model | 1 s ahead | 1.5 s ahead | 2 s ahead |
-|---|---|---|---|
-| IMM (tuned on X2 flights) | 1.55 | 2.19 | 2.88 |
-| TabPFN A (learned from X2 only) | *needs token* | | |
-| TabPFN B (X2 + rows from 50 other Crazyflie flights) | *needs token* | | |
+**Error** = distance between the predicted and the real position. **Range:** how often the real position is inside the 5%-95% range, per direction (should be 90%): the IMM's range is honest.
 
-**Cone:** how often the real position is inside the 5%-95% range, per direction (should be 90%). IMM: 89% / 89% / 90%, so its cone is honest.
+**Alarm** ("will it enter the zone within 2 s?"): AUC (1.0 = perfect, 0.5 = coin flip) and the share of breaches caught when we accept 1 false alarm per 20 safe moments. The alarm is nearly solved by plain physics: 2 s ahead, a slow drone cannot surprise anyone much. TabPFN can at best match it here.
 
-**Alarm** ("will it enter the zone within 2 s?"): AUC (1.0 = perfect, 0.5 = coin flip) and the share of breaches caught when we accept 1 false alarm per 20 safe moments. IMM: **AUC 0.989, 99% caught**. The alarm is nearly solved by plain physics: 2 s ahead, a slow drone cannot surprise anyone much. TabPFN can at best match it here.
+**Where the IMM goes wrong:** in single flights it is often off right after the drone changes what it is doing (dive → hover → climb). Over all test rows, though, rows with a manoeuvre change in the next second are *not* worse (1.48 vs 1.54 m): many changes barely change the motion within 2 s (e.g. straight → zigzag). So TabPFN's chance is not one obvious weak spot; it has to be a little better almost everywhere.
 
-**Where the IMM goes wrong:** in single flights it is often off right after the drone changes what it is doing (dive → hover → climb). Over all test rows, though, rows with a manoeuvre change ahead are *not* worse (1.49 vs 1.55 m at 1 s): many changes barely change the motion within 2 s (e.g. straight → zigzag). So TabPFN's chance is not one obvious weak spot; it has to be a little better almost everywhere.
+**See it:** `python drone/demo_imm.py --view radar` plays a test flight in 3D with the real drone, the IMM's prediction and its error on screen (experiment 10).
 
 ## 4. Experiments
 
@@ -167,6 +165,17 @@ Each experiment in four lines: what happened, why, what we changed, and the resu
 - **Why:** predicting 3-5 s ahead means guessing a drone's next decision, which no method can do well; a defence system acts on the next 1-2 s. So we switched from 1 / 3 / 5 s to **1 / 1.5 / 2 s**, and the alarm from "within 5 s" to "**within 2 s**".
 - **Changed:** rebuilt both tables; re-tuned the IMM for 1.5 s ahead, to be fair to it.
 - **Result:** re-tuning barely changed it (big drone, 1.5 s: 3.30 → 3.28 m), so the earlier settings already suited short times. On the small drone: 1.55 / 2.19 / 2.88 m.
+
+### 9. One answer: where is it in 1 second?
+- **Why:** three horizons (1, 1.5, 2 s) made results and demo harder to read. One clear question: *where will the drone be in 1 second?* The radar-only IMM answers it first; TabPFN then answers the same question from the table.
+- **Changed:** the table's answer is now just `x_1s, y_1s, z_1s` (plus the 2 s alarm). The IMM was re-tuned for 1 s ahead.
+- **Result:** re-tuning picked the same settings (big drone 2.16 m), so the IMM stays as it was. Small drone: **1.54 m**.
+
+### 10. Seeing it: the 3D demo
+- **What:** `demo_imm.py` replays a small-drone test flight in MuJoCo with the real drone (green), the radar dots (white), the IMM's guess for 1 s ahead with its 90% range (blue), and the guess it made 1 s ago for *now* (yellow; the yellow line is the error). Real and predicted x, y, z and the alarm are written on screen. Two views: `chase` (behind the drone) and `radar` (from the protected site). `--record file.mp4` saves a video.
+- **What happened:** flying the drone live inside the viewer gave a slightly different flight from the recorded one: the viewer touches the force we use for wind. The predictions then did not line up.
+- **Changed:** the flight is computed first, exactly as in the dataset, then played back. Checked: all 216 radar readings of flight 54 match the recording.
+- **Result:** flight 54 (an attack): the IMM is about 1.5-2 m off 1 s ahead (1.68 m median) and the alarm comes on 2.4 s before the breach.
 
 ## 5. Known limits
 

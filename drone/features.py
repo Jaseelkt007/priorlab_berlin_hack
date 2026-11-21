@@ -31,7 +31,7 @@ MISSING_WINDOW = 10  # n_missing counts gaps in the last 1 s
 # flight the fits gave nonsense (e.g. -69 m/s2). A real tracker also waits before confirming a track.
 MIN_VALID_VEL = 8  # of 15
 MIN_VALID_ACC = 12  # of 20
-HORIZONS = (1.0, 1.5, 2.0)  # s; short term, what a system can act on (team decision)
+HORIZONS = (1.0,)  # s; one answer: where the drone is in 1 s (team decision, EXPERIMENTS.md experiment 9)
 BREACH_WITHIN = 2.0  # s, the alarm window
 
 FEATURES = [

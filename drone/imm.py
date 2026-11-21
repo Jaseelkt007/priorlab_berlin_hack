@@ -26,7 +26,7 @@ from features import DATA, HORIZONS as TABLE_HORIZONS
 from intruder import RADAR_EVERY, RADAR_NOISE
 
 DT = RADAR_EVERY
-HORIZONS = np.arange(1, 9) * 0.25  # 0.25 .. 2 s: covers the table's 1 / 1.5 / 2 s and the 2 s alarm window
+HORIZONS = np.arange(1, 9) * 0.25  # 0.25 .. 2 s: covers the table's 1 s and the 2 s alarm window
 N = 10  # state size
 CV, CA, CT = 0, 1, 2
 # Which state components each model actually tracks. When the models are blended, a model that does not
@@ -248,7 +248,7 @@ def score(mean, table, label=""):
 
 
 def tune(n_flights):
-    """Coordinate search on X2 training flights: lowest median error at the middle horizon (1.5 s)."""
+    """Coordinate search on X2 training flights: lowest median error 1 s ahead."""
     table = dict(np.load(DATA / "table_x2.npz"))
     seeds, meas, lengths = load_tracks("x2", n_flights)
     sel = np.isin(table["flight"], seeds)
@@ -257,14 +257,14 @@ def tune(n_flights):
             "q_turn": [0.0003, 0.003, 0.03, 0.3], "p_stay": [0.9, 0.95, 0.98, 0.995, 0.999]}
     best = None
     # coordinate search: vary one setting at a time around the current best, two passes
-    current = Settings(q_cv=1.0, q_ca=0.003, q_ct=0.05, q_turn=0.003, p_stay=0.995)  # the 3 s tuning
+    current = Settings(q_cv=1.0, q_ca=0.001, q_ct=0.3, q_turn=0.003, p_stay=0.995)  # the 1.5 s tuning
     for _ in range(2):
         for key, values in grid.items():
             for v in values:
                 st = Settings(**{**asdict(current), key: v})
                 mean, _, _ = run(meas, lengths, st)
                 e = score(align(seeds, mean, table), table)
-                if best is None or e[1] < best[0][1]:
+                if best is None or e[0] < best[0][0]:
                     best = (e, st)
                     print(f"  better: {asdict(st)} -> " + " / ".join(f"{x:.2f}" for x in e) + " m", flush=True)
             current = best[1]
@@ -272,8 +272,8 @@ def tune(n_flights):
     return best[1]
 
 
-# Best settings from tuning on 150 X2 flights for the 1.5 s horizon (--tune; EXPERIMENTS.md, experiment 7).
-# X2 median error 1 / 1.5 / 2 s: 2.16 / 3.28 / 4.61 m.
+# Best settings from tuning on 150 X2 flights (--tune; EXPERIMENTS.md, experiments 7-9). Tuning for 1 s ahead
+# picked the same values as for 1.5 s. X2 median error 1 s ahead: 2.16 m.
 TUNED = Settings(q_cv=1.0, q_ca=0.001, q_ct=0.3, q_turn=0.003, p_stay=0.995)
 
 

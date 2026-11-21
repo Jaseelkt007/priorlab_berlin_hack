@@ -6,6 +6,6 @@ __pycache__/
 *:Zone.Identifier
 
 # Hackathon: external code and downloaded data stay local (large, separately licensed)
-third_party/
-data/
+/third_party/
+/data/
 *.mp4

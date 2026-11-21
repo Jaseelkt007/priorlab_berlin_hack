@@ -1,0 +1,214 @@
+{
+ "100": {
+  "tabpfn": {
+   "r2_mean": 0.6742080341701456,
+   "r2_per_action": {
+    "head_abduct": 0.577,
+    "head_twist": 0.294,
+    "head": 0.223,
+    "wing_yaw_left": 0.946,
+    "wing_roll_left": 0.842,
+    "wing_pitch_left": 0.955,
+    "wing_yaw_right": 0.953,
+    "wing_roll_right": 0.778,
+    "wing_pitch_right": 0.953,
+    "abdomen_abduct": 0.811,
+    "abdomen": 0.461,
+    "beat_freq_mod": 0.298
+   }
+  },
+  "gbt": {
+   "r2_mean": 0.6878842036865724,
+   "r2_per_action": {
+    "head_abduct": 0.576,
+    "head_twist": 0.613,
+    "head": 0.346,
+    "wing_yaw_left": 0.928,
+    "wing_roll_left": 0.798,
+    "wing_pitch_left": 0.898,
+    "wing_yaw_right": 0.935,
+    "wing_roll_right": 0.727,
+    "wing_pitch_right": 0.895,
+    "abdomen_abduct": 0.783,
+    "abdomen": 0.464,
+    "beat_freq_mod": 0.292
+   }
+  },
+  "mlp": {
+   "r2_mean": 0.5916535258293152,
+   "r2_per_action": {
+    "head_abduct": 0.4580000042915344,
+    "head_twist": 0.47699999809265137,
+    "head": 0.1550000011920929,
+    "wing_yaw_left": 0.8500000238418579,
+    "wing_roll_left": 0.6589999794960022,
+    "wing_pitch_left": 0.7609999775886536,
+    "wing_yaw_right": 0.8539999723434448,
+    "wing_roll_right": 0.5879999995231628,
+    "wing_pitch_right": 0.7689999938011169,
+    "abdomen_abduct": 0.6169999837875366,
+    "abdomen": 0.5600000023841858,
+    "beat_freq_mod": 0.35199999809265137
+   }
+  }
+ },
+ "500": {
+  "tabpfn": {
+   "r2_mean": 0.8375863404724889,
+   "r2_per_action": {
+    "head_abduct": 0.808,
+    "head_twist": 0.653,
+    "head": 0.533,
+    "wing_yaw_left": 0.978,
+    "wing_roll_left": 0.923,
+    "wing_pitch_left": 0.978,
+    "wing_yaw_right": 0.982,
+    "wing_roll_right": 0.914,
+    "wing_pitch_right": 0.979,
+    "abdomen_abduct": 0.936,
+    "abdomen": 0.835,
+    "beat_freq_mod": 0.532
+   }
+  },
+  "gbt": {
+   "r2_mean": 0.8242452883098497,
+   "r2_per_action": {
+    "head_abduct": 0.708,
+    "head_twist": 0.742,
+    "head": 0.502,
+    "wing_yaw_left": 0.977,
+    "wing_roll_left": 0.89,
+    "wing_pitch_left": 0.976,
+    "wing_yaw_right": 0.98,
+    "wing_roll_right": 0.887,
+    "wing_pitch_right": 0.973,
+    "abdomen_abduct": 0.946,
+    "abdomen": 0.81,
+    "beat_freq_mod": 0.5
+   }
+  },
+  "mlp": {
+   "r2_mean": 0.7475184798240662,
+   "r2_per_action": {
+    "head_abduct": 0.6259999871253967,
+    "head_twist": 0.6100000143051147,
+    "head": 0.24300000071525574,
+    "wing_yaw_left": 0.9240000247955322,
+    "wing_roll_left": 0.8550000190734863,
+    "wing_pitch_left": 0.8690000176429749,
+    "wing_yaw_right": 0.9100000262260437,
+    "wing_roll_right": 0.8140000104904175,
+    "wing_pitch_right": 0.8600000143051147,
+    "abdomen_abduct": 0.9129999876022339,
+    "abdomen": 0.7799999713897705,
+    "beat_freq_mod": 0.5669999718666077
+   }
+  }
+ },
+ "2000": {
+  "tabpfn": {
+   "r2_mean": 0.8777271106049381,
+   "r2_per_action": {
+    "head_abduct": 0.821,
+    "head_twist": 0.78,
+    "head": 0.599,
+    "wing_yaw_left": 0.99,
+    "wing_roll_left": 0.951,
+    "wing_pitch_left": 0.987,
+    "wing_yaw_right": 0.99,
+    "wing_roll_right": 0.941,
+    "wing_pitch_right": 0.986,
+    "abdomen_abduct": 0.949,
+    "abdomen": 0.904,
+    "beat_freq_mod": 0.634
+   }
+  },
+  "gbt": {
+   "r2_mean": 0.8774686960568117,
+   "r2_per_action": {
+    "head_abduct": 0.819,
+    "head_twist": 0.808,
+    "head": 0.595,
+    "wing_yaw_left": 0.987,
+    "wing_roll_left": 0.933,
+    "wing_pitch_left": 0.986,
+    "wing_yaw_right": 0.987,
+    "wing_roll_right": 0.928,
+    "wing_pitch_right": 0.984,
+    "abdomen_abduct": 0.966,
+    "abdomen": 0.898,
+    "beat_freq_mod": 0.639
+   }
+  },
+  "mlp": {
+   "r2_mean": 0.8395490050315857,
+   "r2_per_action": {
+    "head_abduct": 0.8059999942779541,
+    "head_twist": 0.7919999957084656,
+    "head": 0.38199999928474426,
+    "wing_yaw_left": 0.9459999799728394,
+    "wing_roll_left": 0.8960000276565552,
+    "wing_pitch_left": 0.949999988079071,
+    "wing_yaw_right": 0.9549999833106995,
+    "wing_roll_right": 0.8970000147819519,
+    "wing_pitch_right": 0.9409999847412109,
+    "abdomen_abduct": 0.9549999833106995,
+    "abdomen": 0.8960000276565552,
+    "beat_freq_mod": 0.6570000052452087
+   }
+  }
+ },
+ "8000": {
+  "tabpfn": {
+   "r2_mean": 0.9082144912105027,
+   "r2_per_action": {
+    "head_abduct": 0.87,
+    "head_twist": 0.812,
+    "head": 0.697,
+    "wing_yaw_left": 0.992,
+    "wing_roll_left": 0.964,
+    "wing_pitch_left": 0.989,
+    "wing_yaw_right": 0.993,
+    "wing_roll_right": 0.958,
+    "wing_pitch_right": 0.988,
+    "abdomen_abduct": 0.958,
+    "abdomen": 0.926,
+    "beat_freq_mod": 0.751
+   }
+  },
+  "gbt": {
+   "r2_mean": 0.9096154500336396,
+   "r2_per_action": {
+    "head_abduct": 0.864,
+    "head_twist": 0.866,
+    "head": 0.654,
+    "wing_yaw_left": 0.991,
+    "wing_roll_left": 0.953,
+    "wing_pitch_left": 0.989,
+    "wing_yaw_right": 0.99,
+    "wing_roll_right": 0.948,
+    "wing_pitch_right": 0.99,
+    "abdomen_abduct": 0.976,
+    "abdomen": 0.945,
+    "beat_freq_mod": 0.75
+   }
+  },
+  "mlp": {
+   "r2_mean": 0.9089986681938171,
+   "r2_per_action": {
+    "head_abduct": 0.8939999938011169,
+    "head_twist": 0.8899999856948853,
+    "head": 0.6290000081062317,
+    "wing_yaw_left": 0.984000027179718,
+    "wing_roll_left": 0.9269999861717224,
+    "wing_pitch_left": 0.9750000238418579,
+    "wing_yaw_right": 0.984000027179718,
+    "wing_roll_right": 0.9459999799728394,
+    "wing_pitch_right": 0.972000002861023,
+    "abdomen_abduct": 0.9750000238418579,
+    "abdomen": 0.9589999914169312,
+    "beat_freq_mod": 0.7739999890327454
+   }
+  }
+ }
+}

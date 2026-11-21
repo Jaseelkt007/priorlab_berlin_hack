@@ -41,10 +41,16 @@ class Policy:
         self.model = tf.saved_model.load(str(path))
         self.low, self.high = action_spec.minimum, action_spec.maximum
 
-    def __call__(self, observation):
+    def distribution(self, observation):
+        """Mean action (clipped, env units) and the policy's std (env units)."""
         batched = {k: self.tf.constant(np.asarray(v, np.float32)[None]) for k, v in observation.items()}
-        canonical = np.clip(self.model(batched).mean()[0].numpy(), -1.0, 1.0)
-        return self.low + (canonical + 1.0) * 0.5 * (self.high - self.low)
+        dist = self.model(batched)
+        canonical = np.clip(dist.mean()[0].numpy(), -1.0, 1.0)
+        half_range = 0.5 * (self.high - self.low)
+        return self.low + (canonical + 1.0) * half_range, dist.stddev()[0].numpy() * half_range
+
+    def __call__(self, observation):
+        return self.distribution(observation)[0]
 
 
 def main():

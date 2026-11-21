@@ -25,7 +25,7 @@ Source: the organisers' Notion page, pasted 2026-11-21. Coupon and activation co
 - **Cost:** TabPFN is free; no paid credits needed.
 - **Code:** https://github.com/PriorLabs/TabPFN
 - **Docs:** https://docs.priorlabs.ai/quickstart
-- **Prior Labs deck:** `HackLab_Berlin_x_TabPFN_Prior_Labs.pdf` (on the Notion page; we don't have a copy in the repo yet).
+- **Prior Labs deck:** [`HackLab_Berlin_x_TabPFN_Prior_Labs.pdf`](HackLab_Berlin_x_TabPFN_Prior_Labs.pdf).
 - **Judging criteria:** not published on the page. Ask Prior Labs on site or in Discord. Until we hear, aim for: a working demo, a clear use of TabPFN's in-context learning (few-shot, no training loop), and a spatial or robotics story that reads quickly.
 
 ### Setup (required)

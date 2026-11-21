@@ -70,6 +70,18 @@ def test_rows(cf2, every=5):
     return np.where(is_test & complete(cf2))[0][::every], np.where(is_test)[0][::every]
 
 
+def free(model):
+    """Release a fitted model's GPU memory: the 4 GB card cannot hold several TabPFN models at once."""
+    import gc
+
+    import torch
+
+    del model
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
 def batches(X, batch):
     return [X[i : i + batch] for i in range(0, len(X), batch)]
 
@@ -84,10 +96,14 @@ def run_version(name, ctx_X, ctx_Y, ctx_breach_X, ctx_breach, test_X, alarm_X, b
         model.fit(ctx_X, ctx_Y[:, t])
         parts = [model.predict(b, output_type="quantiles", quantiles=QUANTILES) for b in batches(test_X, batch)]
         q[:, t] = np.concatenate([np.column_stack(p) for p in parts])
+        free(model)
         print(f"  {name}: target {t + 1}/{n_targets} done in {time.time() - t0:.0f} s", flush=True)
+    t0 = time.time()
     clf = make_classifier()
     clf.fit(ctx_breach_X, ctx_breach)
     p_breach = np.concatenate([clf.predict_proba(b)[:, 1] for b in batches(alarm_X, batch)])
+    free(clf)
+    print(f"  {name}: alarm done in {time.time() - t0:.0f} s", flush=True)
     return q, p_breach
 
 

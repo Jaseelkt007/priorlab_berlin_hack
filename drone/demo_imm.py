@@ -80,11 +80,13 @@ def fmt(p):
     return f"{p[0]:6.1f} {p[1]:6.1f} {p[2]:5.1f}"
 
 
-def draw(scn, k, log, meas, pred, errors, start=0):
-    """Draw radar step k into the scene; return the text lines. pred = (mean, cov, ok, p_alarm, hi, lag)."""
+def draw(scn, k, log, meas, pred, errors, start=0, drone=None):
+    """Draw radar step k into the scene; return the text lines. pred = (mean, cov, ok, p_alarm, hi, lag).
+    drone: where the drone is drawn right now (frames come faster than radar readings); lines start there."""
     mean, cov, ok, p_alarm, hi, lag = pred
     true = np.array(log["true"])
     now = true[k]
+    anchor = now if drone is None else drone
     scn.ngeom = start  # the viewer's user scene starts empty; an offscreen render keeps the model's geoms
     for p in true[max(0, k - TRAIL) : k : 2]:
         add(scn, mujoco.mjtGeom.mjGEOM_SPHERE, [0.025] * 3, p, GREEN)
@@ -93,7 +95,7 @@ def draw(scn, k, log, meas, pred, errors, start=0):
             add(scn, mujoco.mjtGeom.mjGEOM_SPHERE, [0.04] * 3, p, WHITE)
     if ok[k]:
         ahead = mean[k, hi[AHEAD]]
-        line(scn, now, ahead, 0.012, BLUE)
+        line(scn, anchor, ahead, 0.012, BLUE)
         add(scn, mujoco.mjtGeom.mjGEOM_SPHERE, [0.08] * 3, ahead, BLUE)
         bubble(scn, ahead, cov[k, hi[AHEAD]], BUBBLE)
     texts = [f"t = {log['t'][k]:5.1f} s   doing: {BEHAVIOURS[log['behaviour'][k]]}",
@@ -103,7 +105,7 @@ def draw(scn, k, log, meas, pred, errors, start=0):
         err = float(np.linalg.norm(said - now))
         errors.append(err)
         add(scn, mujoco.mjtGeom.mjGEOM_SPHERE, [0.08] * 3, said, YELLOW)
-        line(scn, said, now, 0.015, YELLOW)
+        line(scn, said, anchor, 0.015, YELLOW)
         texts += [f"IMM said 1 s ago  x y z: {fmt(said)}",
                   f"off by: {err:4.2f} m   (flight median so far {np.median(errors):4.2f} m)"]
     if ok[k]:
@@ -175,17 +177,16 @@ def record(flight, frames, log, meas, pred, view, out, fps=30, size=(1280, 720))
         k = min(k, n - 1)
         # draw() appends to `errors` once per radar step, as the live viewer does
         texts = draw(renderer.scene, k, log, meas, pred, errors if k != k_drawn else list(errors),
-                     start=renderer.scene.ngeom)
+                     start=renderer.scene.ngeom, drone=flight.data.xpos[flight.pilot.body].copy())
         k_drawn = k
         img = Image.fromarray(renderer.render())
-        zoom, flight.model.vis.global_.fovy = flight.model.vis.global_.fovy, 45.0  # close-up: normal lens
-        inset.update_scene(flight.data, close)
-        flight.model.vis.global_.fovy = zoom
-        x0, y0 = size[0] - INSET[0] - 14, size[1] - INSET[1] - 44
-        img.paste(Image.fromarray(inset.render()), (x0, y0))
         d = ImageDraw.Draw(img)
-        d.rectangle([x0 - 2, y0 - 2, x0 + INSET[0] + 1, y0 + INSET[1] + 1], outline=(255, 255, 255), width=2)
-        d.text((x0 + 6, y0 + 4), "close-up: the real Crazyflie (10 cm)", font=small, fill=(255, 255, 255))
+        if view == "chase":  # the chase camera is too far to see the 10 cm drone: add a close-up
+            inset.update_scene(flight.data, close)
+            x0, y0 = size[0] - INSET[0] - 14, size[1] - INSET[1] - 44
+            img.paste(Image.fromarray(inset.render()), (x0, y0))
+            d.rectangle([x0 - 2, y0 - 2, x0 + INSET[0] + 1, y0 + INSET[1] + 1], outline=(255, 255, 255), width=2)
+            d.text((x0 + 6, y0 + 4), "close-up: the real Crazyflie (10 cm)", font=small, fill=(255, 255, 255))
         box = d.multiline_textbbox((14, 14), "\n".join(texts), font=font)
         d.rectangle([box[0] - 8, box[1] - 8, box[2] + 8, box[3] + 8], fill=(0, 0, 0))
         d.multiline_text((14, 14), "\n".join(texts), font=font,
@@ -258,10 +259,11 @@ def main():
                 if args.view == "radar":
                     set_camera(viewer.cam, "radar", flight)
                 texts = None
-                if k != k_drawn and k < n:
-                    k_drawn = k
-                    texts = draw(viewer.user_scn, k, log, meas, pred, errors)
+                if k < n:
+                    texts = draw(viewer.user_scn, k, log, meas, pred, errors if k != k_drawn else list(errors),
+                                 drone=flight.data.xpos[flight.pilot.body].copy())
                     texts[0] += f"   (replay {replay}, loops until you close the window)"
+                    k_drawn = k
             if texts:  # set_texts outside the lock: inside it, it waits for the lock forever (deadlock)
                 viewer.set_texts([(mujoco.mjtFontScale.mjFONTSCALE_150, mujoco.mjtGridPos.mjGRID_TOPLEFT,
                                    "\n".join(texts), None),

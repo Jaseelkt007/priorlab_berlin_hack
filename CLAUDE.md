@@ -1,6 +1,10 @@
 # priorlab_berlin_hack
 
-Our project for the Prior Labs track at the 2nd edition Berlin Robotics & AI Hackathon.
+Our project for the **Prior Labs track, "TabPFN for spatial awareness"**, at HackLab #2 (Berlin Robotics & AI Hackathon, CIC Berlin, 21-22 Nov 2026). The goal: use TabPFN's in-context learning to help robots and agents predict where things are, where they're going and what happens next.
+
+- **Hard deadline: Sun 22 Nov 2026, 16:30 CET**, via https://tally.so/r/GexoxQ. Every submission needs a 3-minute video (pitch, how it works, demo; a person on camera), a public GitHub repo with docs, and slides for a 5-minute pitch.
+- **This repo is public at submission:** no secrets, tokens or coupon codes in git. `TABPFN_TOKEN` lives in `.env`, which is ignored.
+- Full brief, schedule and setup: `docs/HACKATHON.md`.
 
 <!-- potato-start:begin mode=hackathon version=1 -->
 ## How we build here (hackathon mode)

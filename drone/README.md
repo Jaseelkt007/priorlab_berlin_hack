@@ -15,7 +15,7 @@ A drone approaches a protected site. From noisy radar positions, **TabPFN predic
 | X2 dataset: 2,000 flights | done (`data/intruder_x2.npz`, local only) |
 | Crazyflie as a faster intruder (3 m/s) | done |
 | Crazyflie test dataset: 300 flights | done (`data/intruder_cf2.npz`, local only) |
-| Feature tables (`features.py`) | done: X2 460,693 rows, Crazyflie 148,520 rows |
+| Feature tables (`features.py`) | done: X2 418,050 rows, Crazyflie 137,088 rows; CSV previews in `data/table_*_preview.csv` |
 | Baseline: straight-line guess | done for both drones, see Results |
 | Kalman vs TabPFN vs MLP | next (needs `TABPFN_TOKEN`) |
 | Fine-tuned TabPFN | planned, probably on a rented GPU (Brev); our laptop GPU has 4 GB |
@@ -114,13 +114,15 @@ One table row = one radar reading, built **only from radar measurements up to th
 
 ### Baseline: straight-line guess on X2 (all 1,995 flights)
 
+The table files are numpy archives: `X` (inputs), `Y` (position targets), `breach_5s` (alarm), plus bookkeeping (`flight`, `t`, `behaviour`, `intent`, `pos`, `psi`, `true`) and the name lists (`features`, `targets`). To look at them by eye: `python drone/features.py --preview 2000` writes `data/table_x2_preview.csv` with named columns (`X_*` inputs, `Y_*` outputs).
+
 3D error in metres between the guess "keep the current velocity" and the true future position.
 
 | Horizon | Median | 90th percentile | straight | zigzag | orbit | hover | dash | dive | climb |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 s | 2.45 | 5.99 | 1.8 | 2.5 | 3.0 | 3.0 | 3.3 | 2.9 | 2.9 |
-| 3 s | 7.89 | 18.00 | 5.7 | 7.2 | 10.4 | 9.5 | 12.4 | 9.0 | 9.2 |
-| 5 s | 13.88 | 30.14 | 10.7 | 12.7 | 17.6 | 15.9 | 19.8 | 15.7 | 16.5 |
+| 1 s | 2.34 | 5.74 | 1.7 | 2.4 | 2.9 | 2.8 | 3.0 | 2.8 | 2.8 |
+| 3 s | 7.68 | 17.52 | 5.5 | 7.0 | 10.3 | 9.3 | 11.7 | 8.9 | 9.2 |
+| 5 s | 13.62 | 29.52 | 10.4 | 12.4 | 17.4 | 15.7 | 19.4 | 15.7 | 16.4 |
 
 Errors grow with the horizon and are worst for dashes, orbits and hover-then-go: the manoeuvres a learned model should handle better. This is the bar every model has to beat.
 
@@ -128,9 +130,9 @@ Errors grow with the horizon and are worst for dashes, orbits and hover-then-go:
 
 | Horizon | Median | 90th percentile | straight | zigzag | orbit | hover | dash | dive | climb |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 s | 1.76 | 3.30 | 1.6 | 1.9 | 1.7 | 1.9 | 1.6 | 1.9 | 1.8 |
-| 3 s | 4.63 | 8.84 | 4.1 | 5.0 | 4.3 | 5.3 | 4.6 | 5.2 | 5.0 |
-| 5 s | 7.39 | 13.64 | 6.8 | 7.6 | 6.9 | 8.0 | 7.8 | 8.5 | 8.3 |
+| 1 s | 1.71 | 3.12 | 1.6 | 1.8 | 1.7 | 1.9 | 1.6 | 1.8 | 1.8 |
+| 3 s | 4.50 | 8.41 | 4.0 | 4.9 | 4.2 | 5.2 | 4.5 | 5.1 | 4.9 |
+| 5 s | 7.19 | 12.98 | 6.6 | 7.4 | 6.7 | 7.7 | 7.5 | 8.2 | 8.1 |
 
 Smaller in metres than the X2 only because the Crazyflie is slower (median 1.6 m/s vs 4.3). It is not an easier target: relative to how far it moves, the straight-line guess does worse. Its slow tilting also makes the manoeuvres more even in difficulty. When comparing models across drones, compare each model to this baseline, not raw metres.
 
@@ -155,6 +157,8 @@ What we tried, what we found, what we changed. Newest last.
 
 With D the table's speed median is 4.3 m/s (true flights: 4.6) instead of 6.1. Building the X2 table also went from 7 min to 27 s by reading the compressed file once instead of once per flight.
 
+**5. Track start-up.** The CSV preview showed nonsense in the first rows of each flight (climb -10.8 m/s, acceleration -69 m/s² at t = 0.3 s): with only 3-4 readings the fits are meaningless. Now a row needs 8 of the last 15 readings for position/velocity and 12 of the last 20 for acceleration, so tracks start after about 1.1 s, like a real tracker confirming a new track. Rows: X2 460,693 → 418,050, Crazyflie 148,520 → 137,088. Baselines moved slightly (X2 3 s median 7.89 → 7.68 m); the tables above are the current numbers.
+
 ## Files
 
 | File | What it does |
@@ -162,7 +166,7 @@ With D the table's speed median is 4.3 m/s (true flights: 4.6) instead of 6.1. B
 | `sim.py` | the world: sky, floor, zone, arena, radar post; builds it with any drones |
 | `flight.py` | flight controller: turns "fly this way" into motor commands, works for both drones |
 | `intruder.py` | random intruder pilot, wind, radar recording, dataset generator, live viewer |
-| `features.py` | radar tracks → model table (16 features, 9 targets, alarm label) |
+| `features.py` | radar tracks → model table (16 features, 9 targets, alarm label); `--preview` writes a CSV to look at |
 | `view_drones.py` | fly the drones yourself with the keyboard |
 | `models/README.md` | how to download the two drone models |
 
@@ -179,6 +183,7 @@ python drone/intruder.py --flights 2000              # X2 dataset -> data/intrud
 python drone/intruder.py --drone cf2 --flights 300   # Crazyflie dataset -> data/intruder_cf2.npz
 python drone/features.py                             # X2 table -> data/table_x2.npz (30 s)
 python drone/features.py --drone cf2                 # Crazyflie table -> data/table_cf2.npz
+python drone/features.py --preview 2000              # first 2000 rows as CSV -> data/table_x2_preview.csv
 ```
 
 ## Known limits

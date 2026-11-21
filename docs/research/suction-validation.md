@@ -81,3 +81,15 @@ Cup: Schmalz SPB1 20 class. 16 lip segments on spring slide joints (Dex-Net ring
   - **Check:** a hanging 200 g product compresses the bellows 6.5 mm against 6.4 mm predicted, which reproduces the "lifting effect".
 - **Finding:** with bellows compliance at the published stiffness bound, the cup and product tilt 30–37° before the first lip lifts off. The lip springs still meet the Dex-Net onset rule (+2 % / +8 %). At such tilts no closed-form reference exists for the external moment. This regime is therefore handled by the **V15 sensitivity sweep** (drop thresholds under pick accelerations across the sourced stiffness ranges), not by a single validated number.
 - All 21 gate-1 and gate-2 tests still pass (bellows off by default).
+
+### Gate 3: V11 and V12 (2026-11-22), `tests/test_seal.py`, 4 of 4 passed
+
+- **V11 seal vs roughness:** 75.0 / 75.0 / 74.9 / 74.2 / 72.2 / 63.6 / 36.6 kPa at g0 = 0 / 2 / 5 / 10 / 15 / 20 / 30 µm. A smooth surface seals at the ejector maximum, and the seal falls monotonically, matching the trend of Huh et al.
+- **V12a, peel (tall product, 0.2 kg, CoM 20 mm below the cup):** **every drop is preceded by a vacuum dip**, 16 of 16 across both cup models. Lead time 6–29 ms (median 14–19 ms). The transition is binary: below the limit the vacuum does not move at all (fine sweep in 0.5 m/s² steps); above it, failure runs away (lift-off → leak → less force → more lift-off). This matches Huh et al. ("does not vary while the seal remains, lowers at leak onset"). GOMP-ST's "> 0.1 s" is the visible **deformation** time before failure, not a pressure dip. Our bellows model shows such deformation (up to 30° of tilt) without any pressure change.
+- **V12b, shear (flat product, 50 g):** **graded near-misses exist.** Past the friction limit (119 m/s²) the product slides in the cup and is still held: slip 0.7 / 1.4 / 3.2 / 3.9 mm at 1.05 / 1.1 / 1.2 / 1.26 × the limit, with small vacuum dips (0.06–1 kPa).
+
+**Consequence for the pitch and the model:**
+- The explainer's claim that "a deep vacuum dip that still held is a near-miss" is **not supported for peel**, and must be corrected.
+- The vacuum's predictive value is the **seal at touch** (leaks, porosity, wear: V11).
+- Graded near-misses come from **slip, measured as placement error in the tray** (and small dips) for shear-limited products.
+- The TabPFN targets should be `dropped` (classifier) and `place_offset_mm` (regressor), rather than a vacuum-dip regressor.

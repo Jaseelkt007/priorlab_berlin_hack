@@ -37,7 +37,6 @@ We compare it with what real radar trackers use: an **IMM**, three Kalman-type f
 | Simulation, both drones, intruder flights | done |
 | Data: 2,000 X2 flights, 300 Crazyflie flights | done |
 | Tables | done |
-| Simplest guess ("it keeps flying straight") measured | done |
 | IMM tracker (what real radars use) | built and checked; tuning now |
 | TabPFN | **next** (needs `TABPFN_TOKEN` in `.env`) |
 | TabPFN fine-tuned | if the GPU allows |
@@ -45,14 +44,12 @@ We compare it with what real radar trackers use: an **IMM**, three Kalman-type f
 
 ## Results so far
 
-The number to beat: how far off is "it keeps flying straight"? (median error)
+Median error between the predicted and the real position, on the small-drone test flights:
 
-| | in 1 s | in 3 s | in 5 s |
+| Model | 1 s ahead | 3 s ahead | 5 s ahead |
 |---|---|---|---|
-| X2 | 2.3 m | 7.7 m | 13.6 m |
-| Crazyflie | 1.7 m | 4.5 m | 7.2 m |
-
-It is worst on dashes and circling, where a smarter model should help most.
+| IMM (what real radars use) | *tuning* | | |
+| TabPFN | *needs token* | | |
 
 ## Try it
 

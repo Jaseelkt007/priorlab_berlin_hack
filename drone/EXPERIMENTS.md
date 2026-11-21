@@ -44,68 +44,74 @@ Models may learn the same answers in the drone's own direction (forward, left, u
 
 ## 3. Results
 
-Median error (m) between the prediction and where the drone really was. Lower is better.
+Median error (m) between the predicted position and where the drone really was, on the Crazyflie test flights. Lower is better.
 
-| Model | X2: 1 s | 3 s | 5 s | Crazyflie: 1 s | 3 s | 5 s |
-|---|---|---|---|---|---|---|
-| Straight-line guess | 2.3 | 7.7 | 13.6 | 1.7 | 4.5 | 7.2 |
-| IMM (tuned on X2) | | | | *running* | | |
-| TabPFN | | | | *needs token* | | |
-
-The straight-line guess is worst on dashes (X2, 3 s: 11.7 m) and orbits (10.3 m), and best on straight flight (5.5 m). The Crazyflie's errors are smaller only because it is slower; relative to how far it moves it is harder.
+| Model | 1 s ahead | 3 s ahead | 5 s ahead |
+|---|---|---|---|
+| IMM (tuned on X2 flights) | *running* | | |
+| TabPFN | *needs token* | | |
 
 ## 4. Experiments
 
-Each one: what went wrong or what we wanted to know, what we did, what we decided.
+Each experiment in four lines: what happened, why, what we changed, and the result.
 
-### 1. Crazyflie wobbles
-- **Problem:** its turning motors are very weak, so with gentle settings it overshot its speed by 60%.
-- **Tried:** more damping (worse), then a faster attitude loop.
-- **Decision:** faster attitude loop. Now it holds the commanded speed and stops within 8 cm.
+### 1. The small drone wobbled
+- **What happened:** when told to fly at a speed, the Crazyflie overshot by 60% and kept drifting after stopping.
+- **Why:** its motors for tilting are very weak, and our controller corrected its tilt too slowly.
+- **Changed:** let the controller correct the tilt faster. (Adding more braking made it worse, so that was not the fix.)
+- **Result:** it now flies at the asked speed and stops within 8 cm.
 
-### 2. Intruder bugs
-- **Problem:** in steep dives the controller asked for negative thrust and flipped the drone; flybys aimed too close and 4 of 6 hit the zone.
-- **Fix:** minimum thrust; correct flyby aim.
-- **Result:** 0 crashes in 100 flights; attacks 43/43 breach, flybys 34/35 pass.
+### 2. Two bugs in the intruder pilot
+- **What happened:** some drones crashed in dives, and drones meant to fly *past* the zone flew *into* it (4 of 6).
+- **Why:** in a steep dive the controller asked for negative thrust, which flipped the drone; and a maths slip aimed fly-bys 6-16 m from the centre instead of 15-40 m.
+- **Changed:** thrust can never go below a safe minimum; fixed the fly-by aim.
+- **Result:** in 100 test flights: no crashes, attacks 43/43 reach the zone, fly-bys 34/35 pass by.
 
-### 3. Crazyflie top speed
-- **Question:** how fast can it fly as an intruder?
+### 3. How fast can the small drone fly?
+- **What we wanted:** the Crazyflie as a real attacker, faster than its 0.5 m/s keyboard setting.
+- **Tried:** speeds of 2-5 m/s with different tilt limits, on a fast run, a sharp reversal and a zigzag.
+- **Found:** above about 12° of tilt it cannot catch itself and flips over.
+- **Result:** **3 m/s with 12° tilt** is the fastest it flies safely. The big drone's data was not affected.
 
-| Limit | Result |
+| Speed and tilt | Outcome |
 |---|---|
-| 2 m/s, 10° tilt | stable |
-| **3 m/s, 12° tilt** | **stable, chosen** |
-| 4-5 m/s, 15-20° tilt | flips over and falls |
+| 2 m/s, 10° | flies fine |
+| **3 m/s, 12°** | **flies fine (chosen)** |
+| 4-5 m/s, 15-20° | flips and falls |
 
-### 4. Estimating speed from noisy radar
-- **Problem:** the first method (curve fit over 1 s) was very noisy and invented a +6 m/s² acceleration.
-- **Tried four methods** on 200 flights against the true values:
+### 4. Getting the speed right from noisy radar
+- **What happened:** the first way of reading speed from the radar dots gave speeds about 1.6 m/s too high and a fake "speeding up" signal.
+- **Why:** it fitted a curve to only 1 second of noisy dots and read the speed at the very last dot, where the noise is worst.
+- **Changed:** compared four methods against the true values on 200 flights and picked the best: a straight line through the last 1.5 s for speed, a curve through the last 2 s for acceleration.
+- **Result:** speed error down from 4.9 to 1.5 m/s.
 
-| Method | Speed error | Fake acceleration |
+| Method | Speed error | Fake speeding-up |
 |---|---|---|
-| A: curve, 1 s (first) | 4.9 m/s | +6.2 m/s² |
-| B: line 1 s, curve 2 s | 1.8 | +1.1 |
-| C: curve 2 s | 2.4 | +1.6 |
-| **D: line 1.5 s, curve 2 s (chosen)** | **1.5** | **+0.9** |
+| Curve, 1 s (first try) | 4.9 m/s | +6.2 m/s² |
+| Line 1 s + curve 2 s | 1.8 | +1.1 |
+| Curve 2 s | 2.4 | +1.6 |
+| **Line 1.5 s + curve 2 s (chosen)** | **1.5** | **+0.9** |
 
-### 5. Garbage at the start of each track
-- **Problem:** the first rows of each flight had nonsense values (acceleration -69 m/s²) from only 3-4 readings.
-- **Fix:** a row needs enough readings first (tracks start after ~1.1 s, like a real tracker confirming a target).
+### 5. Nonsense at the start of each flight
+- **What happened:** the first rows of every flight had impossible values (e.g. -69 m/s² acceleration).
+- **Why:** right after the radar first sees a drone, there are only 3-4 dots, too few to measure speed or turning.
+- **Changed:** a row is only made once there are enough dots (after about 1 s), as real trackers also wait to confirm a new target.
+- **Result:** clean tables; about 9% fewer rows.
 
-### 6. IMM tracker loses its acceleration
-- **Problem:** before tuning, the IMM did worse than the straight-line guess. On a made-up accelerating track it was 20 m off at 5 s, as if it ignored acceleration.
-- **Cause:** when the three trackers are blended, the "straight" tracker's built-in zero acceleration erased the others' acceleration and turn rate within a second.
-- **Fix:** a tracker only contributes to what it actually tracks.
-- **Check on made-up tracks:** each motion is now recognised by the right tracker.
+### 6. The IMM forgot accelerations and turns
+- **What happened:** the IMM did worse than it should. On a made-up track with steady acceleration it was 20 m off after 5 s.
+- **Why:** the IMM mixes its three trackers every step. The "straight" tracker always assumes zero acceleration, and that zero was mixed into the "speeding up" tracker until it forgot the acceleration. The same happened to turning.
+- **Changed:** each tracker now only shares what it actually tracks (the standard fix).
+- **Result:** on made-up tracks, each kind of motion is now picked up by the right tracker.
 
-| Track | Leading tracker | Error at 5 s |
+| Made-up track | Tracker that takes over | Error after 5 s |
 |---|---|---|
 | straight | straight (54%) | 1.1 m |
-| accelerating | accelerating (52%) | 10.0 m |
+| speeding up | speeding up (52%) | 10.0 m (was 20) |
 | turning | turning (73%) | 8.4 m |
 
-### 7. IMM tuning
-- **What:** search the IMM's noise settings on 150 X2 flights (training data only) for the lowest 3 s error.
+### 7. Tuning the IMM
+- **What:** the IMM has five settings (how jumpy each tracker expects the drone to be, how often it switches). We search them on 150 big-drone flights for the smallest error 3 s ahead. It never sees the small-drone test flights.
 - **Result:** *running.*
 
 ## 5. Known limits

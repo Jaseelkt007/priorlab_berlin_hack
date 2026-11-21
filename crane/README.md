@@ -59,6 +59,7 @@ MUJOCO_GL=egl crane/.venv/bin/python crane/mujoco_demo.py # fleet data, held-out
 MUJOCO_GL=egl crane/.venv/bin/python crane/mujoco_closed_loop.py   # closed loop, 3 strategies x 12 loads + video (~10 min)
 MUJOCO_GL=egl crane/.venv/bin/python crane/playground_precompute.py # page playground data + fleet rows (~2 min)
 MUJOCO_GL=egl crane/.venv/bin/python crane/render_clip.py --rope 5.2 --sling 2.8 --payload 0.7 --speed 0.9
+MUJOCO_GL=glfw crane/.venv/bin/python crane/live_crane.py      # LIVE 3D window: TabPFN predicts 1 s ahead in real time
 ```
 
 `python3 -I crane/exp1_real.py --no-ml` runs only the physics baselines, with the standard library.
@@ -71,6 +72,7 @@ MUJOCO_GL=egl crane/.venv/bin/python crane/render_clip.py --rope 5.2 --sling 2.8
 | `exp1_real.py`, `exp2_real.py` | real-data experiments; results in `results/*.json` |
 | `mujoco_crane.py`, `mujoco_demo.py` | MuJoCo overhead crane (rail, trolley, rope, hook, slings, beam), demo and video |
 | `mujoco_closed_loop.py` | closed loop: TabPFN chooses speed and anti-sway tuning per move, vs. industry anti-sway |
+| `live_crane.py` | **live** MuJoCo window: the crane shuttles between bays, TabPFN's 1-s-ahead ghost updates in real time; change rope/sling/payload/speed with keys (Up/Down, PgUp/PgDn, Home/End, Ins/Del) or by typing `rope 5` in the terminal |
 | `playground_precompute.py`, `render_clip.py` | page playground (option A, 81 precomputed runs) and any-parameter MP4 clip (option B) |
 | `data_tools/` | dataset download, the period check (measured vs. textbook pendulum), an xlsx reader |
 | `sim-check/` | Node checks of the explainer page's in-browser simulation (`node crane/sim-check/test.js 30`) |

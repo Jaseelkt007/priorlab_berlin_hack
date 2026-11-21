@@ -22,11 +22,11 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 
-from features import DATA
+from features import DATA, HORIZONS as TABLE_HORIZONS
 from intruder import RADAR_EVERY, RADAR_NOISE
 
 DT = RADAR_EVERY
-HORIZONS = np.arange(1, 11) * 0.5  # 0.5 .. 5 s; 1, 3, 5 s are indices 1, 5, 9
+HORIZONS = np.arange(1, 9) * 0.25  # 0.25 .. 2 s: covers the table's 1 / 1.5 / 2 s and the 2 s alarm window
 N = 10  # state size
 CV, CA, CT = 0, 1, 2
 # Which state components each model actually tracks. When the models are blended, a model that does not
@@ -235,45 +235,46 @@ def align(seeds, out, table):
 
 
 def score(mean, table, label=""):
-    """Median 3D error (m) at 1, 3, 5 s against the true future position."""
+    """Median 3D error (m) at the table's horizons against the true future position."""
     errs = []
-    for hi, j in ((1, 0), (5, 1), (9, 2)):
+    for j, h in enumerate(TABLE_HORIZONS):
+        hi = int(np.argmin(np.abs(HORIZONS - h)))
         truth = table["Y_world"][:, 3 * j : 3 * j + 3]
         ok = ~np.isnan(truth).any(1) & ~np.isnan(mean[:, hi]).any(1)
         errs.append(np.median(np.linalg.norm(mean[ok, hi] - truth[ok], axis=1)))
     if label:
-        print(f"{label}: median error 1 s {errs[0]:.2f} m, 3 s {errs[1]:.2f} m, 5 s {errs[2]:.2f} m")
+        print(f"{label}: median error " + ", ".join(f"{h:g} s {e:.2f} m" for h, e in zip(TABLE_HORIZONS, errs)))
     return errs
 
 
 def tune(n_flights):
-    """Grid search on X2 training flights: lowest median 3 s error."""
+    """Coordinate search on X2 training flights: lowest median error at the middle horizon (1.5 s)."""
     table = dict(np.load(DATA / "table_x2.npz"))
     seeds, meas, lengths = load_tracks("x2", n_flights)
     sel = np.isin(table["flight"], seeds)
     table = {k: v[sel] if v.ndim and len(v) == len(sel) else v for k, v in table.items()}
-    grid = {"q_cv": [0.05, 0.3, 1, 4], "q_ca": [0.05, 0.3, 1, 3, 10], "q_ct": [0.05, 0.3, 1, 4],
-            "q_turn": [0.01, 0.1, 0.5], "p_stay": [0.8, 0.9, 0.95, 0.98]}
+    grid = {"q_cv": [0.1, 0.3, 1, 3, 10], "q_ca": [0.001, 0.003, 0.03, 0.3, 3], "q_ct": [0.01, 0.05, 0.3, 1, 4],
+            "q_turn": [0.0003, 0.003, 0.03, 0.3], "p_stay": [0.9, 0.95, 0.98, 0.995, 0.999]}
     best = None
     # coordinate search: vary one setting at a time around the current best, two passes
-    current = Settings(q_cv=0.3, q_ca=0.3, q_ct=0.3, q_turn=0.1, p_stay=0.95)
+    current = Settings(q_cv=1.0, q_ca=0.003, q_ct=0.05, q_turn=0.003, p_stay=0.995)  # the 3 s tuning
     for _ in range(2):
         for key, values in grid.items():
             for v in values:
                 st = Settings(**{**asdict(current), key: v})
-                mean, _, _ = run(meas, lengths, st, horizons=(0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5))
+                mean, _, _ = run(meas, lengths, st)
                 e = score(align(seeds, mean, table), table)
                 if best is None or e[1] < best[0][1]:
                     best = (e, st)
-                    print(f"  better: {asdict(st)} -> 1/3/5 s {e[0]:.2f} / {e[1]:.2f} / {e[2]:.2f} m", flush=True)
+                    print(f"  better: {asdict(st)} -> " + " / ".join(f"{x:.2f}" for x in e) + " m", flush=True)
             current = best[1]
     print("best settings:", asdict(best[1]))
     return best[1]
 
 
-# Best settings from tuning on 150 X2 flights (--tune, then a wider search past the grid edges;
-# EXPERIMENTS.md, experiment 7). X2 median error 1/3/5 s: 2.17 / 7.74 / 13.97 m.
-TUNED = Settings(q_cv=1.0, q_ca=0.003, q_ct=0.05, q_turn=0.003, p_stay=0.995)
+# Best settings from tuning on 150 X2 flights for the 1.5 s horizon (--tune; EXPERIMENTS.md, experiment 7).
+# X2 median error 1 / 1.5 / 2 s: 2.16 / 3.28 / 4.61 m.
+TUNED = Settings(q_cv=1.0, q_ca=0.001, q_ct=0.3, q_turn=0.003, p_stay=0.995)
 
 
 def main():

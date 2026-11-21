@@ -7,7 +7,7 @@ Full detail and every experiment: [`EXPERIMENTS.md`](EXPERIMENTS.md).
 
 A small drone flies toward a protected site. A radar sees it, but the readings are noisy and sometimes missing.
 
-**TabPFN predicts where the drone will be in 1, 3 and 5 seconds, with a range ("it will be somewhere in this cone"), and raises the alarm before it reaches the site.** It has never seen this kind of drone before; it adapts from a few radar readings, without retraining.
+**TabPFN predicts where the drone will be in 1, 1.5 and 2 seconds, with a range ("it will be somewhere in this cone"), and raises the alarm before it reaches the site.** It has never seen this kind of drone before; it adapts from a few radar readings, without retraining.
 
 We compare it with what real radar trackers use: an **IMM**, three Kalman-type filters (straight, speeding up, turning) that switch automatically.
 
@@ -28,7 +28,7 @@ We compare it with what real radar trackers use: an **IMM**, three Kalman-type f
 
 **Inputs** (16 numbers, from the radar only): where the drone is relative to the zone, how fast it goes, whether it is turning, climbing or speeding up, the same a second or two ago, and how many radar readings were missing.
 
-**Outputs**: where it will be after 1, 3 and 5 s, as x, y, z (with a range), and **alarm**: will it enter the zone within 5 s?
+**Outputs**: where it will be after 1, 1.5 and 2 s, as x, y, z (with a range), and **alarm**: will it enter the zone within 2 s?
 
 ## Status
 
@@ -46,10 +46,12 @@ We compare it with what real radar trackers use: an **IMM**, three Kalman-type f
 
 Median error between the predicted and the real position, on the small-drone test flights:
 
-| Model | 1 s ahead | 3 s ahead | 5 s ahead |
+| Model | 1 s ahead | 1.5 s ahead | 2 s ahead |
 |---|---|---|---|
-| IMM (what real radars use) | 1.55 m | 4.28 m | 7.04 m |
+| IMM (what real radars use) | 1.55 m | 2.19 m | 2.88 m |
 | TabPFN | *needs token* | | |
+
+The IMM is good while the drone keeps doing the same thing, and about twice as far off right after it changes (e.g. dive → climb). That is where TabPFN can win.
 
 ## Try it
 

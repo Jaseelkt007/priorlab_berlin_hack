@@ -12,7 +12,7 @@ Every flight is a random intruder flown by a script (`intruder.py`): an **intent
 | Radar readings | 469,025 | 149,688 |
 | Time to make | 16.5 min | 15 min |
 | Breach / left / timeout / crash | 1,127 / 597 / 271 / 5 | 135 / 7 / 158 / 0 |
-| Alarm positives (breach within 5 s) | 12.8% | 4.7% |
+| Alarm positives (breach within 2 s) | 5.3% | 2.0% |
 
 Crashed flights are dropped. Crazyflie flights use different random seeds, so they never repeat an X2 flight's plan.
 
@@ -33,8 +33,8 @@ One row per radar reading, from **radar data only** (never the true position, ne
 
 | | |
 |---|---|
-| `x1 y1 z1`, `x3 y3 z3`, `x5 y5 z5` | where the drone really is 1, 3, 5 s later (world coordinates, used for all scoring) |
-| `breach_5s` | 1 if it enters the zone within 5 s (the alarm) |
+| `x_1s y_1s z_1s`, `x_1.5s …`, `x_2s …` | where the drone really is 1, 1.5, 2 s later (world coordinates, used for all scoring) |
+| `breach_2s` | 1 if it enters the zone within 2 s (the alarm) |
 
 Models may learn the same answers in the drone's own direction (forward, left, up), which is easier to learn; `to_world` converts back exactly.
 
@@ -44,14 +44,18 @@ Models may learn the same answers in the drone's own direction (forward, left, u
 
 ## 3. Results
 
+We predict **1, 1.5 and 2 s ahead** (team decision: short-term predictions are what a defence system can act on, and much further ahead nobody can predict a drone that changes its mind).
+
 Median error (m) between the predicted position and where the drone really was, on the Crazyflie test flights. Lower is better.
 
-| Model | 1 s ahead | 3 s ahead | 5 s ahead |
+| Model | 1 s ahead | 1.5 s ahead | 2 s ahead |
 |---|---|---|---|
-| IMM (tuned on X2 flights) | 1.55 | 4.28 | 7.04 |
+| IMM (tuned on X2 flights) | 1.55 | 2.19 | 2.88 |
 | TabPFN | *needs token* | | |
 
-**How honest is the IMM's cone?** A good 90% cone should contain the real position about 90% of the time. The IMM's: 85% at 1 s, 90% at 3 s, 95% at 5 s, so it is well calibrated. It is hardest on dives, climbs and dashes (8.4, 8.3, 7.8 m at 5 s) and easiest on straight flight and circling (6.3 m).
+**How honest is the IMM's cone?** A good 90% cone should contain the real position about 90% of the time. The IMM's holds it 86-87% of the time: close, slightly too narrow.
+
+**Where the IMM goes wrong:** when the drone keeps doing the same thing (e.g. a steady dive) it is about 1-1.5 m off at 1 s; right after the drone changes what it is doing (dive → hover → climb) its error roughly doubles, because it keeps predicting the old motion for a moment. Those switch moments are where a model that learned from examples can help.
 
 ## 4. Experiments
 
@@ -113,10 +117,14 @@ Each experiment in four lines: what happened, why, what we changed, and the resu
 | turning | turning (73%) | 8.4 m |
 
 ### 7. Tuning the IMM
-- **What:** the IMM has five settings (how jumpy each tracker expects the drone to be, how often it switches). We searched them on 150 big-drone flights for the smallest error 3 s ahead. It never sees the small-drone test flights.
-- **What happened:** the first search ended with several best values at the edge of the range we tried, so the real best could lie further out.
-- **Changed:** searched again past those edges.
-- **Result:** error 3 s ahead on the big drone went 9.7 → 8.0 → **7.7 m**; the last widening only gained 0.3 m, so the settings are close to the best. The tuned IMM expects the drone to keep its current behaviour for a while (99.5% chance per reading) and trusts steady acceleration and steady turns.
+- **What:** the IMM has five settings (how jumpy each tracker expects the drone to be, how often it switches). We searched them on 150 big-drone flights for the smallest error. It never sees the small-drone test flights.
+- **What happened:** the first search (for 3 s ahead) ended with several best values at the edge of the range we tried, so we searched again past those edges.
+- **Result:** error 3 s ahead on the big drone went 9.7 → 8.0 → 7.7 m; the last widening only gained 0.3 m, so the settings were close to the best.
+
+### 8. Shorter prediction times
+- **Why:** predicting 3-5 s ahead means guessing a drone's next decision, which no method can do well; a defence system acts on the next 1-2 s. So we switched from 1 / 3 / 5 s to **1 / 1.5 / 2 s**, and the alarm from "within 5 s" to "**within 2 s**".
+- **Changed:** rebuilt both tables; re-tuned the IMM for 1.5 s ahead, to be fair to it.
+- **Result:** re-tuning barely changed it (big drone, 1.5 s: 3.30 → 3.28 m), so the earlier settings already suited short times. On the small drone: 1.55 / 2.19 / 2.88 m.
 
 ## 5. Known limits
 

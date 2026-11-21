@@ -6,7 +6,7 @@
     python drone/demo_imm.py --view radar --record data/demo_radar_54.mp4   # save a video instead of showing it
 
 What you see:
-  green ball + green trail         the real Crazyflie (MuJoCo physics, intruder pilot) and where it flew
+  the drone + green trail          the real Crazyflie model (MuJoCo physics, intruder pilot) and where it flew
   white dots                       the radar readings (noisy, some missing): all the IMM gets
   blue ball + blue bubble          IMM: where it will be in 1 s; the bubble = its 90% range
   yellow ball + yellow line        what the IMM predicted 1 s ago for *now*; the line to the drone is the error
@@ -34,10 +34,13 @@ TRAIL = 300  # green trail length (radar steps)
 RADAR_DOTS = 30  # radar dots shown (last 3 s)
 CONE = 2.5  # 90% of a 3D normal lies within 2.5 standard deviations
 FRAME = 0.02  # s between played-back frames (50 per second)
-RADAR_CAM = 15.0  # m: in the radar view, the camera sits this far from the drone, toward the radar
+CHASE_CAM = 5.0  # m: camera distance in the chase view (close enough to see the 10 cm Crazyflie itself)
+ZNEAR = 0.0005  # fraction of the model extent
+INSET = (400, 300)  # px: close-up of the drone in recorded videos
+RADAR_CAM = 5.0  # m: in the radar view, the camera sits this far from the drone, toward the radar
 
 GREEN, WHITE, BLUE, BUBBLE, YELLOW = (
-    [0.1, 0.9, 0.2, 0.9], [1, 1, 1, 0.9], [0.2, 0.5, 1.0, 0.9], [0.3, 0.6, 1.0, 0.3], [1.0, 0.85, 0.1, 1.0])
+    [0.1, 0.9, 0.2, 0.9], [1, 1, 1, 0.9], [0.2, 0.5, 1.0, 0.9], [0.3, 0.6, 1.0, 0.12], [1.0, 0.85, 0.1, 1.0])
 EYE = np.eye(3).ravel()
 
 
@@ -83,24 +86,23 @@ def draw(scn, k, log, meas, pred, errors, start=0):
     now = true[k]
     scn.ngeom = start  # the viewer's user scene starts empty; an offscreen render keeps the model's geoms
     for p in true[max(0, k - TRAIL) : k : 2]:
-        add(scn, mujoco.mjtGeom.mjGEOM_SPHERE, [0.06] * 3, p, GREEN)
+        add(scn, mujoco.mjtGeom.mjGEOM_SPHERE, [0.025] * 3, p, GREEN)
     for p in meas[max(0, k - RADAR_DOTS) : k + 1]:
         if not np.isnan(p).any():
-            add(scn, mujoco.mjtGeom.mjGEOM_SPHERE, [0.08] * 3, p, WHITE)
+            add(scn, mujoco.mjtGeom.mjGEOM_SPHERE, [0.04] * 3, p, WHITE)
     if ok[k]:
         ahead = mean[k, hi[AHEAD]]
-        line(scn, now, ahead, 0.03, BLUE)
-        add(scn, mujoco.mjtGeom.mjGEOM_SPHERE, [0.18] * 3, ahead, BLUE)
+        line(scn, now, ahead, 0.012, BLUE)
+        add(scn, mujoco.mjtGeom.mjGEOM_SPHERE, [0.08] * 3, ahead, BLUE)
         bubble(scn, ahead, cov[k, hi[AHEAD]], BUBBLE)
-    add(scn, mujoco.mjtGeom.mjGEOM_SPHERE, [0.22] * 3, now, GREEN)  # the real drone (it is only 10 cm wide)
     texts = [f"t = {log['t'][k]:5.1f} s   doing: {BEHAVIOURS[log['behaviour'][k]]}",
              f"REAL now          x y z: {fmt(now)}"]
     if k >= lag and ok[k - lag]:
         said = mean[k - lag, hi[CHECK]]
         err = float(np.linalg.norm(said - now))
         errors.append(err)
-        add(scn, mujoco.mjtGeom.mjGEOM_SPHERE, [0.2] * 3, said, YELLOW)
-        line(scn, said, now, 0.04, YELLOW)
+        add(scn, mujoco.mjtGeom.mjGEOM_SPHERE, [0.08] * 3, said, YELLOW)
+        line(scn, said, now, 0.015, YELLOW)
         texts += [f"IMM said 1 s ago  x y z: {fmt(said)}",
                   f"off by: {err:4.2f} m   (flight median so far {np.median(errors):4.2f} m)"]
     if ok[k]:
@@ -138,7 +140,7 @@ def set_camera(cam, view, flight):
     if view == "chase":
         cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
         cam.trackbodyid = flight.pilot.body
-        cam.distance, cam.elevation, cam.azimuth = 14.0, -30, 135
+        cam.distance, cam.elevation, cam.azimuth = CHASE_CAM, -20, 135
     else:
         radar_view(cam, flight.data.xpos[flight.pilot.body])
 
@@ -152,6 +154,10 @@ def record(flight, frames, log, meas, pred, view, out, fps=30, size=(1280, 720))
     mono = font_manager.findfont("DejaVu Sans Mono")
     font, small = ImageFont.truetype(mono, 20), ImageFont.truetype(mono, 15)
     renderer = mujoco.Renderer(flight.model, size[1], size[0])
+    inset = mujoco.Renderer(flight.model, INSET[1], INSET[0])  # close-up of the real drone, no markers
+    close = mujoco.MjvCamera()
+    close.type, close.trackbodyid = mujoco.mjtCamera.mjCAMERA_TRACKING, flight.pilot.body
+    close.distance, close.elevation, close.azimuth = 0.3, -20, 135
     cam, errors, k_drawn = mujoco.MjvCamera(), [], -1
     times = np.array([f[0] for f in frames])
     n = min(len(meas), len(log["t"]))
@@ -170,12 +176,17 @@ def record(flight, frames, log, meas, pred, view, out, fps=30, size=(1280, 720))
                      start=renderer.scene.ngeom)
         k_drawn = k
         img = Image.fromarray(renderer.render())
+        inset.update_scene(flight.data, close)
+        x0, y0 = size[0] - INSET[0] - 14, size[1] - INSET[1] - 44
+        img.paste(Image.fromarray(inset.render()), (x0, y0))
         d = ImageDraw.Draw(img)
+        d.rectangle([x0 - 2, y0 - 2, x0 + INSET[0] + 1, y0 + INSET[1] + 1], outline=(255, 255, 255), width=2)
+        d.text((x0 + 6, y0 + 4), "close-up: the real Crazyflie (10 cm)", font=small, fill=(255, 255, 255))
         box = d.multiline_textbbox((14, 14), "\n".join(texts), font=font)
         d.rectangle([box[0] - 8, box[1] - 8, box[2] + 8, box[3] + 8], fill=(0, 0, 0))
         d.multiline_text((14, 14), "\n".join(texts), font=font,
                          fill=(255, 80, 80) if texts[-1].startswith("ALARM") else (255, 255, 255))
-        d.text((14, size[1] - 28), "green: real drone   white: radar   blue: IMM says in 1 s + 90% range   "
+        d.text((14, size[1] - 28), "drone + green trail: real   white: radar   blue: IMM says in 1 s + 90% range   "
                "yellow: IMM's guess for now, made 1 s ago", font=small, fill=(255, 255, 255))
         writer.send(np.ascontiguousarray(np.asarray(img)))
         count += 1
@@ -187,6 +198,8 @@ def fly(seed):
     """Fly the whole flight first (exactly as when the dataset was made), keeping frames to play back.
     Playing back, rather than simulating inside the viewer, keeps the viewer from touching the physics."""
     flight = Flight(seed, "cf2")
+    # the near clip plane scales with the arena (about 0.6 m): make it small so a close camera sees the 10 cm drone
+    flight.model.vis.map.znear = ZNEAR
     frames, next_frame = [], 0.0
     while flight.step():
         if flight.data.time >= next_frame:
@@ -221,7 +234,7 @@ def main():
     if args.record:
         record(flight, frames, log, meas, pred, args.view, args.record)
         return
-    legend = ("green: real drone + path   white: radar   blue: IMM says in 1 s + 90% range   "
+    legend = ("drone + green: real drone and path   white: radar   blue: IMM says in 1 s + 90% range   "
               "yellow: IMM's guess for now, made 1 s ago")
     errors = []
     with mujoco.viewer.launch_passive(flight.model, flight.data, show_left_ui=False, show_right_ui=False) as viewer:

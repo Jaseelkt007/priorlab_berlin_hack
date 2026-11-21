@@ -35,6 +35,8 @@ class Gains:
 GAINS = {
     "x2": Gains(max_speed=3.0, max_climb=1.5, max_yaw_rate=1.5, max_tilt=np.radians(25), pos_w=2.0, att_w=10.0),
     "cf2": Gains(max_speed=0.5, max_climb=0.5, max_yaw_rate=0.3, max_tilt=np.radians(8), pos_w=0.8, att_w=5.0),
+    # The X2 as a fast intruder (the "x2" entry is kept gentle for keyboard flying).
+    "x2_intruder": Gains(max_speed=10.0, max_climb=4.0, max_yaw_rate=1.5, max_tilt=np.radians(35), pos_w=2.0, att_w=10.0),
 }
 
 
@@ -49,15 +51,19 @@ def _vee(s):
 
 
 class FlightController:
-    """Flies one drone body. Call `update(data, dt)` every physics step after setting `command`."""
+    """Flies one drone body. Call `update(data, dt)` every physics step.
 
-    def __init__(self, model, body_name, gains_key):
+    Steer it with either `command` (keyboard style: forward, left, up, yaw rate, each -1..1, in the
+    drone's heading) or `velocity` (a world-frame velocity in m/s; overrides `command` when set).
+    """
+
+    def __init__(self, model, body_name, gains_key, gains=None):
         self.model = model
         self.body = model.body(body_name).id
         joint = model.body_jntadr[self.body]
         self.qpos = model.jnt_qposadr[joint]
         self.dof = model.jnt_dofadr[joint]
-        self.g = GAINS[gains_key]
+        self.g = gains or GAINS[gains_key]
 
         self.mass = model.body_subtreemass[self.body]
         rot = _quat_to_mat(model.body_iquat[self.body])
@@ -68,7 +74,8 @@ class FlightController:
         self.ctrl_low = model.actuator_ctrlrange[self.actuators, 0]
         self.ctrl_high = model.actuator_ctrlrange[self.actuators, 1]
 
-        self.command = np.zeros(4)  # forward, left, up (m/s), yaw rate (rad/s); scaled -1..1
+        self.command = np.zeros(4)  # forward, left, up, yaw rate; each -1..1
+        self.velocity = None  # world-frame m/s
         self.target = None  # position setpoint, set on first update
         self.target_yaw = 0.0
 
@@ -108,8 +115,15 @@ class FlightController:
 
         # 1. Velocity command in the world frame, then move the setpoint along it.
         fwd, left, up, yaw = np.clip(self.command, -1, 1)
-        c, s = np.cos(self.target_yaw), np.sin(self.target_yaw)
-        v_cmd = np.array([g.max_speed * (c * fwd - s * left), g.max_speed * (s * fwd + c * left), g.max_climb * up])
+        if self.velocity is not None:
+            v_cmd = np.asarray(self.velocity, dtype=float).copy()
+            h = np.linalg.norm(v_cmd[:2])
+            if h > g.max_speed:
+                v_cmd[:2] *= g.max_speed / h
+            v_cmd[2] = np.clip(v_cmd[2], -g.max_climb, g.max_climb)
+        else:
+            c, s = np.cos(self.target_yaw), np.sin(self.target_yaw)
+            v_cmd = np.array([g.max_speed * (c * fwd - s * left), g.max_speed * (s * fwd + c * left), g.max_climb * up])
         self.target_yaw += g.max_yaw_rate * yaw * dt
         self.target = self.target + v_cmd * dt
         self.target = pos + np.clip(self.target - pos, -1.0, 1.0)  # no runaway if the drone lags
@@ -117,6 +131,7 @@ class FlightController:
 
         # 2. Position PD -> desired acceleration, with tilt-limited horizontal part.
         acc = g.pos_w**2 * (self.target - pos) + 2 * g.pos_zeta * g.pos_w * (v_cmd - vel)
+        acc[2] = max(acc[2], -0.6 * G)  # never ask for negative thrust: that would flip the drone
         max_h = G * np.tan(g.max_tilt)
         h = np.linalg.norm(acc[:2])
         if h > max_h:

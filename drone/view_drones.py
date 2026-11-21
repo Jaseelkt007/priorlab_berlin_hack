@@ -7,28 +7,18 @@
 
 Two windows open: the MuJoCo viewer, and a small "Drone controls" window. Click the
 controls window, then hold keys (see KEYS). The drone you are not flying holds its position.
-The flight controller is in flight.py. Setup: drone/models/README.md.
+The flight controller is in flight.py, the world in sim.py. Setup: drone/models/README.md.
 """
 
 import argparse
 import time
 import tkinter as tk
-import warnings
-from pathlib import Path
 
 import mujoco
 import mujoco.viewer
 import numpy as np
 
-from flight import FlightController
-
-MENAGERIE = Path(__file__).parent / "models" / "mujoco_menagerie"
-
-# name -> (xml, start position x y z in metres, label)
-DRONES = {
-    "x2": ("skydio_x2/x2.xml", (0.0, 0.0, 1.0), "Skydio X2"),
-    "cf2": ("bitcraze_crazyflie_2/cf2.xml", (0.0, 1.5, 1.0), "Crazyflie 2"),  # beside the X2, not in its path
-}
+from sim import DRONES, build, controllers
 
 # key -> (command index, value); command = forward, left, up, yaw rate
 KEYS = {
@@ -44,46 +34,6 @@ HELP = """Click this window, then hold keys:
   Tab          switch drone
   R            reset both drones
 Mouse in the viewer: drag to rotate, scroll to zoom."""
-
-# Sky, checker floor and lights copied from menagerie's skydio_x2/scene.xml; lights raised for 1 m flight.
-# Timestep 0.002 because the Crazyflie needs a small step; air and RK4 as in the menagerie drone models.
-WORLD_XML = """
-<mujoco model="drones">
-  <option timestep="0.002" density="1.225" viscosity="1.8e-5" integrator="RK4"/>
-  <visual>
-    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
-    <rgba haze="0.15 0.25 0.35 1"/>
-  </visual>
-  <asset>
-    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
-    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3"
-      markrgb="0.8 0.8 0.8" width="300" height="300"/>
-    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
-  </asset>
-  <worldbody>
-    <light pos="0 -1 3" dir="0 0.5 -0.8"/>
-    <light pos="0 0 3" dir="0 0 -1" directional="true"/>
-    <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
-  </worldbody>
-</mujoco>
-"""
-
-
-def build(names):
-    """One world with sky and floor, each drone attached with its own name prefix."""
-    world = mujoco.MjSpec.from_string(WORLD_XML)
-    for name in names:
-        xml, pos, _ = DRONES[name]
-        child = mujoco.MjSpec.from_file(str(MENAGERIE / xml))
-        world.worldbody.add_frame(pos=list(pos)).attach_body(child.worldbody.first_body(), f"{name}_", "")
-    with warnings.catch_warnings():  # the drones' own timestep is replaced by ours on purpose
-        warnings.simplefilter("ignore")
-        return world.compile()
-
-
-def controllers(model, names):
-    # menagerie names each drone body like its key, so after the prefix it is e.g. "x2_x2"
-    return {name: FlightController(model, f"{name}_{name}", name) for name in names}
 
 
 def selftest(names):

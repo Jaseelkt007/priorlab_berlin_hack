@@ -4,7 +4,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
 <style>
-/* Layout: white lab notebook. One-sentence answer, a 10-step animated walkthrough (canvas + caption), FAQ for the exact doubts, live race, RL comparison, use cases, proof plan. Single light theme by request. */
+/* Layout: white lab notebook. One-sentence answer, world-model comparison, warehouse walkthrough (Franka-style arm), two jobs + arm layers, FAQ, pushing walkthrough, live race, fair comparison, other fields, proof plan. Single light theme by request. */
 :root {
   color-scheme: light;
   --bg: #ffffff;
@@ -94,7 +94,6 @@ button:focus-visible { outline: 2px solid var(--tab); outline-offset: 2px; }
 .qa h3 { font-size: 1.02rem; }
 .qa p { font-size: 0.93rem; color: var(--muted); }
 .qa p b { color: var(--ink); font-weight: 600; }
-.qa .go { font-family: var(--f-mono); font-size: 0.76rem; color: var(--tab); background: none; border: none; padding: 0; text-align: left; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 
 /* race */
 .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
@@ -158,65 +157,148 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
 @media (max-width: 820px) { .proof { grid-template-columns: 1fr; } }
 .thread { background: var(--tab-soft); border: 1px solid var(--tab); border-radius: 12px; padding: 18px; display: grid; gap: 8px; }
 @media (prefers-reduced-motion: reduce) { .swap.flash, .ctx tr.fresh td { animation: none; } }
+
+.toc { display: flex; flex-wrap: wrap; gap: 8px; }
+.toc .go { font: 500 0.85rem var(--f-body); }
+.qa .go { font-family: var(--f-mono); font-size: 0.76rem; color: var(--tab); background: none; border: none; padding: 0; text-align: left; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; justify-self: start; }
+.trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+@media (max-width: 820px) { .trio { grid-template-columns: 1fr; } }
+.trio p b { color: var(--ink); }
+.flowline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-family: var(--f-mono); font-size: 0.8rem; color: var(--muted); }
+.flowline span { background: var(--tab-soft); color: var(--tab); padding: 3px 9px; border-radius: 999px; font-weight: 600; }
+.layers { display: grid; gap: 10px; }
+.layer { border-radius: 12px; padding: 16px; display: grid; gap: 6px; border: 1px solid var(--line); }
+.layer.task { background: var(--tab-soft); border-color: var(--tab); }
+.layer.ctrl { background: var(--surface); }
+.layer p { font-size: 0.92rem; color: var(--muted); }
+.handoff { justify-self: center; font-family: var(--f-mono); font-size: 0.82rem; color: var(--ink); background: var(--card); border: 1px dashed var(--muted); border-radius: 999px; padding: 4px 14px; text-align: center; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips span { font-family: var(--f-mono); font-size: 0.75rem; padding: 3px 9px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); }
+.chips span.c-tab { color: var(--tab); border-color: var(--tab); }
+section > p b { font-weight: 600; }
 </style>
 
 <div class="wrap">
   <header class="hero">
     <div class="eyebrow">HackLab Berlin · Prior Labs track · TabPFN for spatial awareness</div>
     <h1>Push, Predict, Adapt</h1>
-    <p class="lede">What we predict, how a push becomes a table row, where the autoregressive part is, and what RL can and cannot do. Ten short animated steps, then a live simulation.</p>
     <div class="answer">
-      <div class="q">In one sentence: if the robot pushes this object from here, at this angle, with this force, where will the object end up, and how sure are we?</div>
-      <p>That question is one table row. The inputs are known before the push. The outputs are what TabPFN fills in. After each real push, the real answer becomes a new row, so the next prediction is better.</p>
+      <div class="q">A world model answers one question before the robot moves: if I do this now, what will happen, and how sure am I?</div>
+      <p>TabPFN learns that answer from a small table of the robot's own past attempts, its log, with no training. The robot then uses the answer to choose a motion, or to check a motion some other controller proposed.</p>
       <div class="rowdemo">
         <table>
-          <tr class="grp"><th colspan="5">Inputs, known before the push</th><th colspan="2" style="color:var(--tab)">Outputs, predicted</th></tr>
-          <tr><th>object</th><th>x cm</th><th>y cm</th><th>aim °</th><th>force %</th><th>→ dx cm</th><th>→ dy cm</th></tr>
-          <tr><td class="in">wooden block</td><td class="in">18</td><td class="in">36</td><td class="in">−7</td><td class="in">55</td><td class="out">+19.1</td><td class="out">−2.2</td></tr>
-          <tr><td class="in">wooden block</td><td class="in">37</td><td class="in">34</td><td class="in">−7</td><td class="in">100</td><td class="out">? ± ?</td><td class="out">? ± ?</td></tr>
+          <tr class="grp"><th colspan="4">Inputs, known before the move</th><th colspan="2" style="color:var(--tab)">Outputs, predicted</th></tr>
+          <tr><th>box</th><th>feels ×</th><th>grip N</th><th>speed</th><th>→ slip mm</th><th>→ drop?</th></tr>
+          <tr><td class="in">standard</td><td class="in">1.0</td><td class="in">40</td><td class="in">fast</td><td class="out">0.3</td><td class="out">no</td></tr>
+          <tr><td class="in">standard</td><td class="in">3.8</td><td class="in">40</td><td class="in">fast</td><td class="out">? ± ?</td><td class="out">? %</td></tr>
         </table>
       </div>
     </div>
+    <nav class="toc" aria-label="On this page">
+      <button class="go" data-target="wm">1 · What a world model is</button>
+      <button class="go" data-target="wh">2 · The warehouse case</button>
+      <button class="go" data-target="jobs">3 · Two jobs, any arm</button>
+      <button class="go" data-target="faq">4 · Your questions</button>
+      <button class="go" data-target="push">5 · Pushing example + live sim</button>
+    </nav>
   </header>
 
-  <section aria-labelledby="story-h">
-    <div class="eyebrow">The walkthrough</div>
-    <h2 id="story-h">How it works, one step at a time</h2>
+  <section id="wm" aria-labelledby="wm-h">
+    <div class="eyebrow">1 · The term</div>
+    <h2 id="wm-h">What a "world model" is, and why ours is a table</h2>
+    <p>A world model is any model that predicts <b>what happens next if an action is taken now</b>. The world models you have seen predict the next video frame. Ours predicts the next numbers: slip, drop risk, where an object ends up. Same idea, different currency.</p>
+    <div class="player"><canvas id="cv-wm" aria-label="Video world model versus tabular world model"></canvas></div>
+    <div class="table-box">
+      <table class="cmp">
+        <thead><tr><th></th><th>Video world model</th><th>Tabular world model (TabPFN)</th></tr></thead>
+        <tbody>
+          <tr><td><b>Predicts</b></td><td>next image frames</td><td>next numbers: slip, drop risk, landing position, load</td></tr>
+          <tr><td><b>Learns from</b></td><td>huge video datasets, long training</td><td>a small table of this robot's own attempts, read in context</td></tr>
+          <tr><td><b>Speed</b></td><td>heavy; a big GPU per prediction</td><td>many what-ifs in one fast call</td></tr>
+          <tr><td><b>Uncertainty</b></td><td>usually not calibrated</td><td>a spread with every prediction</td></tr>
+          <tr><td><b>Sees hidden physics?</b></td><td>only what shows in pixels</td><td>whatever a sensor measures, e.g. how heavy a box feels</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="wh" aria-labelledby="wh-h">
+    <div class="eyebrow">2 · A real application</div>
+    <h2 id="wh-h">The warehouse case: a Franka arm moving boxes from a conveyor into a bin</h2>
     <div class="player">
-      <canvas id="cv-story" aria-label="Animated walkthrough"></canvas>
-      <div class="prog"><i id="story-prog"></i></div>
+      <canvas id="cv-wh" aria-label="Animated warehouse walkthrough"></canvas>
+      <div class="prog"><i id="w-prog"></i></div>
       <div class="cap">
-        <div class="cap-text" aria-live="polite">
-          <span class="cap-n" id="cap-n">Step 1 of 10</span>
-          <h3 id="cap-title"></h3>
-          <p id="cap-body"></p>
-        </div>
+        <div class="cap-text" aria-live="polite"><span class="cap-n" id="w-cap-n"></span><h3 id="w-cap-title"></h3><p id="w-cap-body"></p></div>
         <div class="cap-ctrl">
-          <div class="btns">
-            <button id="s-prev">← Back</button>
-            <button id="s-play">Pause</button>
-            <button id="s-next">Next →</button>
-            <button id="s-replay">Replay step</button>
-          </div>
+          <div class="btns"><button id="w-prev">← Back</button><button id="w-play">Pause</button><button id="w-next">Next →</button><button id="w-replay">Replay step</button></div>
+          <div class="dots" id="w-dots"></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">An illustration with scripted motion; the probabilities are made up to show the mechanism. In the project they come from TabPFN on simulated lifts.</p>
+  </section>
+
+  <section id="jobs" aria-labelledby="jobs-h">
+    <div class="eyebrow">3 · How it plugs into a robot</div>
+    <h2 id="jobs-h">Imagine many, do one. Two jobs. Any arm.</h2>
+    <div class="trio">
+      <div class="case"><h3>Imagine many, do one</h3><p>"Asking 136 questions" means writing 136 what-if rows in software and sending them to TabPFN in one call. The arm does not move during this. Like a pool player picturing shots before taking one, the robot then executes <b>one</b> motion and logs <b>one</b> row.</p><div class="flowline"><span>imagine 6–136</span>→<span>do 1</span>→<span>log 1</span></div></div>
+      <div class="case"><h3>Job 1: planner</h3><p>The world model picks the motion itself: speed, grip, push direction. Use this when no other controller exists, or to tune one parameter (like speed) that a fixed program leaves open.</p></div>
+      <div class="case"><h3>Job 2: safety check</h3><p>Another controller (RL policy, VLA, human operator) proposes a motion. The world model predicts its outcome first: go, adjust, or send to a manual lane. A risk screen, not a certified safety system.</p></div>
+    </div>
+    <div class="layers" id="layers">
+      <div class="layer task">
+        <span class="eyebrow">Task layer · the same code for every arm</span>
+        <h3>What to do, and what will happen</h3>
+        <p>Box features, grip force, speed, push direction → predicted slip, drop risk, landing spot. Expressed in centimetres, newtons and seconds, never joint angles.</p>
+        <div class="chips"><span class="c-tab">TabPFN world model</span><span class="c-tab">planner or safety check</span><span class="c-tab">the robot's log</span></div>
+      </div>
+      <div class="handoff">"lift this box at 0.4 m/s with a 70 N grip"</div>
+      <div class="layer ctrl">
+        <span class="eyebrow">Control layer · per arm, supplied by the vendor</span>
+        <h3>How to move the joints</h3>
+        <p>Inverse kinematics and motion control turn that command into joint motion. This part already exists for every serious arm.</p>
+        <div class="chips"><span>Franka (libfranka)</span><span>Universal Robots (RTDE)</span><span>Kinova</span><span>SO-101 (LeRobot)</span><span>MuJoCo simulation</span></div>
+      </div>
+    </div>
+    <p class="note">A side effect: if an arm is sloppy (backlash, cheap servos), its rows record the outcome of arm and box together, so the model adapts to the arm as well as the object.</p>
+  </section>
+
+  <section id="faq" aria-labelledby="faq-h">
+    <div class="eyebrow">4 · Your questions, answered directly</div>
+    <h2 id="faq-h">The doubts worth settling first</h2>
+    <div class="faq">
+      <div class="qa"><h3>What exactly is a "world model" here?</h3><p>A model of <b>what happens next if the robot does X now</b>. Video world models answer in pixels. Ours answers in the numbers the robot logs: slip, drop risk, where the object ends up.</p><button class="go" data-target="wm">See section 1 →</button></div>
+      <div class="qa"><h3>Where does the table come from?</h3><p><b>The robot's own log.</b> Every attempt is one row. Inputs come from sensors the arm already has: camera (box size), joint torques in the first 2 cm of a lift (how heavy it feels), gripper force, commanded speed. Outputs are measured afterwards: slip, drop, placement error.</p><button class="go" data-player="w" data-step="1">See warehouse step 2 →</button></div>
+      <div class="qa"><h3>Does it apply to the conveyor case with a heavy box?</h3><p><b>Yes, that is the clearest application.</b> A policy sees a normal-looking box and does its usual fast lift, so the heavy box slips out. Our robot does a 2 cm test lift, reads "feels 3.8× heavier", asks TabPFN how each speed and grip would go, and picks the fastest safe one.</p><button class="go" data-player="w" data-step="2">See warehouse steps 3–5 →</button></div>
+      <div class="qa"><h3>"136 questions": doesn't the robot have to do the work?</h3><p>It does, <b>once</b>. The questions are imagined in software in one batched call, while the arm holds still. Then the arm executes the single best motion and logs the result.</p><button class="go" data-player="w" data-step="3">See warehouse step 4 →</button></div>
+      <div class="qa"><h3>Is it a safety layer?</h3><p><b>It can be, and that is one of its two jobs.</b> It can choose the motion itself (planner), or screen motions proposed by an RL policy, a VLA or a person (safety check). It is a risk screen, never a certified safety system.</p><button class="go" data-player="w" data-step="5">See warehouse step 6 →</button></div>
+      <div class="qa"><h3>Does it depend on the arm brand?</h3><p><b>No.</b> The world model works in task terms (centimetres, newtons, speed). The arm's own controller turns the chosen motion into joint angles. Franka, UR, Kinova or SO-101 all work, and the model even absorbs a sloppy arm's quirks.</p><button class="go" data-target="layers">See the two layers →</button></div>
+      <div class="qa"><h3>How does it adapt to something heavier than it has seen?</h3><p>The test lift turns hidden weight into a number. TabPFN predicts from the rows nearest to that situation, with a wide spread if the rows are few, so the planner goes cautious. After the move, the outcome is a new row and the next prediction uses it. <b>No weights change.</b> If no available motion is safe, it says so: manual lane.</p><button class="go" data-player="w" data-step="4">See warehouse step 5 →</button></div>
+      <div class="qa"><h3>Can't a well-trained RL policy or VLA handle heavy boxes?</h3><p><b>Within its training, yes.</b> RL trained on randomized weights, with memory of recent steps, adapts inside that range. Outside it, or for a property nobody randomized, it needs new training. We must prove our advantage against exactly that strong baseline.</p><button class="go" data-player="s" data-step="8">See the RL range step →</button></div>
+    </div>
+  </section>
+
+  <section id="push" aria-labelledby="story-h">
+    <div class="eyebrow">5 · Second example</div>
+    <h2 id="story-h">Pushing objects: the same idea in its simplest form</h2>
+    <p>Pushing is the easiest version to build first in simulation: the row is where the object was and how it was pushed, the output is where it ended up. These ten steps show the mechanics in detail, including the autoregressive part (step 6).</p>
+    <div class="player">
+      <canvas id="cv-story" aria-label="Animated pushing walkthrough"></canvas>
+      <div class="prog"><i id="s-prog"></i></div>
+      <div class="cap">
+        <div class="cap-text" aria-live="polite"><span class="cap-n" id="s-cap-n"></span><h3 id="s-cap-title"></h3><p id="s-cap-body"></p></div>
+        <div class="cap-ctrl">
+          <div class="btns"><button id="s-prev">← Back</button><button id="s-play">Pause</button><button id="s-next">Next →</button><button id="s-replay">Replay step</button></div>
           <div class="dots" id="s-dots"></div>
         </div>
       </div>
     </div>
   </section>
 
-  <section aria-labelledby="faq-h">
-    <div class="eyebrow">Your questions, answered directly</div>
-    <h2 id="faq-h">The doubts worth settling first</h2>
-    <div class="faq">
-      <div class="qa"><h3>Tabular data is a snapshot. How can it describe motion?</h3><p>Each row is a <b>before → after</b> record of one action: where the object was, how it was pushed, and how far it moved. The motion lives in the columns. For fast dynamics (a walking robot at 50 Hz) a row is one time step with velocities as columns. For pushing, one row per push is the natural unit.</p><button class="go" data-step="1">See step 2 →</button></div>
-      <div class="qa"><h3>To predict further ahead, do we feed predictions back in?</h3><p><b>Yes, across pushes, not video frames.</b> The predicted landing of push 1 becomes the input position of push 2. The spread grows each step. So we plan two or three pushes ahead, execute only the first, measure where the object really stopped, and plan again. That is model-predictive control.</p><button class="go" data-step="5">See step 6 →</button></div>
-      <div class="qa"><h3>A well-trained RL policy or VLA can handle many objects. So what is new?</h3><p><b>You are right that it can, within its training.</b> RL trained on randomized objects adapts to objects inside that range. VLAs generalize to objects they can recognize. Both struggle with <b>hidden properties outside their training</b>: weight, friction, an off-centre load, a worn motor. Fixing that means more training or a purpose-built adaptation module. TabPFN adapts from a few rows at run time, with no training, and says how sure it is.</p><button class="go" data-step="8">See step 9 →</button></div>
-      <div class="qa"><h3>So what exactly is the product?</h3><p>A <b>world model that learns on the job</b>: given an object and a candidate push, it predicts where the object ends up, with a calibrated spread, and improves after every push. A planner, or a VLA, uses it to choose safe pushes. That covers the track's "where things are going" and "what happens next".</p><button class="go" data-step="9">See step 10 →</button></div>
-    </div>
-  </section>
-
   <section aria-labelledby="race-h">
-    <div class="eyebrow">Live simulation</div>
+    <div class="eyebrow">Live simulation · pushing</div>
     <h2 id="race-h">Both robots, same objects, objects swapped live</h2>
     <div class="controls" role="group" aria-label="Simulation controls">
       <div class="group"><span class="lbl">Object</span>
@@ -281,44 +363,52 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
         <tbody id="score-body"></tbody>
       </table>
     </div>
-    <p class="note">A browser simulation that explains the idea; nothing here is a result. A small Bayesian model stands in for TabPFN. The RL baseline here is deliberately the simple one, trained on wood only. In the real project we also compare against RL trained on randomized objects, the strong baseline.</p>
+    <p class="note">A browser simulation that explains the idea; nothing here is a result. A small Bayesian model stands in for TabPFN. "Force %" is shorthand: a real arm sets push stroke length and speed. The RL baseline here is deliberately the simple one; in the project we also compare against RL trained on randomized objects.</p>
   </section>
 
   <section aria-labelledby="rl-h">
-    <div class="eyebrow">Being fair to RL</div>
-    <h2 id="rl-h">Where each approach stands when a new object arrives</h2>
+    <div class="eyebrow">Being fair to RL and VLAs</div>
+    <h2 id="rl-h">Where each approach stands when an unfamiliar object arrives</h2>
     <div class="table-box">
       <table class="cmp">
-        <thead><tr><th>Approach</th><th>Object inside training range</th><th>Object outside training range</th><th>Cost to adapt</th><th>Says when unsure?</th></tr></thead>
+        <thead><tr><th>Approach</th><th>Inside training range</th><th>Outside training range</th><th>Cost to adapt</th><th>Says when unsure?</th></tr></thead>
         <tbody>
           <tr><td>RL trained on one object</td><td class="meh">Only that object</td><td class="no">Fails</td><td>New training run</td><td class="no">No</td></tr>
           <tr><td>RL with randomized physics + memory of recent steps (e.g. RMA)</td><td class="yes">Adapts</td><td class="no">Fails or very cautious</td><td>Large training run, ranges chosen up front</td><td class="no">No</td></tr>
           <tr><td>VLA (vision-language-action model)</td><td class="yes">Handles objects it can recognize</td><td class="meh">Hidden physics is invisible to the camera</td><td>Demonstrations + fine-tuning</td><td class="no">No</td></tr>
-          <tr class="us"><td><b>TabPFN world model + planner</b></td><td class="yes">Adapts</td><td class="yes">Adapts from a few rows (to be measured)</td><td><b>A few pushes, 0 gradient steps</b></td><td class="yes">Yes, every prediction has a spread</td></tr>
+          <tr class="us"><td><b>TabPFN world model</b></td><td class="yes">Adapts</td><td class="yes">Adapts from a few rows (to be measured)</td><td><b>A few attempts, 0 gradient steps</b></td><td class="yes">Yes, every prediction has a spread</td></tr>
         </tbody>
       </table>
     </div>
   </section>
 
   <section aria-labelledby="use-h">
-    <div class="eyebrow">Why anyone outside the hackathon should care</div>
-    <h2 id="use-h">Real robots meet new physics every day</h2>
-    <div class="cases">
-      <div class="case"><h3>Warehouses and parcels</h3><p>Every parcel is a new object: unknown weight, contents and friction. Boxes that look the same weigh different amounts. The robot has seconds per item to adapt.</p><div class="row">parcel · x · y · aim · force → dx · dy</div></div>
-      <div class="case"><h3>Home and service robots</h3><p>Mugs, bottles and toys on wood, glass or tablecloth. Nobody can simulate every home. The robot's first few pushes in that home are the data.</p><div class="row">object · surface · aim · force → slide distance</div></div>
-      <div class="case"><h3>Wear and damage</h3><p>A gripper pad wears, a motor weakens, a wheel slips. Same robot, new physics. Today's rows overrule training-time assumptions without retraining.</p><div class="row">command · joint state → actual motion</div></div>
-      <div class="case"><h3>Field robots</h3><p>On mud, sand or wet grass the same command moves a rover a different distance. It needs a calibrated "how far will this take me" before committing.</p><div class="row">terrain features · command → displacement ± spread</div></div>
+    <div class="eyebrow">Beyond this arm</div>
+    <h2 id="use-h">The same pattern in other fields</h2>
+    <p>It fits wherever four things hold: an action leads to a measurable outcome, real attempts are scarce, the physics changes after deployment, and the robot must know when it is unsure.</p>
+    <div class="table-box">
+      <table class="cmp">
+        <thead><tr><th>Field</th><th>Row: inputs → outputs</th><th>What changes on site</th></tr></thead>
+        <tbody>
+          <tr><td><b>Warehouse picking</b></td><td>box size, felt weight, grip, speed → slip, drop risk</td><td>contents, weight, cardboard, gripper wear</td></tr>
+          <tr><td><b>Pushing and sorting</b></td><td>object pose, push direction, stroke → where it ends up</td><td>friction, mass, off-centre loads</td></tr>
+          <tr><td><b>Mobile robots, AGVs</b></td><td>wheel command, load, floor → actual displacement</td><td>load, wet floor, wheel wear</td></tr>
+          <tr><td><b>Rovers, farm robots</b></td><td>terrain features, command → slip, displacement</td><td>mud, sand, slope</td></tr>
+          <tr><td><b>Drones</b></td><td>thrust command, payload → climb rate, drift</td><td>payload, wind</td></tr>
+          <tr><td><b>Industrial processes</b></td><td>feed rate, pressure → material removed, weld width</td><td>tool wear, material batch</td></tr>
+          <tr><td><b>People and vehicles nearby</b></td><td>an agent's recent track → where it will be in 1–3 s</td><td>every new person or vehicle</td></tr>
+        </tbody>
+      </table>
     </div>
-    <div class="thread"><h3>The common thread</h3><p>The physics changes after deployment, the change is invisible to cameras, real tries are scarce, and the robot must know when it is unsure. That is where a model that learns from a few rows, with calibrated uncertainty, earns its place next to RL and VLAs.</p></div>
   </section>
 
   <section aria-labelledby="proof-h">
     <div class="eyebrow">What we have to prove by Sunday 16:30</div>
     <h2 id="proof-h">Claims we will measure, not assume</h2>
     <div class="proof">
-      <div class="case"><h3>Hypotheses</h3><ul><li>On objects outside RL's training range, TabPFN reaches the target in fewer pushes.</li><li>Its 90% prediction bands contain about 90% of real outcomes.</li><li>Uncertainty-aware planning drops fewer objects.</li></ul></div>
-      <div class="case"><h3>Baselines</h3><ul><li>PPO trained on one object</li><li>PPO with randomized physics and history, the strong one, trained fast in JAX/MJX</li><li>MLP-ensemble world model given the same rows</li></ul></div>
-      <div class="case"><h3>Tests and risks</h3><ul><li>Held-out objects, hundreds of seeded episodes, confidence intervals</li><li>Decision latency with a cached context and batched candidates</li><li>Risk: push physics in MuJoCo is noisy, so we measure that noise first</li></ul></div>
+      <div class="case"><h3>Demo options (MuJoCo, Franka)</h3><ul><li><b>A · Pushing:</b> easiest physics to get right; build first.</li><li><b>B · Conveyor lift:</b> the strongest real-world story; needs reliable grip-slip physics, so we test it in a short spike before committing.</li><li>Same world-model and planner code for both.</li></ul></div>
+      <div class="case"><h3>Hypotheses</h3><ul><li>On objects outside RL's training range, TabPFN succeeds with fewer attempts.</li><li>Its 90% prediction bands contain about 90% of real outcomes.</li><li>As a safety check, it prevents most drops of a fast policy.</li></ul></div>
+      <div class="case"><h3>Baselines and tests</h3><ul><li>PPO on one object; PPO with randomized physics and history, trained fast in JAX/MJX</li><li>MLP-ensemble world model given the same rows</li><li>Held-out objects, hundreds of seeded episodes, decision latency</li></ul></div>
     </div>
   </section>
 </div>
@@ -487,17 +577,19 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
     return { pos, done, end: A + B + Sd };
   }
 
-  // ---------- story canvas ----------
+  // ---------- canvas fitting with layouts (y can point up for side views) ----------
   function storyLayout(cssW) {
     if (cssW >= 640) return { narrow: false, LW: 1000, LH: 500, wx: 22, wy: 64, sc: 560, dx: 612, dy: 40, dw: 372 };
     return { narrow: true, LW: 440, LH: 780, wx: 10, wy: 46, sc: 420, dx: 10, dy: 338, dw: 420 };
   }
-  function fitStory(cv) {
-    const cssW = cv.clientWidth || 800, L = storyLayout(cssW), cssH = Math.round(cssW * L.LH / L.LW), dpr = Math.min(window.devicePixelRatio || 1, 2);
+  function fitStory(cv, layoutFn = storyLayout) {
+    const cssW = cv.clientWidth || 800, L = layoutFn(cssW), cssH = Math.round(cssW * L.LH / L.LW), dpr = Math.min(window.devicePixelRatio || 1, 2);
     if (cv.width !== Math.round(cssW * dpr) || cv.height !== Math.round(cssH * dpr)) { cv.width = Math.round(cssW * dpr); cv.height = Math.round(cssH * dpr); cv.style.height = cssH + 'px'; }
     const ctx = cv.getContext('2d'), k = dpr * cssW / L.LW; ctx.setTransform(k, 0, 0, k, 0, 0);
     ctx.fillStyle = C['--card']; ctx.fillRect(0, 0, L.LW, L.LH);
-    return { ctx, L, w: L.LW, h: L.LH, X: x => L.wx + x * L.sc, Y: y => L.wy + y * L.sc, S: v => v * L.sc };
+    const X = x => L.wx + (x - (L.xmin || 0)) * L.sc;
+    const Y = L.yUp ? (y => L.wy + (L.ymax - y) * L.sc) : (y => L.wy + y * L.sc);
+    return { ctx, L, w: L.LW, h: L.LH, X, Y, S: v => v * L.sc };
   }
   function text(g, s, x, y, o = {}) {
     const { ctx } = g;
@@ -506,28 +598,29 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
     if (o.bg) {
       const w = ctx.measureText(s).width, pad = 5, h = (o.size || 13) + 8;
       const bx = o.align === 'center' ? x - w / 2 - pad : o.align === 'right' ? x - w - pad : x - pad;
-      ctx.fillStyle = o.bg; ctx.globalAlpha = o.bgAlpha ?? 0.95; ctx.fillRect(bx, y - (o.size || 13) - 3, w + 2 * pad, h); ctx.globalAlpha = 1;
+      ctx.fillStyle = o.bg; ctx.globalAlpha = (o.bgAlpha ?? 0.95) * (o.alpha ?? 1); ctx.fillRect(bx, y - (o.size || 13) - 3, w + 2 * pad, h); ctx.globalAlpha = 1;
       if (o.border) { ctx.strokeStyle = o.border; ctx.lineWidth = 1.2; ctx.strokeRect(bx, y - (o.size || 13) - 3, w + 2 * pad, h); }
     }
     ctx.fillStyle = o.color || C['--ink']; ctx.globalAlpha = o.alpha ?? 1; ctx.fillText(s, x, y); ctx.globalAlpha = 1;
   }
   function worldCaption(g, s) { text(g, s, g.L.wx, g.L.wy - 16, { size: 12, mono: true, color: C['--muted'] }); }
 
-  // data table on canvas
-  const COLW = [74, 44, 44, 50, 56, 52, 52];
-  const COLN = ['object', 'x cm', 'y cm', 'aim °', 'force %', '→ dx', '→ dy'];
-  function colX(g, c) { const f = g.L.dw / 372; let x = g.L.dx; for (let i = 0; i < c; i++) x += COLW[i] * f; return x; }
-  function colW(g, c) { return COLW[c] * g.L.dw / 372; }
+  // data table on canvas; cols = [name, width, isOutput]
+  const PUSHCOLS = [['object', 74], ['x cm', 44], ['y cm', 44], ['aim °', 50], ['force %', 56], ['→ dx', 52, 1], ['→ dy', 52, 1]];
+  const WHCOLS = [['box', 76], ['feels ×', 60], ['grip N', 56], ['speed', 62], ['→ slip mm', 66, 1], ['→ drop?', 52, 1]];
+  function colX(g, c, cols = PUSHCOLS) { const f = g.L.dw / 372; let x = g.L.dx; for (let i = 0; i < c; i++) x += cols[i][1] * f; return x; }
+  function colW(g, c, cols = PUSHCOLS) { return cols[c][1] * g.L.dw / 372; }
   const ROWH = 25, HEAD = 50;
-  function cellAnchor(g, row, c) { return { x: colX(g, c) + colW(g, c) - 6, y: g.L.dy + HEAD + row * ROWH + 17 }; }
+  function cellAnchor(g, row, c, cols = PUSHCOLS) { return { x: colX(g, c, cols) + colW(g, c, cols) - 6, y: g.L.dy + HEAD + row * ROWH + 17 }; }
   function drawData(g, rows, o = {}) {
-    const { ctx, L } = g, x0 = L.dx, y0 = L.dy, inW = colX(g, 5) - x0, outW = colW(g, 5) + colW(g, 6);
+    const cols = o.cols || PUSHCOLS, { ctx, L } = g, x0 = L.dx, y0 = L.dy;
+    const firstOut = cols.findIndex(c => c[2]), inW = colX(g, firstOut, cols) - x0, outW = L.dw - inW;
     text(g, o.title || 'The table TabPFN reads', x0, y0 - 14, { size: 12, mono: true, color: C['--muted'] });
     ctx.fillStyle = C['--surface']; ctx.fillRect(x0, y0, inW, 22);
     ctx.fillStyle = C['--tab-soft']; ctx.fillRect(x0 + inW, y0, outW, 22);
-    text(g, 'INPUTS · known before the push', x0 + 6, y0 + 15, { size: 10.5, mono: true, weight: 600, color: C['--muted'] });
+    text(g, o.inLabel || 'INPUTS · known before the push', x0 + 6, y0 + 15, { size: 10.5, mono: true, weight: 600, color: C['--muted'] });
     text(g, 'OUTPUTS', x0 + inW + 6, y0 + 15, { size: 10.5, mono: true, weight: 600, color: C['--tab'] });
-    for (let c = 0; c < 7; c++) text(g, COLN[c], c === 0 ? colX(g, c) + 4 : colX(g, c) + colW(g, c) - 6, y0 + 41, { size: 11, mono: true, align: c === 0 ? 'left' : 'right', color: c >= 5 ? C['--tab'] : C['--muted'] });
+    cols.forEach((col, c) => text(g, col[0], c === 0 ? colX(g, c, cols) + 4 : colX(g, c, cols) + colW(g, c, cols) - 6, y0 + 41, { size: 11, mono: true, align: c === 0 ? 'left' : 'right', color: col[2] ? C['--tab'] : C['--muted'] }));
     ctx.strokeStyle = C['--line']; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, y0 + HEAD - 2); ctx.lineTo(x0 + L.dw, y0 + HEAD - 2); ctx.stroke();
     let y = y0 + HEAD;
     const t = o.t || 0;
@@ -537,18 +630,18 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
       if (r.hl) { ctx.globalAlpha = 0.9 * a; ctx.fillStyle = r.hl; ctx.fillRect(x0, y, L.dw, ROWH - 1); ctx.globalAlpha = 1; }
       r.cells.forEach((v, c) => {
         if (v == null) return;
-        const isOut = c >= 5, q = v === '?';
-        const ax = c === 0 ? colX(g, c) + 4 : colX(g, c) + colW(g, c) - 6;
+        const isOut = !!cols[c][2], q = v === '?';
+        const ax = c === 0 ? colX(g, c, cols) + 4 : colX(g, c, cols) + colW(g, c, cols) - 6;
         if (q) {
           const pulse = 0.55 + 0.45 * Math.sin(t * 6);
-          ctx.globalAlpha = pulse * a; ctx.fillStyle = C['--tab']; ctx.fillRect(colX(g, c) + 4, y + 3, colW(g, c) - 8, ROWH - 7); ctx.globalAlpha = 1;
-          text(g, '?', colX(g, c) + colW(g, c) / 2, y + 17, { size: 14, mono: true, weight: 600, align: 'center', color: '#ffffff', alpha: a });
+          ctx.globalAlpha = pulse * a; ctx.fillStyle = C['--tab']; ctx.fillRect(colX(g, c, cols) + 4, y + 3, colW(g, c, cols) - 8, ROWH - 7); ctx.globalAlpha = 1;
+          text(g, '?', colX(g, c, cols) + colW(g, c, cols) / 2, y + 17, { size: 14, mono: true, weight: 600, align: 'center', color: '#ffffff', alpha: a });
           return;
         }
         const italic = r.pred && (c === 1 || c === 2);
-        text(g, String(v), ax, y + 17, { size: 12, mono: true, align: c === 0 ? 'left' : 'right', weight: isOut ? 600 : 400, color: isOut ? C['--tab'] : italic ? C['--rl'] : C['--ink'], alpha: a });
+        const col = isOut ? (r.bad ? C['--danger'] : C['--tab']) : italic ? C['--rl'] : C['--ink'];
+        text(g, String(v), ax, y + 17, { size: 12, mono: true, align: c === 0 ? 'left' : 'right', weight: isOut ? 600 : 400, color: col, alpha: a });
       });
-      if (r.tag) text(g, r.tag, x0 + L.dw + 2, y + 17, { size: 10, mono: true, align: 'right', color: C['--muted'], alpha: 0 });
       ctx.strokeStyle = C['--line']; ctx.beginPath(); ctx.moveTo(x0, y + ROWH - 1); ctx.lineTo(x0 + L.dw, y + ROWH - 1); ctx.stroke();
       y += ROWH;
     });
@@ -568,6 +661,36 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
     ctx.fillStyle = on ? C['--tab'] : C['--tab-soft']; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, 30, 15) : ctx.rect(x, y, w, 30); ctx.fill();
     text(g, s, x + 13, y + 20, { size: 13, display: true, weight: 600, color: on ? '#ffffff' : C['--tab'] });
     return w;
+  }
+  // flow diagram used by both walkthroughs
+  function drawFlow(g, t, nodes, loopLabel, footer) {
+    const { ctx, L } = g, W = L.LW, H = L.LH;
+    let pos;
+    if (!L.narrow) { const nw = 200, gap = (W - 60 - 4 * nw) / 3; pos = nodes.map((_, i) => ({ x: 30 + i * (nw + gap), y: 120, w: nw, h: 140 })); }
+    else { const nw = W - 60; pos = nodes.map((_, i) => ({ x: 30, y: 50 + i * 150, w: nw, h: 108 })); }
+    const step = Math.floor(t / 1.6) % 6;
+    nodes.forEach(([title, sub, col], i) => {
+      const p = pos[i], on = step === i || (step === 4 && i === 3) || (step === 5 && i === 2);
+      ctx.fillStyle = on ? C['--tab-soft'] : C['--surface']; ctx.strokeStyle = on ? C['--tab'] : C['--line']; ctx.lineWidth = on ? 2.5 : 1.2;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(p.x, p.y, p.w, p.h, 12) : ctx.rect(p.x, p.y, p.w, p.h); ctx.fill(); ctx.stroke();
+      text(g, title, p.x + 14, p.y + 28, { size: 16, display: true, weight: 600, color: col });
+      wrapText(g, sub, p.x + 14, p.y + 54, p.w - 28, { size: 13, color: C['--muted'] });
+    });
+    const link = (a, b) => L.narrow ? [{ x: a.x + a.w / 2, y: a.y + a.h }, { x: b.x + b.w / 2, y: b.y }] : [{ x: a.x + a.w, y: a.y + a.h / 2 }, { x: b.x, y: b.y + b.h / 2 }];
+    for (let i = 0; i < 3; i++) {
+      const [a, b] = link(pos[i], pos[i + 1]);
+      ctx.strokeStyle = C['--muted']; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      const an = Math.atan2(b.y - a.y, b.x - a.x); ctx.fillStyle = C['--muted']; ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - 9 * Math.cos(an - 0.4), b.y - 9 * Math.sin(an - 0.4)); ctx.lineTo(b.x - 9 * Math.cos(an + 0.4), b.y - 9 * Math.sin(an + 0.4)); ctx.closePath(); ctx.fill();
+      if (step === i) { const u = (t % 1.6) / 1.6; ctx.fillStyle = C['--tab']; ctx.beginPath(); ctx.arc(lerp(a.x, b.x, u), lerp(a.y, b.y, u), 6, 0, 7); ctx.fill(); }
+    }
+    const c = pos[3], tb = pos[2];
+    ctx.strokeStyle = C['--tab']; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.beginPath();
+    let lbl;
+    if (!L.narrow) { const yb = c.y + c.h + 40; ctx.moveTo(c.x + c.w / 2, c.y + c.h); ctx.lineTo(c.x + c.w / 2, yb); ctx.lineTo(tb.x + tb.w / 2, yb); ctx.lineTo(tb.x + tb.w / 2, tb.y + tb.h + 6); lbl = { x: (c.x + tb.x + tb.w) / 2 + 20, y: yb + 24 }; }
+    else { const xr = W - 12; ctx.moveTo(c.x + c.w, c.y + c.h / 2); ctx.lineTo(xr, c.y + c.h / 2); ctx.lineTo(xr, tb.y + tb.h / 2); ctx.lineTo(tb.x + tb.w + 6, tb.y + tb.h / 2); lbl = { x: W / 2, y: c.y + c.h + 36 }; }
+    ctx.stroke(); ctx.setLineDash([]);
+    text(g, loopLabel, lbl.x, lbl.y, { size: 13, weight: 600, align: 'center', color: C['--tab'], bg: C['--card'] });
+    if (footer) wrapText(g, footer, 30, L.narrow ? H - 60 : H - 46, W - 60, { size: 13.5, color: C['--ink'] });
   }
 
   // ---------- story data (deterministic) ----------
@@ -889,63 +1012,327 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
       title: 'Where this fits next to big robot models', dur: 12,
       body: 'We do not replace VLAs or RL policies. They decide what to do. TabPFN predicts what will physically happen, from a handful of this object\'s rows, and flags when it is unsure. Think of it as a fast physics check that updates itself after every push.',
       draw(g, t) {
-        const { ctx, L } = g, W = L.LW, H = L.LH;
-        const nodes = [
+        drawFlow(g, t, [
           ['Camera + task', '"push the box onto the shelf"', C['--muted']],
           ['VLA or RL policy', 'decides WHAT to do: proposes a push', C['--rl']],
           ['TabPFN world model', 'predicts WHAT HAPPENS: landing cloud from this object\'s rows', C['--tab']],
           ['Check', 'on target and confident? push. Unsure? gentle probe or adjust', C['--ink']],
-        ];
-        let pos;
-        if (!L.narrow) { const nw = 200, gap = (W - 60 - 4 * nw) / 3; pos = nodes.map((_, i) => ({ x: 30 + i * (nw + gap), y: 150, w: nw, h: 120 })); }
-        else { const nw = W - 60; pos = nodes.map((_, i) => ({ x: 30, y: 60 + i * 150, w: nw, h: 100 })); }
-        const step = Math.floor(t / 1.6) % 6;
-        nodes.forEach(([title, sub, col], i) => {
-          const p = pos[i], on = (step === i) || (step >= 4 && (i === 2 || i === 3) && ((step === 4 && i === 3) || (step === 5 && i === 2)));
-          ctx.fillStyle = on ? C['--tab-soft'] : C['--surface']; ctx.strokeStyle = on ? C['--tab'] : C['--line']; ctx.lineWidth = on ? 2.5 : 1.2;
-          ctx.beginPath(); ctx.roundRect ? ctx.roundRect(p.x, p.y, p.w, p.h, 12) : ctx.rect(p.x, p.y, p.w, p.h); ctx.fill(); ctx.stroke();
-          text(g, title, p.x + 14, p.y + 28, { size: 16, display: true, weight: 600, color: col });
-          wrapText(g, sub, p.x + 14, p.y + 54, p.w - 28, { size: 13, color: C['--muted'] });
-        });
-        const link = (a, b) => L.narrow ? [{ x: a.x + a.w / 2, y: a.y + a.h }, { x: b.x + b.w / 2, y: b.y }] : [{ x: a.x + a.w, y: a.y + a.h / 2 }, { x: b.x, y: b.y + b.h / 2 }];
-        for (let i = 0; i < 3; i++) {
-          const [a, b] = link(pos[i], pos[i + 1]);
-          ctx.strokeStyle = C['--muted']; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x - (L.narrow ? 0 : 6), b.y - (L.narrow ? 6 : 0)); ctx.stroke();
-          const an = Math.atan2(b.y - a.y, b.x - a.x); ctx.fillStyle = C['--muted']; ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - 9 * Math.cos(an - 0.4), b.y - 9 * Math.sin(an - 0.4)); ctx.lineTo(b.x - 9 * Math.cos(an + 0.4), b.y - 9 * Math.sin(an + 0.4)); ctx.closePath(); ctx.fill();
-          if (step === i) { const u = (t % 1.6) / 1.6; ctx.fillStyle = C['--tab']; ctx.beginPath(); ctx.arc(lerp(a.x, b.x, u), lerp(a.y, b.y, u), 6, 0, 7); ctx.fill(); }
-        }
-        // feedback loop: check -> TabPFN
-        const c = pos[3], tb = pos[2];
-        ctx.strokeStyle = C['--tab']; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.beginPath();
-        let lbl;
-        if (!L.narrow) { const yb = c.y + c.h + 40; ctx.moveTo(c.x + c.w / 2, c.y + c.h); ctx.lineTo(c.x + c.w / 2, yb); ctx.lineTo(tb.x + tb.w / 2, yb); ctx.lineTo(tb.x + tb.w / 2, tb.y + tb.h + 6); lbl = { x: (c.x + tb.x + tb.w) / 2 + 20, y: yb + 24 }; }
-        else { const xr = W - 12; ctx.moveTo(c.x + c.w, c.y + c.h / 2); ctx.lineTo(xr, c.y + c.h / 2); ctx.lineTo(xr, tb.y + tb.h / 2); ctx.lineTo(tb.x + tb.w + 6, tb.y + tb.h / 2); lbl = { x: W / 2, y: c.y + c.h + 40 }; }
-        ctx.stroke(); ctx.setLineDash([]);
-        text(g, 'after the push: the outcome becomes a new row', lbl.x, lbl.y, { size: 13, weight: 600, align: 'center', color: C['--tab'], bg: C['--card'] });
-        if (!L.narrow) wrapText(g, 'The VLA brings general skill and semantics. TabPFN brings fast, calibrated physical prediction for this specific object, learned on the job.', 30, H - 40, W - 60, { size: 13.5, color: C['--ink'] });
+        ], 'after the push: the outcome becomes a new row', g.L.narrow ? '' : 'The VLA brings general skill and semantics. TabPFN brings fast, calibrated physical prediction for this specific object, learned on the job.');
       },
     },
   ];
   function c0th() { return SD.chain[0].th; }
 
-  // ---------- story player ----------
-  const story = { i: 0, t: 0, playing: !reduce };
-  const cvS = document.getElementById('cv-story');
-  const capN = document.getElementById('cap-n'), capT = document.getElementById('cap-title'), capB = document.getElementById('cap-body'), prog = document.getElementById('story-prog');
-  const dotsEl = document.getElementById('s-dots'), bPlayS = document.getElementById('s-play');
-  SCENES.forEach((s, i) => { const b = document.createElement('button'); b.textContent = i + 1; b.setAttribute('aria-label', `Step ${i + 1}: ${s.title}`); b.addEventListener('click', () => setScene(i)); dotsEl.appendChild(b); });
-  function setScene(i) {
-    story.i = (i + SCENES.length) % SCENES.length; story.t = reduce && !story.playing ? SCENES[story.i].dur - 0.01 : 0;
-    capN.textContent = `Step ${story.i + 1} of ${SCENES.length}`; capT.textContent = SCENES[story.i].title; capB.textContent = SCENES[story.i].body;
-    [...dotsEl.children].forEach((b, k) => b.setAttribute('aria-current', String(k === story.i)));
+  // ---------- warehouse: a Franka-style arm at a conveyor (side view, metres, y up) ----------
+  function whLayout(cssW) {
+    if (cssW >= 640) return { narrow: false, LW: 1000, LH: 520, wx: 40, wy: 44, sc: 370, xmin: -0.08, ymax: 1.24, yUp: true, dx: 612, dy: 44, dw: 372 };
+    return { narrow: true, LW: 440, LH: 900, wx: 14, wy: 40, sc: 330, xmin: -0.08, ymax: 1.24, yUp: true, dx: 10, dy: 492, dw: 420 };
   }
-  function syncStoryBtn() { bPlayS.textContent = story.playing ? 'Pause' : 'Play'; }
-  document.getElementById('s-prev').addEventListener('click', () => setScene(story.i - 1));
-  document.getElementById('s-next').addEventListener('click', () => setScene(story.i + 1));
-  document.getElementById('s-replay').addEventListener('click', () => { story.t = 0; story.playing = true; syncStoryBtn(); });
-  bPlayS.addEventListener('click', () => { story.playing = !story.playing; if (story.playing && story.t >= SCENES[story.i].dur - 0.02) story.t = 0; syncStoryBtn(); });
-  document.querySelectorAll('.qa .go').forEach(b => b.addEventListener('click', () => { setScene(+b.dataset.step); story.playing = true; story.t = 0; syncStoryBtn(); cvS.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' }); }));
-  setScene(0); syncStoryBtn();
+  const WH = { belt: 0.35, bw: 0.16, bh: 0.12, S: { x: 0.55, y: 0.68 }, L1: 0.34, L2: 0.34, hand: 0.06, finger: 0.06 };
+  const WP = { home: { x: 0.55, y: 1.0 }, aboveP: { x: 0.3, y: 0.72 }, pick: { x: 0.3, y: 0.53 }, probe: { x: 0.3, y: 0.555 }, lift: { x: 0.3, y: 0.82 }, aboveB: { x: 0.9, y: 1.16 }, into: { x: 0.9, y: 1.04 } };
+  const sstep = u => u * u * (3 - 2 * u);
+  function makeRun(o = {}) {
+    const spd = o.spd || 1, segs = [];
+    const add = (a, b, d, g0, g1, carry, k) => segs.push({ a: WP[a], b: WP[b], d, g0, g1, carry, k });
+    add('home', 'aboveP', 0.6, 0, 0, false, 'reach'); add('aboveP', 'pick', 0.4, 0, 0, false, 'reach'); add('pick', 'pick', 0.3, 0, 1, false, 'grip');
+    if (o.probe) { add('pick', 'probe', 0.4, 1, 1, true, 'probe'); add('probe', 'probe', o.think || 2.0, 1, 1, true, 'think'); add('probe', 'lift', 0.45 * spd, 1, 1, true, 'lift'); }
+    else add('pick', 'lift', 0.45 * spd, 1, 1, true, 'lift');
+    add('lift', 'aboveB', 0.9 * spd, 1, 1, true, 'transfer'); add('aboveB', 'into', 0.3, 1, 1, true, 'lower'); add('into', 'into', 0.25, 1, 0, false, 'release'); add('into', 'home', 0.6, 0, 0, false, 'back');
+    let acc = 0; segs.forEach(s => { s.t0 = acc; acc += s.d; s.t1 = acc; });
+    const find = k => segs.find(s => s.k === k);
+    const run = { spd, segs, total: acc, tGrip: find('grip').t1, tTransfer0: find('transfer').t0, tTransfer1: find('transfer').t1, tRelease: find('release').t0, tThink0: o.probe ? find('think').t0 : null, tThink1: o.probe ? find('think').t1 : null };
+    if (o.slip) { const d = run.tTransfer1 - run.tTransfer0; run.tSlip0 = run.tTransfer0 + o.slip[0] * d; run.tDetach = run.tSlip0 + o.slip[1] * d; }
+    return run;
+  }
+  function runAt(run, tau) {
+    if (tau <= 0) return { w: WP.home, grip: 0, seg: run.segs[0] };
+    for (const s of run.segs) if (tau < s.t1) { const u = sstep(clamp((tau - s.t0) / s.d, 0, 1)); return { w: { x: lerp(s.a.x, s.b.x, u), y: lerp(s.a.y, s.b.y, u) }, grip: lerp(s.g0, s.g1, u), seg: s }; }
+    return { w: WP.home, grip: 0, seg: last(run.segs), done: true };
+  }
+  const tipOf = w => ({ x: w.x, y: w.y - WH.hand - WH.finger });
+  function groundAt(x) { if (x > -0.06 && x < 0.43) return WH.belt + WH.bh / 2; if (x > 0.48 && x < 0.62) return 0.35 + WH.bh / 2; return WH.bh / 2; }
+  function fall(p0, v, dt) {
+    let x = p0.x, y = p0.y, vx = v.x, vy = v.y, landed = false; const h = 0.004;
+    for (let s = 0; s < dt && !landed; s += h) { vy -= 9.8 * h; x += vx * h; y += vy * h; const gy = groundAt(x); if (y <= gy) { y = gy; landed = true; } }
+    return { x, y, landed };
+  }
+  function boxState(run, t, t0) {
+    const tau = t - t0;
+    if (tau < run.tGrip) return { p: { x: lerp(-0.14, 0.3, ease(clamp(t / 1.1, 0, 1))), y: WH.belt + WH.bh / 2 }, tilt: 0 };
+    if (run.tDetach != null && tau >= run.tSlip0) {
+      if (tau < run.tDetach) { const u = (tau - run.tSlip0) / (run.tDetach - run.tSlip0), tp = tipOf(runAt(run, tau).w); return { p: { x: tp.x, y: tp.y - 0.05 * u * u }, tilt: 0.06 * u, slipping: true }; }
+      const tp1 = tipOf(runAt(run, run.tDetach).w), tp0 = tipOf(runAt(run, run.tDetach - 0.02).w);
+      const v = { x: (tp1.x - tp0.x) / 0.02, y: (tp1.y - tp0.y) / 0.02 };
+      const f = fall({ x: tp1.x, y: tp1.y - 0.05 }, v, tau - run.tDetach);
+      return { p: f, tilt: f.landed ? 0.35 : 0.18, dropped: true, landed: f.landed };
+    }
+    if (tau < run.tRelease) return { p: tipOf(runAt(run, tau).w), tilt: 0 };
+    return { p: tipOf(WP.into), tilt: 0, placed: true };
+  }
+  // how hard the box pulls on the grip, relative to what the grip can hold
+  function loadOf(run, tau, mass, grip) {
+    const st = runAt(run, tau); if (!st.seg.carry || tau < run.tGrip) return 0;
+    let dyn = 0;
+    if (st.seg.k === 'lift' || st.seg.k === 'transfer') { const u = clamp((tau - st.seg.t0) / st.seg.d, 0, 1); dyn = 0.1 * Math.sin(Math.PI * u) / (run.spd * run.spd); }
+    return mass * (0.24 + dyn) / (grip / 40);
+  }
+  function elbowOf(w) {
+    const S = WH.S, L1 = WH.L1, L2 = WH.L2, dx = w.x - S.x, dy = w.y - S.y, d0 = Math.hypot(dx, dy) || 1e-6, d = clamp(d0, 0.05, L1 + L2 - 1e-3);
+    const ux = dx / d0, uy = dy / d0, a = (L1 * L1 - L2 * L2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, L1 * L1 - a * a));
+    const px = S.x + a * ux, py = S.y + a * uy, e1 = { x: px - h * uy, y: py + h * ux }, e2 = { x: px + h * uy, y: py - h * ux };
+    return e1.y > e2.y ? e1 : e2;
+  }
+  function drawPlant(g, t) {
+    const { ctx, X, Y, S } = g;
+    ctx.strokeStyle = C['--table-edge']; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(-0.08), Y(0)); ctx.lineTo(X(1.12), Y(0)); ctx.stroke();
+    // conveyor
+    ctx.strokeStyle = C['--muted']; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(0.0), Y(WH.belt - 0.04)); ctx.lineTo(X(0.0), Y(0)); ctx.moveTo(X(0.36), Y(WH.belt - 0.04)); ctx.lineTo(X(0.36), Y(0)); ctx.stroke();
+    ctx.fillStyle = C['--surface']; ctx.lineWidth = 1.5; ctx.fillRect(X(-0.08), Y(WH.belt), S(0.5), S(0.04)); ctx.strokeRect(X(-0.08), Y(WH.belt), S(0.5), S(0.04));
+    ctx.fillStyle = C['--muted']; for (let i = 0; i < 9; i++) { const x = -0.08 + ((i * 0.06 + t * 0.09) % 0.5); ctx.fillRect(X(x), Y(WH.belt) - 1, S(0.025), 2); }
+    [-0.06, 0.4].forEach(x => { ctx.strokeStyle = C['--muted']; ctx.beginPath(); ctx.arc(X(x), Y(WH.belt - 0.02), S(0.018), 0, 7); ctx.stroke(); });
+    text(g, 'conveyor', X(0.17), Y(WH.belt - 0.04) + 16, { size: 11, mono: true, align: 'center', color: C['--muted'] });
+    // pedestal
+    ctx.fillStyle = C['--line']; ctx.fillRect(X(0.49), Y(0.35), S(0.12), S(0.35));
+    // shelf + bin
+    ctx.fillStyle = C['--line']; ctx.fillRect(X(1.05), Y(0.85), S(0.02), S(0.85)); ctx.fillRect(X(0.76), Y(0.85), S(0.33), S(0.02));
+    ctx.strokeStyle = C['--ink']; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(0.79), Y(0.99)); ctx.lineTo(X(0.79), Y(0.85)); ctx.lineTo(X(1.01), Y(0.85)); ctx.lineTo(X(1.01), Y(0.99)); ctx.stroke();
+    text(g, 'bin on shelf', X(0.9), Y(0.83) + 14, { size: 11, mono: true, align: 'center', color: C['--muted'] });
+  }
+  function drawArm(g, w, grip) {
+    const { ctx, X, Y, S } = g, Sh = WH.S, E = elbowOf(w), base = { x: 0.55, y: 0.36 };
+    const seg = (a, b) => { ctx.lineCap = 'round'; ctx.strokeStyle = C['--muted']; ctx.lineWidth = S(0.064); ctx.beginPath(); ctx.moveTo(X(a.x), Y(a.y)); ctx.lineTo(X(b.x), Y(b.y)); ctx.stroke(); ctx.strokeStyle = '#f8fafb'; ctx.lineWidth = S(0.05); ctx.stroke(); ctx.lineCap = 'butt'; };
+    const joint = p => { ctx.fillStyle = C['--ink']; ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), S(0.024), 0, 7); ctx.fill(); ctx.fillStyle = C['--tab']; ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), S(0.008), 0, 7); ctx.fill(); };
+    seg(base, Sh); seg(Sh, E); seg(E, w);
+    const hy = w.y - WH.hand;
+    ctx.fillStyle = '#f8fafb'; ctx.strokeStyle = C['--muted']; ctx.lineWidth = 1.5;
+    ctx.fillRect(X(w.x - 0.06), Y(w.y - 0.012), S(0.12), S(WH.hand - 0.012)); ctx.strokeRect(X(w.x - 0.06), Y(w.y - 0.012), S(0.12), S(WH.hand - 0.012));
+    const sep = lerp(WH.bw / 2 + 0.026, WH.bw / 2 + 0.006, grip);
+    ctx.fillStyle = C['--ink']; [-1, 1].forEach(sx => ctx.fillRect(X(w.x + sx * sep) - S(0.006), Y(hy), S(0.012), S(WH.finger + 0.012)));
+    joint(base); joint(Sh); joint(E); joint(w);
+  }
+  function drawCarton(g, p, o = {}) {
+    const { ctx, X, Y, S } = g, w = S(WH.bw), h = S(WH.bh);
+    ctx.save(); ctx.translate(X(p.x), Y(p.y)); ctx.rotate(-(o.tilt || 0)); ctx.globalAlpha = o.alpha ?? 1;
+    ctx.fillStyle = C['--box']; ctx.strokeStyle = C['--ink']; ctx.lineWidth = 1.5; ctx.fillRect(-w / 2, -h / 2, w, h); ctx.strokeRect(-w / 2, -h / 2, w, h);
+    ctx.fillStyle = '#efe2cb'; ctx.fillRect(-w * 0.08, -h / 2, w * 0.16, h);
+    if (o.xray) { ctx.globalAlpha = (o.alpha ?? 1) * o.xray; ctx.fillStyle = C['--steel']; for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) { ctx.beginPath(); ctx.arc(-w / 2 + w * (0.2 + 0.3 * i), -h / 2 + h * (0.3 + 0.4 * j), Math.min(w, h) * 0.16, 0, 7); ctx.fill(); } }
+    ctx.restore();
+  }
+  function gauge(g, v, label) {
+    const { ctx, L } = g, x = L.wx + 2, y = L.wy + 2, w = 150, maxV = 1.4, col = v < 0.75 ? C['--tab'] : v < 1 ? C['--rl'] : C['--danger'];
+    text(g, label || 'pull on the grip vs. what it can hold', x, y + 10, { size: 11, mono: true, color: C['--muted'] });
+    ctx.fillStyle = C['--surface']; ctx.fillRect(x, y + 17, w, 10); ctx.strokeStyle = C['--line']; ctx.lineWidth = 1; ctx.strokeRect(x, y + 17, w, 10);
+    ctx.fillStyle = col; ctx.fillRect(x, y + 17, w * clamp(v / maxV, 0, 1), 10);
+    const lx = x + w / maxV; ctx.strokeStyle = C['--ink']; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(lx, y + 13); ctx.lineTo(lx, y + 31); ctx.stroke();
+    text(g, 'slips past this line', lx + 5, y + 42, { size: 10, mono: true, color: C['--muted'] });
+  }
+  function banner(g, s, color) { text(g, s, g.X(0.52), g.Y(1.2), { size: 15, display: true, weight: 600, align: 'center', color, bg: C['--card'], border: color }); }
+  function camera(g, alpha) {
+    const { ctx, X, Y, S } = g; ctx.globalAlpha = alpha;
+    ctx.fillStyle = C['--ink']; ctx.fillRect(X(0.1), Y(0.82), S(0.09), S(0.05)); ctx.beginPath(); ctx.arc(X(0.145), Y(0.77), S(0.016), 0, 7); ctx.fill();
+    ctx.strokeStyle = C['--muted']; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(X(0.145), Y(0.76)); ctx.lineTo(X(0.05), Y(0.5)); ctx.moveTo(X(0.145), Y(0.76)); ctx.lineTo(X(0.32), Y(0.5)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+  }
+  function curveTo(g, a, b, frac) {
+    const c = { x: a.x, y: Math.max(a.y, b.y) + 0.1 };
+    const q = u => ({ x: (1 - u) * (1 - u) * a.x + 2 * (1 - u) * u * c.x + u * u * b.x, y: (1 - u) * (1 - u) * a.y + 2 * (1 - u) * u * c.y + u * u * b.y });
+    return { pts: Array.from({ length: 30 }, (_, i) => q(i / 29 * (frac ?? 1))), at: q };
+  }
+
+  const LOG = [['small', '0.6', '30', 'fast', '0.1', 'no'], ['standard', '1.0', '40', 'fast', '0.3', 'no'], ['large', '1.4', '60', 'fast', '1.1', 'no'], ['standard', '1.1', '40', 'fast', '0.4', 'no'], ['large', '1.6', '40', 'fast', '6.2', 'yes']];
+  const logRows = (alpha, n) => LOG.slice(-(n || LOG.length)).map(c => ({ cells: c, alpha, bad: c[5] === 'yes' }));
+  const R_FAST = makeRun({ spd: 1 });
+  const R_DROP = makeRun({ spd: 1, slip: [0.08, 0.2] });
+  const R_PROBE = makeRun({ spd: 2.1, probe: true, think: 30 });
+  const R_SLOW = makeRun({ spd: 2.1, probe: true, think: 0.6 });
+  const R_MED = makeRun({ spd: 1.45, probe: true, think: 0.6 });
+  const WHO = { cols: WHCOLS, inLabel: 'INPUTS · known before the move' };
+  const OPTS = [
+    ['fast', '40', '≈9.0', '72%'], ['fast', '70', '≈4.1', '35%'], ['medium', '40', '≈5.2', '41%'],
+    ['medium', '70', '≈1.9', '9%'], ['slow', '40', '≈2.6', '12%'], ['slow', '70', '≈0.9', '1.5%'],
+  ];
+
+  const WSCENES = [
+    {
+      title: 'The job: conveyor to bin', dur: R_FAST.total + 2.4,
+      body: 'Boxes arrive on a conveyor. A robot arm (a Franka-style arm, seen from the side) grips each box and lifts it into a bin on a shelf. Speed is money: a faster lift means more boxes per hour. But a faster lift also shakes the box harder, so a box can slip out of the gripper.',
+      draw(g, t) {
+        worldCaption(g, 'Side view · conveyor, arm, bin');
+        drawPlant(g, t); const t0 = 0.4, b = boxState(R_FAST, t, t0), st = runAt(R_FAST, t - t0);
+        drawCarton(g, b.p, { tilt: b.tilt }); drawArm(g, st.w, st.grip); gauge(g, loadOf(R_FAST, t - t0, 1, 40));
+        if (b.placed) banner(g, `Placed · ${R_FAST.total.toFixed(1)} s per box`, C['--target']);
+        drawData(g, [], { ...WHO, title: 'The robot\'s log', note: 'Every lift will be written to this log as one row. That log is the table TabPFN reads.' });
+      },
+    },
+    {
+      title: 'Every lift is logged as one row', dur: R_FAST.total + 4.5,
+      body: 'The inputs come from sensors the arm already has: the camera gives the box size, the joint-torque sensors tell how heavy the box feels in the first 2 cm of the lift, the gripper reports its force, the controller knows the speed. The outputs are measured after the move: how far the box slipped in the grip, and whether it dropped.',
+      draw(g, t) {
+        worldCaption(g, 'Side view · where each number comes from');
+        drawPlant(g, t); const t0 = 0.4, tau = t - t0, b = boxState(R_FAST, t, t0), st = runAt(R_FAST, tau);
+        camera(g, t < 2.6 ? 1 : 0.35);
+        drawCarton(g, b.p, { tilt: b.tilt }); drawArm(g, st.w, st.grip); gauge(g, loadOf(R_FAST, tau, 1, 40));
+        const lab = (s, p, col) => text(g, s, g.X(p.x), g.Y(p.y), { size: 12.5, weight: 600, color: col || C['--ink'], bg: C['--card'], border: C['--line'] });
+        if (t > 0.3 && t < 2.6) lab('camera: box size 30 × 20 × 12 cm', { x: 0.2, y: 0.95 });
+        if (tau > R_FAST.tGrip - 0.3 && tau < R_FAST.tGrip + 0.9) lab('gripper: 40 N', { x: 0.36, y: 0.66 });
+        if (tau > R_FAST.tGrip + 0.3 && tau < R_FAST.tTransfer1) lab('joint torques: feels 1.0× a standard box', { x: 0.02, y: 1.05 });
+        if (tau > R_FAST.tTransfer0 && tau < R_FAST.tRelease) lab('controller: speed fast', { x: 0.55, y: 1.22 });
+        if (b.placed) lab('measured: slipped 0.3 mm, no drop', { x: 0.42, y: 0.76 }, C['--tab']);
+        const rows = logRows(0.55);
+        if (b.placed) rows.push({ cells: ['standard', '1.0', '40', 'fast', '0.3', 'no'], hl: C['--tab-soft'] });
+        drawData(g, rows, { ...WHO, title: 'The robot\'s log · earlier today (faded) + this lift', note: b.placed ? 'One lift = one row. Note the earlier drop (red): the log also records failures, which is exactly what the model needs to learn risk.' : 'Rows from earlier today. The new lift is about to add one.' });
+      },
+    },
+    {
+      title: 'A heavy box arrives. The policy does what it always does', dur: R_DROP.total + 2.6,
+      body: 'This box looks exactly like a standard box, but it is full of tins and weighs 3.8 times as much. An RL or VLA policy maps the camera image to a motion. The image is the same, so the motion is the same: a fast lift. The grip cannot hold the box at that acceleration, it slips and falls, and the policy carries on with an empty gripper. Unless boxes this heavy were in its training, nothing inside it can say "slow down".',
+      draw(g, t) {
+        worldCaption(g, 'Side view · same-looking box, hidden weight');
+        drawPlant(g, t); const t0 = 0.6, tau = t - t0, b = boxState(R_DROP, t, t0), st = runAt(R_DROP, tau);
+        drawCarton(g, b.p, { tilt: b.tilt, xray: t < 2.4 ? 1 : 0.3 }); drawArm(g, st.w, st.grip);
+        gauge(g, b.dropped ? 0 : loadOf(R_DROP, tau, 3.8, 40));
+        if (t < 2.4) text(g, 'x-ray: full of tins, 3.8× heavier. The camera sees a standard box.', g.X(0.0), g.Y(0.62), { size: 12.5, weight: 600, color: C['--steel'], bg: C['--card'], border: C['--line'] });
+        if (tau > R_DROP.tGrip && tau < R_DROP.tDetach) text(g, 'policy: same image → same fast lift', g.X(0.55), g.Y(1.22), { size: 12.5, weight: 600, color: C['--rl'], bg: C['--card'], border: C['--line'], align: 'center' });
+        if (b.slipping) text(g, 'slipping…', g.X(b.p.x) + 40, g.Y(b.p.y), { size: 12.5, weight: 600, color: C['--danger'], bg: C['--card'] });
+        if (b.landed) banner(g, 'Dropped', C['--danger']);
+        const rows = logRows(0.5);
+        if (b.landed) rows.push({ cells: ['standard', '3.8', '40', 'fast', 'fell', 'yes'], hl: C['--rl-soft'], bad: true });
+        drawData(g, rows, { ...WHO, title: 'The robot\'s log', note: b.landed ? 'The drop is logged. The policy itself does not change: the next heavy box gets the same fast lift.' : 'The policy never asks "what will happen if I do this with this box?"' });
+      },
+    },
+    {
+      title: 'A world model asks first: what happens if…?', dur: 13,
+      body: 'Our robot grips the box and lifts it 2 cm. The joint-torque sensors say it feels 3.8 times heavier than a standard box, a number the camera could never give. Before moving further, it writes six "what if" rows, one per speed and grip combination, with the outcomes left blank, and sends them to TabPFN in one call. All of this happens in software while the arm holds still. Nothing is tried for real.',
+      draw(g, t) {
+        worldCaption(g, 'Side view · holding still after a 2 cm test lift');
+        drawPlant(g, t); const t0 = 0.4, tau = Math.min(t - t0, R_PROBE.tThink0 + 9), b = boxState(R_PROBE, t0 + tau, t0), st = runAt(R_PROBE, tau);
+        drawCarton(g, b.p, { xray: 0.3 }); drawArm(g, st.w, st.grip);
+        const thinking = tau > R_PROBE.tThink0;
+        gauge(g, loadOf(R_PROBE, tau, 3.8, 40), thinking ? 'test lift: feels 3.8× a standard box' : undefined);
+        const tAsk = t0 + R_PROBE.tThink0 + 1.2, tFill = tAsk + 2.6;
+        if (t > tFill) {
+          const a = tipOf(WP.probe), bpt = tipOf(WP.aboveB);
+          const show = [[0, C['--danger'], 0.42, '✗ fast: 72% drop'], [3, C['--rl'], 0.7, '~ medium, firm: 9%'], [5, C['--target'], 1, '✓ slow, firm: 1.5%']];
+          show.forEach(([idx, col, frac, lbl], k) => {
+            const cv = curveTo(g, { x: a.x + k * 0.012, y: a.y }, { x: bpt.x, y: bpt.y - k * 0.03 }, frac);
+            const { ctx } = g; ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); cv.pts.forEach((p, i) => i ? ctx.lineTo(g.X(p.x), g.Y(p.y)) : ctx.moveTo(g.X(p.x), g.Y(p.y))); ctx.stroke(); ctx.setLineDash([]);
+            const end = last(cv.pts); text(g, lbl, g.X(end.x) + 8, g.Y(end.y) - 6 - k * 2, { size: 12, weight: 600, color: col, bg: C['--card'] });
+          });
+          text(g, 'imagined, not executed', g.X(0.42), g.Y(0.66), { size: 12, mono: true, color: C['--muted'], bg: C['--card'] });
+        }
+        const filled = t > tFill, chosen = 5;
+        const rows = t < tAsk ? [] : OPTS.map((o, i) => ({ cells: ['standard', '3.8', o[1], o[0], filled ? o[2] : '?', filled ? o[3] : '?'], hl: filled && i === chosen ? C['--tab-soft'] : null, bad: filled && parseFloat(o[3]) > 20 }));
+        drawData(g, rows, { ...WHO, t, title: 'One TabPFN call: six what-if rows', note: t < tAsk ? 'Test lift done. Writing the questions…' : filled ? `Chosen: the fastest option with drop risk under 2%, slow with a firm grip (${R_SLOW.total.toFixed(1)} s instead of ${R_FAST.total.toFixed(1)} s). Numbers here are illustrative.` : 'Inputs come from the test lift. TabPFN reads the log and fills in every ? with a prediction and a spread.' });
+      },
+    },
+    {
+      title: 'Do one. Log it. Get faster.', dur: R_SLOW.total + 5.5,
+      body: 'The arm executes only the chosen motion: slow, firm grip. The box arrives safely, and the outcome is logged as a new row. The next heavy box is asked about with that row in the table, and now a faster option is predicted to be safe. The robot got faster on heavy boxes without any retraining. That is in-context learning.',
+      draw(g, t) {
+        worldCaption(g, 'Side view · executing the chosen motion');
+        drawPlant(g, t); const t0 = 0.4, tau = t - t0, b = boxState(R_SLOW, t, t0), st = runAt(R_SLOW, tau);
+        drawCarton(g, b.p, { xray: 0.3 }); drawArm(g, st.w, st.grip); gauge(g, loadOf(R_SLOW, tau, 3.8, 70));
+        if (tau > R_SLOW.tGrip && tau < R_SLOW.tRelease) text(g, 'slow, grip 70 N', g.X(0.55), g.Y(1.22), { size: 12.5, weight: 600, color: C['--tab'], bg: C['--card'], border: C['--line'], align: 'center' });
+        if (b.placed) banner(g, `Placed safely · ${R_SLOW.total.toFixed(1)} s`, C['--target']);
+        const tNext = t0 + R_SLOW.tRelease + 1.6;
+        const rows = [...logRows(0.45, 3), { cells: ['standard', '3.8', '40', 'fast', 'fell', 'yes'], alpha: 0.6, bad: true }];
+        if (b.placed) rows.push({ cells: ['standard', '3.8', '70', 'slow', '1.2', 'no'], hl: C['--tab-soft'] });
+        if (t > tNext) { rows.push({ sep: 'next heavy box, asking again:' }); rows.push({ cells: ['standard', '3.7', '70', 'medium', '≈1.4', '1.6%'], hl: C['--tab-soft'] }); }
+        drawData(g, rows, { ...WHO, title: 'The robot\'s log, growing', note: t > tNext ? `With one more row about heavy boxes, medium speed is now predicted safe: ${R_MED.total.toFixed(1)} s instead of ${R_SLOW.total.toFixed(1)} s per heavy box. No weights changed.` : 'The new row is the whole learning step.' });
+      },
+    },
+    {
+      title: 'Same model, two jobs', dur: 12,
+      body: 'Job 1, planner: the world model chooses speed and grip itself, as in the last two steps. Job 2, safety check: a policy you already have (RL, a VLA, a human operator) proposes a motion, and the world model predicts its outcome first. Safe: go. Risky: slow down or grip harder. Nothing safe: send the box to a manual lane. The arm brand does not matter, because all of this works in task terms, not joint angles.',
+      draw(g, t) {
+        drawFlow(g, t, [
+          ['Camera + policy', 'RL or VLA decides WHAT: pick this box, put it in bin 3', C['--muted']],
+          ['Proposed motion', 'fast lift, grip 40 N', C['--rl']],
+          ['World model (TabPFN)', 'predicts slip, drop risk and load for THIS box, from the log', C['--tab']],
+          ['Decide', 'safe → go · risky → slower or firmer · nothing safe → manual lane', C['--ink']],
+        ], 'after the move: the outcome becomes a new row', g.L.narrow ? '' : 'The policy brings general skill: what to pick and where to put it. The world model brings a fast, calibrated prediction of physics the camera cannot see, learned on the job.');
+      },
+    },
+  ];
+
+  // ---------- "what is a world model" animation ----------
+  function wmLayout(cssW) { return cssW >= 640 ? { narrow: false, LW: 1000, LH: 330, wx: 0, wy: 0, sc: 1, dx: 0, dy: 0, dw: 0 } : { narrow: true, LW: 440, LH: 760, wx: 0, wy: 0, sc: 1, dx: 0, dy: 0, dw: 0 }; }
+  function miniFrame(g, x, y, w, h, boxX, boxY, alpha) {
+    const { ctx } = g; ctx.globalAlpha = alpha;
+    ctx.fillStyle = C['--table']; ctx.fillRect(x, y, w, h); ctx.strokeStyle = C['--table-edge']; ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = C['--muted']; ctx.fillRect(x + 4, y + h * 0.72, w * 0.5, 3);
+    ctx.fillStyle = C['--box']; ctx.strokeStyle = C['--ink']; const bw = w * 0.18, bh = h * 0.2; ctx.fillRect(x + w * boxX - bw / 2, y + h * boxY - bh / 2, bw, bh); ctx.strokeRect(x + w * boxX - bw / 2, y + h * boxY - bh / 2, bw, bh);
+    ctx.strokeStyle = C['--muted']; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + w * 0.62, y + h); ctx.lineTo(x + w * 0.62, y + h * 0.45); ctx.lineTo(x + w * boxX, y + h * boxY - bh / 2 - 4); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  function drawWM(g, t) {
+    const { ctx, L } = g, cyc = (t % 5.5) / 5.5;
+    const lanes = [
+      { title: 'Video world model (e.g. NVIDIA Cosmos, DeepMind Genie)', col: C['--muted'], kind: 'video' },
+      { title: 'Tabular world model (TabPFN, our project)', col: C['--tab'], kind: 'tab' },
+    ];
+    lanes.forEach((ln, li) => {
+      const area = L.narrow ? { x: 10, y: 24 + li * 372, w: 420 } : { x: 20, y: 22 + li * 158, w: 960 };
+      text(g, ln.title, area.x, area.y, { size: 13.5, weight: 600, display: true, color: ln.col });
+      let boxes;
+      if (!L.narrow) { const ws = [220, 160, 220, 220], gap = (area.w - ws.reduce((a, b) => a + b, 0)) / 3; let x = area.x; boxes = ws.map(w => { const b = { x, y: area.y + 14, w, h: 110 }; x += w + gap; return b; }); }
+      else boxes = [0, 1, 2, 3].map(i => ({ x: area.x, y: area.y + 14 + i * 86, w: area.w, h: 64 }));
+      const labels = ln.kind === 'video'
+        ? [['state now', 'a camera frame (pixels)'], ['action', 'lift fast'], ['model', 'predicts the next frame'], ['prediction', 'next frame (pixels)']]
+        : [['state now', 'box standard · feels 3.8× · grip 40 N'], ['action', 'speed fast'], ['model', 'reads the robot\'s log, fills in the ?'], ['prediction', 'slip ≈ 9 mm · drop risk 72% ± spread']];
+      boxes.forEach((b, i) => {
+        const isModel = i === 2, isOut = i === 3, appear = isOut ? clamp((cyc - 0.7) / 0.1, 0, 1) : 1, pulse = isModel && cyc > 0.45 && cyc < 0.7;
+        ctx.globalAlpha = isOut ? 0.25 + 0.75 * appear : 1;
+        ctx.fillStyle = isModel ? (pulse ? C['--tab-soft'] : C['--surface']) : C['--card'];
+        ctx.strokeStyle = isModel ? (ln.kind === 'tab' ? C['--tab'] : C['--muted']) : C['--line']; ctx.lineWidth = isModel ? 2 : 1.2;
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(b.x, b.y, b.w, b.h, 10) : ctx.rect(b.x, b.y, b.w, b.h); ctx.fill(); ctx.stroke(); ctx.globalAlpha = 1;
+        text(g, labels[i][0].toUpperCase(), b.x + 10, b.y + 16, { size: 10, mono: true, weight: 600, color: C['--muted'], alpha: isOut ? 0.3 + 0.7 * appear : 1 });
+        if (ln.kind === 'video' && (i === 0 || i === 3)) {
+          const fw = L.narrow ? 90 : 120, fh = L.narrow ? 38 : 70, fx = L.narrow ? b.x + b.w - fw - 10 : b.x + 10, fy = L.narrow ? b.y + 16 : b.y + 24;
+          miniFrame(g, fx, fy, fw, fh, i === 0 ? 0.3 : 0.55, i === 0 ? 0.6 : 0.3, i === 3 ? 0.25 + 0.75 * appear : 1);
+          wrapText(g, labels[i][1], L.narrow ? b.x + 10 : fx + fw + 8, L.narrow ? b.y + 38 : b.y + 44, L.narrow ? b.w - fw - 30 : b.w - fw - 26, { size: 12, color: C['--ink'], alpha: i === 3 ? 0.3 + 0.7 * appear : 1 });
+        } else {
+          wrapText(g, labels[i][1], b.x + 10, b.y + (L.narrow ? 38 : 42), b.w - 20, { size: isOut && ln.kind === 'tab' ? 14 : 13, weight: isOut ? 600 : 400, color: isOut && ln.kind === 'tab' ? C['--tab'] : C['--ink'], alpha: isOut ? 0.3 + 0.7 * appear : 1 });
+        }
+        if (i < 3) {
+          const nb = boxes[i + 1], a = L.narrow ? { x: b.x + b.w / 2, y: b.y + b.h } : { x: b.x + b.w, y: b.y + b.h / 2 }, e = L.narrow ? { x: nb.x + nb.w / 2, y: nb.y } : { x: nb.x, y: nb.y + nb.h / 2 };
+          ctx.strokeStyle = C['--muted']; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(e.x, e.y); ctx.stroke();
+          const segStart = i * 0.22, u = (cyc - segStart) / 0.22;
+          if (u >= 0 && u <= 1) { ctx.fillStyle = ln.kind === 'tab' ? C['--tab'] : C['--muted']; ctx.beginPath(); ctx.arc(lerp(a.x, e.x, u), lerp(a.y, e.y, u), 5, 0, 7); ctx.fill(); }
+        }
+      });
+    });
+  }
+
+  // ---------- step players ----------
+  function makePlayer(pre, cvId, scenes, layoutFn) {
+    const P = { i: 0, t: 0, playing: !reduce, cv: document.getElementById(cvId) };
+    const $ = id => document.getElementById(pre + '-' + id);
+    const capN = $('cap-n'), capT = $('cap-title'), capB = $('cap-body'), prog = $('prog'), dots = $('dots'), bPlay = $('play');
+    scenes.forEach((s, i) => { const b = document.createElement('button'); b.textContent = i + 1; b.setAttribute('aria-label', `Step ${i + 1}: ${s.title}`); b.addEventListener('click', () => P.set(i)); dots.appendChild(b); });
+    P.set = i => {
+      P.i = (i + scenes.length) % scenes.length; P.t = reduce && !P.playing ? scenes[P.i].dur - 0.01 : 0;
+      capN.textContent = `Step ${P.i + 1} of ${scenes.length}`; capT.textContent = scenes[P.i].title; capB.textContent = scenes[P.i].body;
+      [...dots.children].forEach((b, k) => b.setAttribute('aria-current', String(k === P.i)));
+    };
+    P.sync = () => { bPlay.textContent = P.playing ? 'Pause' : 'Play'; };
+    $('prev').addEventListener('click', () => P.set(P.i - 1));
+    $('next').addEventListener('click', () => P.set(P.i + 1));
+    $('replay').addEventListener('click', () => { P.t = 0; P.playing = true; P.sync(); });
+    bPlay.addEventListener('click', () => { P.playing = !P.playing; if (P.playing && P.t >= scenes[P.i].dur - 0.02) P.t = 0; P.sync(); });
+    P.tick = raw => { if (P.playing) { P.t += raw; if (P.t >= scenes[P.i].dur) P.set(P.i + 1); } };
+    P.draw = () => { const g = fitStory(P.cv, layoutFn); scenes[P.i].draw(g, P.t); prog.style.width = `${clamp(P.t / scenes[P.i].dur, 0, 1) * 100}%`; };
+    P.goto = i => { P.set(i); P.playing = true; P.t = 0; P.sync(); P.cv.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' }); };
+    P.set(0); P.sync();
+    return P;
+  }
+  const PW = makePlayer('w', 'cv-wh', WSCENES, whLayout);
+  const PS = makePlayer('s', 'cv-story', SCENES, storyLayout);
+  document.querySelectorAll('.go').forEach(b => b.addEventListener('click', () => {
+    if (b.dataset.target) { document.getElementById(b.dataset.target).scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); return; }
+    (b.dataset.player === 's' ? PS : PW).goto(+b.dataset.step);
+  }));
+  const cvWM = document.getElementById('cv-wm'); let wmT = reduce ? 4.6 : 0;
 
   // ---------- live race ----------
   const state = { object: 'wood', tour: true, tourIdx: 0, tourT: 0, playing: !reduce, speed: 1 };
@@ -1121,15 +1508,15 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
   let lastT = performance.now();
   function frame(now) {
     const raw = Math.min(0.05, (now - lastT) / 1000); lastT = now;
-    if (story.playing) { story.t += raw; if (story.t >= SCENES[story.i].dur) setScene(story.i + 1); }
+    PW.tick(raw); PS.tick(raw); if (!reduce) wmT += raw;
     if (state.playing) {
       const dt = raw * state.speed;
       if (state.tour) { state.tourT += dt; if (state.tourT >= TOUR[state.tourIdx][1]) { state.tourT = 0; state.tourIdx = (state.tourIdx + 1) % TOUR.length; setObject(TOUR[state.tourIdx][0], true); } }
       rl.update(dt); tab.update(dt);
     }
     tourline.textContent = state.tour ? `Auto tour · next object in ${Math.max(0, Math.ceil(TOUR[state.tourIdx][1] - state.tourT))} s` : 'Manual · pick an object';
-    const g = fitStory(cvS); SCENES[story.i].draw(g, story.t);
-    prog.style.width = `${clamp(story.t / SCENES[story.i].dur, 0, 1) * 100}%`;
+    drawWM(fitStory(cvWM, wmLayout), wmT);
+    PW.draw(); PS.draw();
     rl.draw(); tab.draw(); rl.ui(); tab.ui();
     requestAnimationFrame(frame);
   }

@@ -1,5 +1,7 @@
 # Drone track: where is the intruder drone going?
 
+**New to the project? Start with [`EXPLAINED.md`](EXPLAINED.md): the whole idea in diagrams.**
+
 Part of our Prior Labs entry ("TabPFN for spatial awareness"). Branch: `drone`.
 Full detail and every experiment: [`EXPERIMENTS.md`](EXPERIMENTS.md).
 
@@ -61,9 +63,11 @@ From the repo root, in the `priorlab` conda env. First get the drone models: see
 ```sh
 python drone/view_drones.py                 # fly the two drones with the keyboard
 python drone/intruder.py --view 8           # watch an intruder flight (any number)
-python drone/intruder.py --drone cf2 --view 8
-python drone/demo_imm.py --view radar       # a test flight: real vs IMM-predicted position, live
-python drone/demo_imm.py --view radar --record data/demo_radar_54.mp4   # the same as a video  (needs: pip install imageio-ffmpeg)
+python drone/intruder.py --drone cf2 --view 8   # building, red zone, the X2 defender hovering beside it
+python drone/intruder.py --drone cf2 --view 54 --record results/videos/scene_54.mp4   # the same as a video
+python drone/demo_imm.py --view radar --tabpfn   # a test flight: real vs IMM (blue) and TabPFN (pink), live
+python drone/demo_imm.py --view chase --tabpfn --record results/videos/imm_vs_tabpfn_chase_54.mp4
+# videos need: pip install imageio-ffmpeg. They render offscreen, so a server GPU works: MUJOCO_GL=egl
 ```
 
 Make the data again (it is not in git):

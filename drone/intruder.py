@@ -23,7 +23,7 @@ import mujoco
 import numpy as np
 
 from flight import GAINS
-from sim import ARENA_RADIUS, ZONE_HEIGHT, ZONE_RADIUS, build, controllers
+from sim import ARENA_RADIUS, POLE_GROUP, ZONE_HEIGHT, ZONE_RADIUS, build, controllers
 
 # drone -> (physics timestep in s, controller gains, first seed). The Crazyflie needs the small step.
 # Crazyflie seeds start at 100000 so its test flights never reuse an X2 training flight's random plan.
@@ -151,6 +151,9 @@ def outcome_of(pos):
     return None
 
 
+GUARD_POS = np.array([7.0, -7.0, 12.0])  # m: the defender X2 hovers here, beside the building, above the roof
+
+
 class Radar:
     """The radar at the zone centre: noisy position readings with single dropouts and blackout bursts."""
 
@@ -173,12 +176,16 @@ class Radar:
 class Flight:
     """One intruder flight in its own MuJoCo world. Step it, read its state; `record` keeps the radar log."""
 
-    def __init__(self, seed, drone="x2"):
+    def __init__(self, seed, drone="x2", guard=False):
+        """guard: also put the X2 (the defender) in the world, hovering in place next to the building.
+        Only for watching: the guard never touches the intruder, but the dataset is made without it."""
         timestep, gains, _ = SETUP[drone]
         self.rng = np.random.default_rng(seed)
-        self.model = build([drone], zone=True, timestep=timestep)
+        names = [drone] + (["x2"] if guard and drone != "x2" else [])
+        self.model = build(names, zone=True, timestep=timestep)
         self.data = mujoco.MjData(self.model)
         self.pilot = controllers(self.model, [drone], GAINS[gains])[drone]
+        self.guard = controllers(self.model, ["x2"])["x2"] if len(names) > 1 else None
         self.policy = IntruderPolicy(self.rng, self.pilot.g.max_speed)
         self.wind = Wind(self.rng, self.pilot.mass / X2_MASS)
 
@@ -186,8 +193,13 @@ class Flight:
         q, v = self.pilot.qpos, self.pilot.dof
         self.data.qpos[q : q + 3] = start
         self.data.qvel[v : v + 3] = [*(unit(-start[:2]) * self.policy.max_speed * self.policy.aggression * 0.6), 0]
+        if self.guard:
+            g = self.guard.qpos
+            self.data.qpos[g : g + 3] = GUARD_POS
         mujoco.mj_forward(self.model, self.data)
         self.pilot.reset_target(self.data)
+        if self.guard:
+            self.guard.reset_target(self.data)  # holds this position: no command, so it hovers
         self.outcome = None
         self.log = {k: [] for k in ["t", "true", "vel", "meas", "behaviour", "wind"]}
         self._next_policy = 0.0
@@ -212,6 +224,8 @@ class Flight:
             log["wind"].append(d.xfrc_applied[self.pilot.body, :2].copy())
             self._next_radar += RADAR_EVERY
         self.pilot.update(d, m.opt.timestep)
+        if self.guard:
+            self.guard.update(d, m.opt.timestep)
         mujoco.mj_step(m, d)
         self.outcome = outcome_of(self.pilot.state(d)[0]) or ("timeout" if d.time >= MAX_TIME else None)
         return self.outcome is None
@@ -262,17 +276,21 @@ def view(index, drone):
     import mujoco.viewer
 
     seed = SETUP[drone][2] + index
-    flight = Flight(seed, drone)
+    flight = Flight(seed, drone, guard=True)
     p = flight.policy
     print(f"{drone} flight {index} (seed {seed}): intent {p.intent}, aggression {p.aggression:.2f}, wind {np.linalg.norm(flight.wind.mean):.1f} N")
     with mujoco.viewer.launch_passive(flight.model, flight.data) as viewer:
         viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
         viewer.cam.trackbodyid = flight.pilot.body
-        viewer.cam.distance, viewer.cam.elevation = (25.0 if drone == "x2" else 4.0), -25
+        viewer.cam.distance, viewer.cam.elevation = (25.0 if drone == "x2" else 2.5), -12
+        viewer.opt.geomgroup[POLE_GROUP] = 1  # the zone poles: MuJoCo hides group 3 unless asked
         start = time.time()
         last = None
         while viewer.is_running():
             alive = flight.step() if flight.outcome is None else False
+            pos = flight.pilot.state(flight.data)[0]
+            with viewer.lock():  # behind the drone, looking toward the building
+                viewer.cam.azimuth = np.degrees(np.arctan2(-pos[1], -pos[0]))
             if p.behaviour != last and alive:
                 last = p.behaviour
                 print(f"  t={flight.data.time:5.1f}s  {last}")
@@ -285,15 +303,58 @@ def view(index, drone):
                 time.sleep(max(lag, 0.02))
 
 
+def record_view(index, drone, out, fps=30, size=(1280, 720)):
+    """The same as --view, saved as an MP4 instead of a window (renders offscreen: works on a server GPU)."""
+    import imageio_ffmpeg
+    from matplotlib import font_manager
+    from PIL import Image, ImageDraw, ImageFont
+
+    seed = SETUP[drone][2] + index
+    flight = Flight(seed, drone, guard=True)
+    font = ImageFont.truetype(font_manager.findfont("DejaVu Sans Mono"), 22)
+    renderer = mujoco.Renderer(flight.model, size[1], size[0])
+    cam = mujoco.MjvCamera()
+    cam.type, cam.trackbodyid = mujoco.mjtCamera.mjCAMERA_TRACKING, flight.pilot.body
+    cam.distance, cam.elevation = (25.0 if drone == "x2" else 2.5), -12
+    options = mujoco.MjvOption()
+    options.geomgroup[POLE_GROUP] = 1  # the zone poles: MuJoCo hides group 3 unless asked
+    writer = imageio_ffmpeg.write_frames(str(out), size, fps=fps, quality=8, macro_block_size=8)
+    writer.send(None)
+    frames, held = 0, 0
+    while held < 2 * fps:  # after the end, hold the last picture 2 s
+        if flight.outcome is None:
+            while flight.data.time < frames / fps and flight.step():
+                pass
+        else:
+            held += 1
+        pos = flight.pilot.state(flight.data)[0]
+        cam.azimuth = np.degrees(np.arctan2(-pos[1], -pos[0]))  # behind the drone, looking at the building
+        renderer.update_scene(flight.data, cam, scene_option=options)
+        img = Image.fromarray(renderer.render())
+        text = f"t = {flight.data.time:4.1f} s   intruder: {flight.policy.behaviour}"
+        if flight.outcome:
+            text += f"   -> {flight.outcome.upper()}"
+        d = ImageDraw.Draw(img)
+        d.rectangle((6, 6, 20 + d.textlength(text, font=font), 42), fill=(0, 0, 0))
+        d.text((14, 10), text, font=font, fill=(255, 255, 255))
+        writer.send(np.asarray(img).tobytes())
+        frames += 1
+    writer.close()
+    print(f"{drone} flight {index}: {flight.outcome} at {flight.data.time:.1f} s, {frames} frames -> {out}")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--drone", choices=list(SETUP), default="x2")
     parser.add_argument("--view", type=int, metavar="N", help="watch flight N of the dataset live")
+    parser.add_argument("--record", type=Path, help="with --view: save it as an MP4 instead (no window needed)")
     parser.add_argument("--flights", type=int, default=2000)
     parser.add_argument("--out", type=Path, help="default: data/intruder_<drone>.npz")
     parser.add_argument("--workers", type=int, default=4)
     args = parser.parse_args()
-    if args.view is not None:
+    if args.view is not None and args.record:
+        record_view(args.view, args.drone, args.record)
+    elif args.view is not None:
         view(args.view, args.drone)
     else:
         out = args.out or Path(__file__).resolve().parent.parent / "data" / f"intruder_{args.drone}.npz"

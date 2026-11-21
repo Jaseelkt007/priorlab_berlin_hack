@@ -28,6 +28,7 @@ from compare import imm_breach_probability
 from features import DATA
 from imm import HORIZONS, TUNED, run
 from intruder import BEHAVIOURS, SETUP, Flight
+from sim import POLE_GROUP, RADAR_TOP
 
 AHEAD = 1.0  # s: the prediction drawn (blue)
 CHECK = 1.0  # yellow: the prediction made this long ago for now
@@ -36,9 +37,8 @@ RADAR_DOTS = 30  # radar dots shown (last 3 s)
 CONE = 2.5  # 90% of a 3D normal lies within 2.5 standard deviations
 FRAME = 0.02  # s between played-back frames (50 per second)
 CHASE_CAM = 5.0  # m: camera distance in the chase view (close enough to see the 10 cm Crazyflie itself)
-ZNEAR = 0.0005  # fraction of the model extent
 INSET = (400, 300)  # px: close-up of the drone in recorded videos
-SITE_CAMERA = np.array([0.0, 0.0, 3.0])  # m: the radar view's camera, on the radar post at the zone centre
+SITE_CAMERA = np.array(RADAR_TOP)  # m: the radar view's camera, on top of the radar on the building
 SITE_SPAN = 4.0  # m of the scene shown around the drone in the radar view (the camera zooms)
 
 PINK = [0.91, 0.48, 0.64, 1.0]  # TabPFN
@@ -204,6 +204,8 @@ def record(flight, frames, log, meas, pred, view, out, fps=30, size=(1280, 720),
     close.type, close.trackbodyid = mujoco.mjtCamera.mjCAMERA_TRACKING, flight.pilot.body
     close.distance, close.elevation, close.azimuth = 0.3, -20, 135
     cam, errors, tab_errors, k_drawn = mujoco.MjvCamera(), [], [], -1
+    options = mujoco.MjvOption()
+    options.geomgroup[POLE_GROUP] = view != "radar"
     times = np.array([f[0] for f in frames])
     n = min(len(meas), len(log["t"]))
     writer = imageio_ffmpeg.write_frames(out, size, fps=fps, quality=8, macro_block_size=8)
@@ -214,7 +216,7 @@ def record(flight, frames, log, meas, pred, view, out, fps=30, size=(1280, 720),
         flight.data.qpos[:] = qpos
         mujoco.mj_forward(flight.model, flight.data)
         set_camera(cam, view, flight)
-        renderer.update_scene(flight.data, cam)
+        renderer.update_scene(flight.data, cam, scene_option=options)
         k = min(k, n - 1)
         # draw() appends to `errors` once per radar step, as the live viewer does
         new = k != k_drawn
@@ -245,8 +247,6 @@ def fly(seed):
     """Fly the whole flight first (exactly as when the dataset was made), keeping frames to play back.
     Playing back, rather than simulating inside the viewer, keeps the viewer from touching the physics."""
     flight = Flight(seed, "cf2")
-    # the near clip plane scales with the arena (about 0.6 m): make it small so a close camera sees the 10 cm drone
-    flight.model.vis.map.znear = ZNEAR
     frames, next_frame = [], 0.0
     while flight.step():
         if flight.data.time >= next_frame:
@@ -286,6 +286,7 @@ def main():
     errors, tab_errors = [], []
     with mujoco.viewer.launch_passive(flight.model, flight.data, show_left_ui=False, show_right_ui=False) as viewer:
         set_camera(viewer.cam, args.view, flight)
+        viewer.opt.geomgroup[POLE_GROUP] = args.view != "radar"
         times = np.array([f[0] for f in frames])
         start, k_drawn, replay = time.time(), -1, 1
         while viewer.is_running():

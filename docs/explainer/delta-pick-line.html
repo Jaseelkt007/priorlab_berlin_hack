@@ -1,0 +1,1020 @@
+<title>Delta Pick Line</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: a packaging-line HMI on white. Pitch, a live line with four strategies on the same products, the physics of one pick, the real log columns, the per-pick decision, calibration, today's solutions, business case, next steps. Single light theme by deliberate choice (the team's docs are white). */
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --panel: #f5f7f9;
+  --card: #ffffff;
+  --ink: #0f1a22;
+  --muted: #586672;
+  --line: #dde4e9;
+  --steel: #9aa7b1;
+  --steel-dark: #5f6d78;
+  --belt: #2f6f9e;
+  --belt-soft: #dcebf5;
+  --tab: #0a7a7e;
+  --tab-soft: #e0f2f2;
+  --recipe: #c45a17;
+  --recipe-soft: #fbe9dd;
+  --safe: #6b5fb0;
+  --fast: #8a8f94;
+  --good: #278646;
+  --bad: #c0392b;
+  --bad-soft: #fbe4e1;
+  --warn: #c98a00;
+  --f-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 80px;
+}
+.wrap { max-width: 1160px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--f-display); line-height: 1.15; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); letter-spacing: -0.02em; }
+h2 { font-size: clamp(1.4rem, 3vw, 2rem); letter-spacing: -0.01em; }
+h3 { font-size: 1.05rem; }
+p { margin: 0; max-width: 72ch; }
+a { color: var(--tab); }
+.eyebrow { font-family: var(--f-mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.note { font-size: 0.84rem; color: var(--muted); max-width: 95ch; }
+section { padding-block: 60px 4px; display: grid; gap: 18px; }
+.tab { color: var(--tab); } .rec { color: var(--recipe); } .bad { color: var(--bad); } .good { color: var(--good); }
+
+header.hero { padding-block: 40px 0; display: grid; gap: 18px; }
+.pitch { font-size: 1.1rem; max-width: 78ch; }
+.pitch b { font-weight: 600; }
+.facts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+@media (max-width: 900px) { .facts { grid-template-columns: repeat(2, 1fr); } }
+.fact { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 2px; background: var(--panel); min-width: 0; }
+.fact .v { font-family: var(--f-display); font-size: 1.45rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.fact .k { font-size: 0.8rem; color: var(--muted); }
+.fact a { font-size: 0.72rem; font-family: var(--f-mono); }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; }
+
+button, select, input[type=number] {
+  font: 500 0.86rem var(--f-body); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 11px;
+}
+button { cursor: pointer; border-radius: 999px; }
+button:hover { border-color: var(--steel-dark); }
+button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--tab); outline-offset: 2px; }
+input[type=range] { accent-color: var(--tab); width: 100%; }
+
+/* line */
+.line-shell { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--card); }
+.bar { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 12px 14px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.grp { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.grp .lbl { font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-right: 2px; }
+.sbtn[data-s="tabpfn"][aria-pressed="true"] { background: var(--tab); border-color: var(--tab); }
+.sbtn[data-s="recipe"][aria-pressed="true"] { background: var(--recipe); border-color: var(--recipe); }
+.sbtn[data-s="safe"][aria-pressed="true"] { background: var(--safe); border-color: var(--safe); }
+.phase { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; padding: 12px 14px; border-bottom: 1px solid var(--line); align-items: start; }
+.phase .clock { font-family: var(--f-mono); font-size: 0.8rem; color: var(--muted); padding-top: 3px; }
+.phase h3 { font-size: 1.05rem; }
+.phase p { font-size: 0.92rem; color: var(--muted); grid-column: 2; }
+.timeline { display: flex; gap: 4px; padding: 0 14px 12px; flex-wrap: wrap; }
+.timeline span { font-family: var(--f-mono); font-size: 0.7rem; padding: 3px 8px; border-radius: 999px; background: var(--panel); color: var(--muted); border: 1px solid var(--line); }
+.timeline span.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+#cv-line { display: block; width: 100%; max-width: 100%; }
+.hud { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); background: var(--panel); }
+@media (max-width: 900px) { .hud { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 480px) { .hud { grid-template-columns: repeat(2, 1fr); } }
+.cell { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: grid; gap: 2px; min-width: 0; }
+.cell .k { font-family: var(--f-mono); font-size: 0.66rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.cell .v { font-family: var(--f-mono); font-size: 1.02rem; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gauge { height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; }
+.gauge i { display: block; height: 100%; width: 0; background: var(--belt); }
+.manual { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 18px; padding: 12px 14px; border-top: 1px solid var(--line); }
+@media (max-width: 760px) { .manual { grid-template-columns: 1fr; } }
+.manual label { font-size: 0.82rem; color: var(--muted); display: grid; gap: 4px; }
+.manual .row { display: flex; justify-content: space-between; font-family: var(--f-mono); font-size: 0.78rem; }
+
+.box { border: 1px solid var(--line); border-radius: 12px; padding: 6px 10px; overflow-x: auto; background: var(--card); }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.score th, .score td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; font-size: 0.88rem; }
+.score th:first-child, .score td:first-child { text-align: left; }
+.score thead th { font-family: var(--f-mono); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 500; }
+.score td { font-family: var(--f-mono); }
+.score td:first-child { font-family: var(--f-body); font-weight: 600; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: 0; }
+.score tr.best td { background: var(--tab-soft); }
+
+/* physics */
+.phys { display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; align-items: start; }
+@media (max-width: 860px) { .phys { grid-template-columns: 1fr; } }
+.phys-card { border: 1px solid var(--line); border-radius: 12px; background: var(--card); overflow: hidden; min-width: 0; }
+.phys-card canvas { display: block; width: 100%; }
+.sliders { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; }
+.sliders label { font-size: 0.82rem; color: var(--muted); display: grid; gap: 2px; }
+.sliders .row { display: flex; justify-content: space-between; font-family: var(--f-mono); font-size: 0.78rem; color: var(--ink); }
+.formula { font-family: var(--f-mono); font-size: 0.82rem; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 4px; overflow-x: auto; }
+.badge { display: inline-block; font-family: var(--f-display); font-weight: 600; padding: 4px 12px; border-radius: 999px; }
+
+/* columns */
+.cols th, .cols td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: left; font-size: 0.86rem; vertical-align: top; }
+.cols thead th { font-family: var(--f-mono); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 500; }
+.cols td:first-child { font-family: var(--f-mono); white-space: nowrap; }
+.cols td.ex { font-family: var(--f-mono); white-space: nowrap; }
+.cols tr.g td { background: var(--panel); font-family: var(--f-display); font-weight: 600; font-size: 0.9rem; }
+.chip { font-family: var(--f-mono); font-size: 0.66rem; padding: 2px 7px; border-radius: 999px; white-space: nowrap; }
+.chip.in { background: var(--belt-soft); color: var(--belt); }
+.chip.act { background: var(--recipe-soft); color: var(--recipe); }
+.chip.out { background: var(--tab-soft); color: var(--tab); }
+.chip.hid { background: var(--bad-soft); color: var(--bad); }
+.log th, .log td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; font-family: var(--f-mono); font-size: 0.76rem; }
+.log th { color: var(--muted); font-weight: 500; position: sticky; top: 0; background: var(--card); }
+.log th.in { color: var(--belt); } .log th.act { color: var(--recipe); } .log th.out { color: var(--tab); }
+.log td:nth-child(3) { text-align: left; }
+.log tr.drop td { background: var(--bad-soft); }
+.log tr.mis td { background: #fff5d6; }
+.log tr.fresh td { animation: fresh 1.2s ease-out; }
+@keyframes fresh { from { background: var(--tab-soft); } to { background: transparent; } }
+
+/* decision + calibration */
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 860px) { .two { grid-template-columns: 1fr; } }
+.panel { border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.panel canvas { display: block; width: 100%; }
+.metrics { display: flex; flex-wrap: wrap; gap: 14px; font-family: var(--f-mono); font-size: 0.82rem; }
+.metrics b { font-weight: 600; }
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+@media (max-width: 860px) { .steps { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 460px) { .steps { grid-template-columns: 1fr; } }
+.step { border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 6px; align-content: start; background: var(--card); }
+.step .n { font-family: var(--f-mono); font-size: 0.72rem; color: var(--muted); }
+.step p { font-size: 0.9rem; color: var(--muted); }
+
+.cmp th, .cmp td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; font-size: 0.88rem; }
+.cmp thead th { font-family: var(--f-mono); font-size: 0.68rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.cmp tr.us td { background: var(--tab-soft); }
+
+.calc { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 860px) { .calc { grid-template-columns: 1fr; } }
+.calc .inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+.calc label { font-size: 0.82rem; color: var(--muted); display: grid; gap: 4px; }
+.calc input { width: 100%; }
+.out-big { font-family: var(--f-display); font-size: 2.2rem; font-weight: 600; color: var(--tab); font-variant-numeric: tabular-nums; }
+.market { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 760px) { .market { grid-template-columns: 1fr; } }
+.src { font-size: 0.82rem; color: var(--muted); columns: 2; column-gap: 28px; }
+@media (max-width: 760px) { .src { columns: 1; } }
+.src li { margin-bottom: 4px; break-inside: avoid; }
+@media (prefers-reduced-motion: reduce) { .log tr.fresh td { animation: none; } }
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">HackLab Berlin · Prior Labs track · TabPFN for spatial awareness</div>
+    <h1>Delta Pick Line</h1>
+    <p class="pitch">On food and pharma packaging lines, delta robots pick products off a conveyor with a suction cup and place them into trays <b>more than 100 times a minute</b>, at up to <b>15 g</b>. At that speed only the suction cup holds the product, so every line trades speed against drops: run fast and products fall or land crooked; run slow and output is lost. Today that trade-off is <b>set by hand, once per product</b>, and conservatively. But products differ in ways a camera cannot see: weight, a porous or oily surface that leaks vacuum, an off-centre filling. So the robot is too careful with most picks, still fails on the odd ones, and every changeover means retuning. We use the sensor these grippers already have, <b>the vacuum reading at the moment the cup touches</b>. TabPFN predicts the drop risk of every possible speed from the line's own recent picks, with no training. The robot then takes the fastest safe speed for each pick and adapts within minutes when the product or conditions change.</p>
+    <div class="facts">
+      <div class="fact"><span class="v">100–150 m/s²</span><span class="k">peak acceleration of an industrial delta (10–15 g)</span><a href="https://library.e.abb.com/public/1c971fb90d8c34f8c1257c2100468677/ROB0082EN_F_HR.pdf">ABB IRB 360 guide</a></div>
+      <div class="fact"><span class="v">0.36–0.44 s</span><span class="k">typical pick-and-place cycle</span><a href="https://library.e.abb.com/public/1c971fb90d8c34f8c1257c2100468677/ROB0082EN_F_HR.pdf">ABB IRB 360 guide</a></div>
+      <div class="fact"><span class="v">55–68%</span><span class="k">typical OEE (overall equipment effectiveness) of high-speed food packaging lines</span><a href="https://oxmaint.com/industries/food-manufacturing/oee-optimization-food-production-lines-practical-guide">Oxmaint (vendor)</a></div>
+      <div class="fact"><span class="v">16–58%</span><span class="k">faster suction transport once item limits are learned (research, with trial runs)</span><a href="https://arxiv.org/pdf/2203.08359">GOMP-ST, Berkeley</a></div>
+      <div class="fact"><span class="v">$2.1–2.2 B</span><span class="k">delta robot market 2024–25, growing 11–17% a year</span><a href="https://www.marketresearch.com/Global-Industry-Analysts-v1039/Delta-Robots-42758865">GIA</a> · <a href="https://marketintelo.com/report/delta-robot-market">MarketIntelo</a></div>
+    </div>
+    <nav class="toc" aria-label="On this page">
+      <button class="go" data-target="line">The live line</button>
+      <button class="go" data-target="physics">Why a pick fails</button>
+      <button class="go" data-target="columns">The real log</button>
+      <button class="go" data-target="decide">How each pick is decided</button>
+      <button class="go" data-target="calib">Calibration</button>
+      <button class="go" data-target="today">Today vs ours</button>
+      <button class="go" data-target="business">Business</button>
+    </nav>
+  </header>
+
+  <section id="line" aria-labelledby="line-h">
+    <div class="eyebrow">1 · The line, live</div>
+    <h2 id="line-h">Four ways to run the same line, on the same products</h2>
+    <p>All four strategies run in parallel on identical products and conditions. The view shows one of them. The scenario walks through what really happens in a shift: dry morning, humidity rising, a product changeover, a suction cup wearing out, a second changeover.</p>
+    <div class="line-shell">
+      <div class="bar">
+        <div class="grp" role="group" aria-label="Show strategy"><span class="lbl">Show</span>
+          <button class="sbtn" data-s="tabpfn">TabPFN world model</button>
+          <button class="sbtn" data-s="recipe">Commissioning recipe</button>
+          <button class="sbtn" data-s="safe">Safe recipe 50%</button>
+          <button class="sbtn" data-s="fast">Full speed</button>
+        </div>
+        <div class="grp" role="group" aria-label="Playback"><span class="lbl">Speed</span>
+          <button class="spd" data-v="0.25">¼×</button><button class="spd" data-v="0.5">½×</button><button class="spd" data-v="1">1×</button><button class="spd" data-v="4">4×</button>
+          <button id="b-play">Pause</button><button id="b-reset">Restart shift</button>
+        </div>
+      </div>
+      <div class="phase" aria-live="polite">
+        <span class="clock" id="clock">00:00</span>
+        <h3 id="ph-title"></h3>
+        <p id="ph-text"></p>
+      </div>
+      <div class="timeline" id="timeline"></div>
+      <canvas id="cv-line" aria-label="Side view of the delta robot line"></canvas>
+      <div class="hud">
+        <div class="cell"><span class="k">This pick</span><span class="v" id="h-prod">–</span></div>
+        <div class="cell"><span class="k">Weight (checkweigher)</span><span class="v" id="h-w">–</span></div>
+        <div class="cell"><span class="k">Seal at touch</span><span class="v" id="h-seal">–</span><div class="gauge"><i id="h-seal-g"></i></div></div>
+        <div class="cell"><span class="k">Speed chosen</span><span class="v" id="h-o">–</span><div class="gauge"><i id="h-o-g"></i></div></div>
+        <div class="cell"><span class="k">Predicted drop risk</span><span class="v" id="h-p">–</span></div>
+        <div class="cell"><span class="k">Outcome</span><span class="v" id="h-out">–</span></div>
+      </div>
+      <div class="manual">
+        <label for="m-prod">Product on the line (changeover)
+          <select id="m-prod"><option value="biscuit">Butter biscuit</option><option value="pouch">Coffee pouch</option><option value="cheese">Cheese wedge, foil</option></select>
+        </label>
+        <label for="m-hum"><span class="row"><span>Hall humidity</span><span id="m-hum-v">40%</span></span><input type="range" id="m-hum" min="30" max="90" step="1" value="40"></label>
+        <label for="m-wear"><span class="row"><span>Suction-cup wear</span><span id="m-wear-v">0%</span></span><input type="range" id="m-wear" min="0" max="100" step="1" value="0"></label>
+      </div>
+    </div>
+    <div class="box">
+      <table class="score" aria-label="Live scoreboard">
+        <thead><tr><th>Strategy</th><th>Avg speed</th><th>Picks / min</th><th>Good packs / min</th><th>Dropped</th><th>Misplaced</th><th>Line stops</th><th>Failure rate</th></tr></thead>
+        <tbody id="score"></tbody>
+      </table>
+    </div>
+    <p class="note">Rates are over the last 60 s of line time. Moving the manual controls stops the guided scenario; "Restart shift" brings it back. This is a browser simulation with an illustrative physics model and a small Bayesian model standing in for TabPFN. It explains the mechanism; it is not a measurement.</p>
+  </section>
+
+  <section id="physics" aria-labelledby="phys-h">
+    <div class="eyebrow">2 · Why one pick fails</div>
+    <h2 id="phys-h">A suction cup has a fixed budget of force. Acceleration spends it.</h2>
+    <div class="phys">
+      <div class="phys-card"><canvas id="cv-phys" aria-label="Forces on a product held by a suction cup"></canvas></div>
+      <div class="panel">
+        <div class="sliders">
+          <label for="p-acc"><span class="row"><span>Acceleration</span><span id="p-acc-v"></span></span><input type="range" id="p-acc" min="10" max="150" step="1" value="120"></label>
+          <label for="p-seal"><span class="row"><span>Seal vacuum</span><span id="p-seal-v"></span></span><input type="range" id="p-seal" min="5" max="70" step="1" value="40"></label>
+          <label for="p-m"><span class="row"><span>Product weight</span><span id="p-m-v"></span></span><input type="range" id="p-m" min="5" max="200" step="1" value="60"></label>
+          <label for="p-d"><span class="row"><span>Cup diameter</span><span id="p-d-v"></span></span><input type="range" id="p-d" min="10" max="40" step="1" value="25"></label>
+          <label for="p-mu"><span class="row"><span>Friction (cup on product)</span><span id="p-mu-v"></span></span><input type="range" id="p-mu" min="0.2" max="0.9" step="0.01" value="0.55"></label>
+          <label for="p-h"><span class="row"><span>Centre of mass below cup</span><span id="p-h-v"></span></span><input type="range" id="p-h" min="2" max="40" step="1" value="9"></label>
+        </div>
+        <div class="formula" id="p-formula"></div>
+        <div><span class="badge" id="p-badge"></span></div>
+        <p class="note">Holding force = vacuum × cup area × efficiency. The product fails when the sideways inertia beats friction (shear), the vertical load beats the holding force (lift), or the tipping moment of a tall product beats the cup's grip at its edge (peel). The seal vacuum is the one input the robot can measure the moment it touches the product. Friction and centre of mass are hidden.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="columns" aria-labelledby="col-h">
+    <div class="eyebrow">3 · The real inputs and outputs</div>
+    <h2 id="col-h">Every pick already produces a row. Here is what is in it.</h2>
+    <p>These columns come from equipment a modern delta line already has: camera, checkweigher, vacuum sensor, robot controller, line PLC. Nothing new needs to be installed. <span class="chip in">input</span> is known before the move, <span class="chip act">action</span> is what we choose, <span class="chip out">output</span> is measured after, <span class="chip hid">hidden</span> is real physics no sensor sees.</p>
+    <div class="box">
+      <table class="cols">
+        <thead><tr><th>Column</th><th>Role</th><th>Unit</th><th>Source on a real line</th><th>Example</th></tr></thead>
+        <tbody id="coldict"></tbody>
+      </table>
+    </div>
+    <h3>Live log of the strategy on screen</h3>
+    <div class="box" style="max-height: 360px; overflow: auto">
+      <table class="log" aria-label="Live pick log">
+        <thead><tr>
+          <th>#</th><th>time</th><th>sku</th>
+          <th class="in">weight g</th><th class="in">L×W×H mm</th><th class="in">pick off mm</th><th class="in">seal kPa</th><th class="in">evac ms</th><th class="in">humid %</th><th class="in">cup cycles</th><th class="in">cup Ø</th>
+          <th class="act">speed %</th><th>pred drop</th>
+          <th class="out">dropped</th><th class="out">vac min kPa</th><th class="out">place off mm</th><th class="out">place rot °</th><th class="out">cycle s</th>
+        </tr></thead>
+        <tbody id="logbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="decide" aria-labelledby="dec-h">
+    <div class="eyebrow">4 · How each pick is decided</div>
+    <h2 id="dec-h">Imagine every speed, pick the fastest safe one, learn from the outcome</h2>
+    <div class="steps">
+      <div class="step"><span class="n">Step 1 · cup touches (≈10 ms)</span><h3>Read the seal</h3><p>The vacuum sensor shows how well this particular product sealed. A leaky biscuit or a wrinkled film shows up here, before any acceleration.</p></div>
+      <div class="step"><span class="n">Step 2 · one batched call</span><h3>Ask TabPFN 15 questions</h3><p>One row per candidate speed, 30% to 100%, with the outcome left blank. TabPFN reads the recent log of this product and returns a drop probability for each.</p></div>
+      <div class="step"><span class="n">Step 3 · decide</span><h3>Fastest speed under 0.5% risk</h3><p>The risk limit is a business setting, changeable at any time without retraining. If no speed is safe, the product goes to a reject or manual lane.</p></div>
+      <div class="step"><span class="n">Step 4 · after the place</span><h3>Log the outcome</h3><p>Dropped or not, plus the lowest vacuum during the move. A deep dip that still held is a near-miss: it teaches the limit without losing a product.</p></div>
+    </div>
+    <div class="two">
+      <div class="panel">
+        <h3>Current pick: predicted drop risk at each speed</h3>
+        <canvas id="cv-bars" aria-label="Predicted drop risk for each candidate speed"></canvas>
+        <p class="note" id="bars-note"></p>
+      </div>
+      <div class="panel">
+        <h3>Speed chosen per pick, over the shift</h3>
+        <canvas id="cv-trace" aria-label="Chosen speed per pick over time"></canvas>
+        <p class="note">Teal: TabPFN's chosen speed for each pick. Orange: the commissioning recipe. Red marks: drops. After a changeover TabPFN starts careful and speeds up as rows arrive. Under humidity or cup wear it slows down only the picks that need it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="calib" aria-labelledby="cal-h">
+    <div class="eyebrow">5 · Calibration</div>
+    <h2 id="cal-h">"0.5% risk" is only useful if it is true</h2>
+    <div class="two">
+      <div class="panel">
+        <h3>Two meanings of calibration on this line</h3>
+        <p><b>Calibration run.</b> After a changeover the model has no rows for the new product, so its predictions are wide and it chooses slow, safe speeds. Within the first few dozen picks the near-miss signal (vacuum dips) pins down the limit and speed climbs. No engineer tunes anything.</p>
+        <p><b>Calibrated probabilities.</b> When the model says "10% drop risk", about 1 in 10 such picks should really drop. We check this in shadow mode: the model predicts for every pick of every strategy, including the reckless ones, and we compare predictions with what happened. Points on the diagonal mean the numbers can be trusted for setting a risk limit.</p>
+        <div class="metrics" id="cal-metrics"></div>
+      </div>
+      <div class="panel">
+        <h3>Reliability diagram (all strategies, shadow mode)</h3>
+        <canvas id="cv-rel" aria-label="Reliability diagram"></canvas>
+        <p class="note">Each dot is a group of picks with similar predicted risk. x: predicted, y: observed drop rate, bars: 90% interval from the count. Dot size grows with the number of picks.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="today" aria-labelledby="today-h">
+    <div class="eyebrow">6 · How it is handled today</div>
+    <h2 id="today-h">The data exists. Nobody uses it to decide the motion.</h2>
+    <div class="box">
+      <table class="cmp">
+        <thead><tr><th>Today</th><th>What it does</th><th>What it leaves open</th></tr></thead>
+        <tbody>
+          <tr><td><b>Fixed recipe per product</b></td><td>an integrator sets speed and vacuum once at commissioning, with margin</td><td>wastes speed on easy picks, still fails on odd ones, ignores drift, needs retuning at every changeover</td></tr>
+          <tr><td><b>Vacuum switch per pick</b></td><td>confirms "held" or "lost"</td><td>reports after the failure; never changes the motion</td></tr>
+          <tr><td><b>Smart vacuum monitoring</b> (Piab, Schmalz, Festo AX, SMC)</td><td>IO-Link data and AI anomaly detection for leaks and wear</td><td>serves maintenance, not per-pick motion. But it proves the data stream is already there</td></tr>
+          <tr><td><b>Digital twin</b> (ABB PickMaster Twin)</td><td>simulates layout and flow offline; ABB claims changeover from hours to minutes</td><td>does not learn each product's grip physics from live picks</td></tr>
+          <tr><td><b>Research: GOMP-ST</b> (UC Berkeley, 2022)</td><td>learns suction failure limits from repeated trials with a sample object; 16–58% faster, near 100% success</td><td>needs dedicated physical trials per object; no calibrated risk; no update during production</td></tr>
+          <tr class="us"><td><b>Ours: TabPFN world model</b></td><td>predicts drop risk per pick and per speed from the line's own recent log, in context</td><td>no trials, no training, calibrated risk, adapts during the shift. To be proven in MuJoCo, then on hardware</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="business" aria-labelledby="biz-h">
+    <div class="eyebrow">7 · Business</div>
+    <h2 id="biz-h">What it is worth</h2>
+    <div class="market">
+      <div class="fact"><span class="v">$2.1–2.2 B → $3.6–4.2 B</span><span class="k">delta robot market, 2024/25 to 2030 (report summaries)</span><a href="https://www.marketresearch.com/Global-Industry-Analysts-v1039/Delta-Robots-42758865">GIA</a> · <a href="https://marketintelo.com/report/delta-robot-market">MarketIntelo</a></div>
+      <div class="fact"><span class="v">32.5%</span><span class="k">pick-and-place share of delta applications, the largest</span><a href="https://marketintelo.com/report/delta-robot-market">MarketIntelo</a></div>
+      <div class="fact"><span class="v">$3.1 B → $13.2 B</span><span class="k">food robotics 2025 to 2035; deltas about a quarter</span><a href="https://www.gminsights.com/industry-analysis/food-robotics-market">GM Insights</a></div>
+    </div>
+    <div class="calc">
+      <div class="panel">
+        <h3>Value per line (illustrative calculator)</h3>
+        <div class="inputs">
+          <label for="c-rob">Robots on the line<input type="number" id="c-rob" value="3" min="1" max="20"></label>
+          <label for="c-ppm">Good packs/min per robot today<input type="number" id="c-ppm" value="110" min="10" max="300"></label>
+          <label for="c-gain">Throughput gain %<input type="number" id="c-gain" value="8" min="0" max="60" step="0.5"></label>
+          <label for="c-mar">Contribution margin € per pack<input type="number" id="c-mar" value="0.03" min="0" max="2" step="0.01"></label>
+          <label for="c-h">Production hours per day<input type="number" id="c-h" value="16" min="1" max="24"></label>
+          <label for="c-d">Days per year<input type="number" id="c-d" value="250" min="1" max="365"></label>
+        </div>
+        <button id="c-live">Use the gain measured in the live line</button>
+        <p class="note">Only counts if the robot cell is the line's bottleneck. Avoided drops, cleanup stops and retuning hours come on top and are not included.</p>
+      </div>
+      <div class="panel">
+        <span class="eyebrow">Extra output per year</span>
+        <span class="out-big" id="c-packs">–</span>
+        <span class="eyebrow">Extra contribution per year</span>
+        <span class="out-big" id="c-eur">–</span>
+        <p class="note">Who pays: robot makers' picking software (ABB, FANUC, Yaskawa), packaging machine builders (e.g. Syntegon) and vacuum-gripper makers that already sell smart sensors (Piab, Schmalz, Festo). A software add-on on data the line already produces. Back of the envelope: 50,000 installed deltas × €1–2k per robot per year is €50–100 M per year.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="next-h">
+    <div class="eyebrow">8 · What we build and prove</div>
+    <h2 id="next-h">From this page to a measured result</h2>
+    <div class="steps">
+      <div class="step"><span class="n">Simulation</span><h3>MuJoCo delta cell</h3><p>Delta kinematics with real limits (10 m/s, 150 m/s², jerk), conveyor and trays, suction modelled with MuJoCo's adhesion actuator plus friction, validated against the shear, lift and peel limits.</p></div>
+      <div class="step"><span class="n">Data</span><h3>Product catalogue</h3><p>Biscuits, pouches, cheese, bars, blister cartons with realistic weight, seal and friction spread, plus humidity, cup wear and changeovers. The log uses the columns above.</p></div>
+      <div class="step"><span class="n">Model</span><h3>TabPFN-3.5</h3><p>Classifier for drop, regressors for vacuum dip and placement error, cached context per product, batched over candidate speeds. Calibration checked in shadow mode.</p></div>
+      <div class="step"><span class="n">Proof</span><h3>Baselines and metrics</h3><p>Fixed recipes, a GOMP-ST-style learned limit, an MLP on the same rows. Good packs per minute, drop rate, picks to recover after changeover, calibration error, decision latency.</p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="src-h">
+    <div class="eyebrow">Sources</div>
+    <h2 id="src-h">Where the numbers come from</h2>
+    <ul class="src">
+      <li><a href="https://new.abb.com/products/robotics/industrial-robots/irb-360">ABB IRB 360 FlexPicker</a></li>
+      <li><a href="https://library.e.abb.com/public/1c971fb90d8c34f8c1257c2100468677/ROB0082EN_F_HR.pdf">ABB IRB 360 product guide (speed, acceleration, cycle times)</a></li>
+      <li><a href="https://library.e.abb.com/public/f03878770fef4c2c93757953373aed9b/IRB%20360_datasheet_20220829.pdf">ABB IRB 360 datasheet</a></li>
+      <li><a href="https://library.e.abb.com/public/d02772b2e8cc14fcc12575bb005c2c06/ABB%20white%20paper%20Rick%20Tallian%20High%20speed%20picking.pdf">ABB white paper: high-speed picking</a></li>
+      <li><a href="https://www.abb.com/global/en/areas/robotics/products/software/pickmaster-twin">ABB PickMaster Twin</a></li>
+      <li><a href="https://arxiv.org/pdf/2203.08359">GOMP-ST: Grasp Optimized Motion Planning for Suction Transport</a></li>
+      <li><a href="https://www2.iea.lth.se/publications/MS-Theses/Full%20document/5434_full_document.pdf">Lund University thesis: delta robot error handling</a></li>
+      <li><a href="https://piab.com/news/digitizing-vacuum-generation-enables-predictive-maintenance-of-robotic-handling-systems">Piab: digitized vacuum, predictive maintenance</a></li>
+      <li><a href="https://www.festo.com/us/en/p/festo-ax-asset-type-vacuum-id_GSDA_VAC">Festo AX vacuum monitoring</a></li>
+      <li><a href="https://www.smc.eu/en-gb/products/vacuum-switches~22446~nav">SMC vacuum switches and sensors</a></li>
+      <li><a href="https://oxmaint.com/industries/food-manufacturing/oee-optimization-food-production-lines-practical-guide">Oxmaint: OEE on food lines (vendor)</a></li>
+      <li><a href="https://shoplogix.com/oee-for-packaging-industry/">Shoplogix: OEE for packaging (vendor)</a></li>
+      <li><a href="https://www.syntegon.com/solutions/food/robotic-packaging/">Syntegon robotic packaging</a></li>
+      <li><a href="https://www.marketresearch.com/Global-Industry-Analysts-v1039/Delta-Robots-42758865">Global Industry Analysts: delta robots</a></li>
+      <li><a href="https://marketintelo.com/report/delta-robot-market">MarketIntelo: delta robot market</a></li>
+      <li><a href="https://www.technavio.com/report/delta-robots-market-industry-analysis">Technavio: delta robots</a></li>
+      <li><a href="https://www.gminsights.com/industry-analysis/food-robotics-market">GM Insights: food robotics</a></li>
+    </ul>
+  </section>
+</div>
+
+<script>
+(() => {
+  // ================= basics =================
+  const G = 9.81, AMAX = 150, SETPOINT = 65, ETA = 0.85, RISK = 0.005;
+  const OPTS = Array.from({ length: 15 }, (_, i) => +(0.30 + i * 0.05).toFixed(2));
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const sstep = u => u * u * (3 - 2 * u);
+  function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function gauss(r) { let u = 0; while (!u) u = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * r()); }
+  function erf(x) { const s = Math.sign(x); x = Math.abs(x); const t = 1 / (1 + 0.3275911 * x); const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return s * y; }
+  const Phi = x => 0.5 * (1 + erf(x / Math.SQRT2));
+  const $ = id => document.getElementById(id);
+  const num = (id, d) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : d; };
+  const C = {};
+  (function readColors() { const cs = getComputedStyle(document.documentElement); ['--ink','--muted','--line','--panel','--card','--steel','--steel-dark','--belt','--belt-soft','--tab','--tab-soft','--recipe','--recipe-soft','--safe','--fast','--good','--bad','--bad-soft','--warn'].forEach(k => C[k] = cs.getPropertyValue(k).trim() || '#888'); })();
+
+  // ================= products and physics =================
+  // dims mm [L, W, H]; seal = vacuum reached at touch (kPa below ambient, mean/sd); porous = how much humidity opens the surface
+  const PRODUCTS = {
+    biscuit: { name: 'Butter biscuit', sku: 'BIS-0412', w: [12, 1.2], dims: [60, 45, 8], cup: 15, seal: [36, 5], porous: 1.0, mu: 0.60, h: 4, kappa: 1.0, color: '#d9a95b', edge: '#a8772f' },
+    pouch: { name: 'Coffee pouch', sku: 'COF-2210', w: [60, 3], dims: [110, 70, 22], cup: 25, seal: [44, 8], porous: 0.3, mu: 0.55, h: 9, kappa: 0.6, color: '#7a5230', edge: '#4d321c' },
+    cheese: { name: 'Cheese wedge, foil', sku: 'CHE-0125', w: [125, 4], dims: [80, 60, 35], cup: 30, seal: [56, 4], porous: 0.0, mu: 0.45, h: 17, kappa: 1.0, color: '#efcd57', edge: '#b8962a' },
+  };
+  const holdForce = (seal, cupMm) => seal * 1000 * Math.PI * (cupMm / 2000) ** 2 * ETA;
+  function physicsU(m, a, seal, cupMm, hMm, mu, kappa) {
+    const F = holdForce(seal, cupMm), r = cupMm / 2000;
+    const shear = m * a / (mu * F), lift = m * (G + 0.5 * a) / F, peel = m * a * (hMm / 1000) / (F * r * kappa);
+    return { F, shear, lift, peel, U: Math.max(shear, lift, peel) };
+  }
+  function sampleItem(rng, prodKey, env, idx) {
+    const p = PRODUCTS[prodKey];
+    const humF = 1 - p.porous * clamp((env.hum - 45) / 100, 0, 1) * 1.6;
+    const off = Math.abs(gauss(rng) * 2.5);
+    let seal = (p.seal[0] + gauss(rng) * p.seal[1]) * humF * (1 - 0.45 * env.wear) * (1 - 0.02 * off);
+    seal = clamp(seal, 3, SETPOINT);
+    return {
+      idx, prod: prodKey, sku: p.sku, m: (p.w[0] + gauss(rng) * p.w[1]) / 1000,
+      dims: p.dims.map(d => d * (1 + gauss(rng) * 0.02)), cup: p.cup, seal, off,
+      evac: 14 + 520 / seal + Math.abs(gauss(rng) * 3), hum: env.hum, cupCycles: env.cupCycles,
+      mu: p.mu * Math.exp(gauss(rng) * 0.06), h: p.h * (1 + gauss(rng) * 0.08), kappa: p.kappa,
+      noise: Math.exp(gauss(rng) * 0.04), r1: rng(), r2: rng(), r3: gauss(rng), r4: gauss(rng), r5: gauss(rng), r6: rng(),
+    };
+  }
+  function outcome(it, o) {
+    const ph = physicsU(it.m, o * AMAX, it.seal, it.cup, it.h, it.mu, it.kappa);
+    const U = ph.U * it.noise;
+    const dropped = U > 1;
+    const misplaced = !dropped && U > 0.9 && it.r1 < (U - 0.9) / 0.1 * 0.7;
+    const dip = dropped ? 1 : 0.5 * Math.max(0, U - 0.55) / 0.45;
+    const vacMin = dropped ? Math.max(0.5, 2.5 + it.r3) : Math.max(0.5, it.seal * (1 - dip) + it.r3 * 0.5);
+    const placeOff = dropped ? NaN : 1.2 + 32 * Math.max(0, U - 0.7) ** 2 + Math.abs(it.r4) * 0.7 + (misplaced ? 9 : 0);
+    const placeRot = dropped ? NaN : it.r5 * (1.5 + 45 * Math.max(0, U - 0.8) ** 2) + (misplaced ? 14 * Math.sign(it.r5 || 1) : 0);
+    const stop = dropped && it.r6 < 0.25;
+    return { U, dropped, misplaced, dip, vacMin, placeOff, placeRot, stop, detach: 0.3 + 0.3 * it.r2 };
+  }
+  const cycleTime = o => 0.15 + 0.25 / Math.sqrt(o);
+
+  // ================= stand-in for TabPFN: Bayesian limit model per product =================
+  const KG = Array.from({ length: 70 }, (_, i) => Math.exp(Math.log(0.8) + i * (Math.log(7) - Math.log(0.8)) / 69));
+  const PRI = KG.map(k => -0.5 * ((Math.log(k) - Math.log(2.0)) / 0.45) ** 2);
+  class Model {
+    constructor() { this.post = {}; }
+    st(prod) { return this.post[prod] || (this.post[prod] = { lp: PRI.slice(), n: 0 }); }
+    w(prod) { const lp = this.st(prod).lp; let mx = -Infinity; for (const v of lp) mx = Math.max(mx, v); const w = lp.map(v => Math.exp(v - mx)); const s = w.reduce((a, b) => a + b, 0); return w.map(v => v / s); }
+    z(it, o) { return it.m * o * AMAX / holdForce(it.seal, it.cup); }
+    pdrop(it, o, w) { w = w || this.w(it.prod); const z = this.z(it, o); let p = 0; for (let i = 0; i < KG.length; i++) p += w[i] * Phi((KG[i] * z - 1) / 0.07); return clamp(p, 1e-5, 1 - 1e-5); }
+    allP(it) { const w = this.w(it.prod); return OPTS.map(o => this.pdrop(it, o, w)); }
+    update(it, o, out) {
+      const s = this.st(it.prod), z = this.z(it, o);
+      for (let i = 0; i < KG.length; i++) {
+        s.lp[i] = 0.97 * s.lp[i] + 0.03 * PRI[i];
+        const U = KG[i] * z;
+        let lik;
+        if (out.dropped) lik = Phi((U - 1) / 0.07);
+        else if (out.dip > 0.03) { const Uobs = 0.55 + 0.9 * out.dip; lik = Math.exp(-0.5 * ((Uobs - U) / 0.06) ** 2) * Phi((1 - U) / 0.07); }
+        else lik = Phi((0.62 - U) / 0.07);
+        s.lp[i] += Math.log(Math.max(lik, 1e-12));
+      }
+      s.n++;
+    }
+  }
+
+  // ================= strategies =================
+  const RECIPE = {};
+  (function commission() { // tuned once at commissioning: nominal air, fresh cup, 5% engineer margin
+    const r = mulberry(99), env = { hum: 40, wear: 0, cupCycles: 0 };
+    for (const k of ['biscuit', 'cheese']) {
+      const items = Array.from({ length: 400 }, (_, i) => sampleItem(r, k, env, i));
+      let best = 0.3;
+      for (const o of OPTS) { const f = items.filter(it => outcome(it, o).dropped).length / items.length; if (f <= RISK) best = o; }
+      RECIPE[k] = Math.max(0.3, +(best - 0.05).toFixed(2));
+    }
+    RECIPE.pouch = RECIPE.biscuit; // new product: copied from biscuits until someone retunes it
+  })();
+  const STRATS = [
+    { key: 'tabpfn', name: 'TabPFN world model', color: () => C['--tab'], policy: (it, m) => { const ps = m.allP(it); let o = OPTS[0]; OPTS.forEach((v, i) => { if (ps[i] <= RISK) o = v; }); return o; } },
+    { key: 'recipe', name: 'Commissioning recipe', color: () => C['--recipe'], policy: it => RECIPE[it.prod] },
+    { key: 'safe', name: 'Safe recipe 50%', color: () => C['--safe'], policy: () => 0.5 },
+    { key: 'fast', name: 'Full speed', color: () => C['--fast'], policy: () => 1.0 },
+  ];
+
+  // ================= scenario =================
+  const TOUR = [
+    { t: 0, title: 'Butter biscuits, dry morning air', text: 'A well-tuned line. The recipe runs biscuits near full speed. TabPFN starts with no rows, so its first picks are careful, then it catches up within seconds.', prod: 'biscuit', hum: 40, wear: 0 },
+    { t: 35, title: 'Humidity climbs to 80%', text: 'Porous biscuits leak vacuum in humid air: the seal at touch drops. Same product, same recipe, weaker grip. Watch the recipe start dropping biscuits while TabPFN slows only the leaky ones.', prod: 'biscuit', hum: 80, wear: 0 },
+    { t: 75, title: 'Changeover: coffee pouches', text: 'New product, heavier and soft. Its recipe was copied from biscuits until an engineer finds time to retune it. TabPFN has no rows for pouches: it runs a short, cautious calibration and speeds up from near-misses.', prod: 'pouch', hum: 55, wear: 0 },
+    { t: 115, title: 'The suction cup is wearing out', text: 'A worn cup lip leaks a little more vacuum every minute, on every product. Nobody sees it until drops start. TabPFN sees it in the seal readings and the vacuum dips, and backs off gradually.', prod: 'pouch', hum: 55, wear: 1 },
+    { t: 150, title: 'Changeover: cheese wedges, new cup', text: 'Heavy, smooth, well-sealing product with its own tuned recipe and a fresh cup. Everyone does well here. The question is who gets closest to the real limit.', prod: 'cheese', hum: 50, wear: 0, instant: true },
+    { t: 190, title: 'End of the guided shift', text: 'The shift loops and the models keep their memory. Compare good packs per minute and drops in the scoreboard, then try the manual controls.', prod: 'biscuit', hum: 40, wear: 0, instant: true },
+  ];
+  const TOUR_LEN = 205;
+  const tl = $('timeline');
+  TOUR.slice(0, 5).forEach((p, i) => { const s = document.createElement('span'); s.textContent = `${String(Math.floor(p.t / 60)).padStart(2, '0')}:${String(p.t % 60).padStart(2, '0')} ${p.title.split(':')[0].split(',')[0]}`; s.dataset.i = i; tl.appendChild(s); });
+
+  let S; // world state
+  function newWorld() {
+    S = {
+      T: 0, speed: 0.5, playing: !reduce, tour: true, phase: -1, view: 'tabpfn',
+      env: { prod: 'biscuit', hum: 40, wear: 0, humT: 40, wearT: 0, cupCycles: 0 },
+      lanes: STRATS.map(s => ({ s, model: new Model(), rng: mulberry(7), idx: 0, cur: null, log: [], fin: [], placed: [], floor: [], cal: [], trace: [], stopUntil: 0 })),
+    };
+  }
+  newWorld();
+
+  function applyPhase(i) {
+    const p = TOUR[i]; S.phase = i;
+    S.env.prod = p.prod; S.env.humT = p.hum; S.env.wearT = p.wear;
+    if (p.instant || i === 0) { S.env.hum = p.hum; S.env.wear = p.wear; }
+    if (p.wear === 0 && (p.instant || i === 0)) S.env.cupCycles = 0;
+    $('ph-title').textContent = p.title; $('ph-text').textContent = p.text;
+    [...tl.children].forEach((c, k) => c.classList.toggle('on', k === Math.min(i, 4)));
+    $('m-prod').value = p.prod;
+    S.lanes.forEach(L => { L.trace.push({ ev: true, label: p.title.split(':')[0].split(',')[0], n: L.trace.filter(x => !x.ev).length }); });
+  }
+
+  // ================= lane stepping =================
+  function startPick(L, t0) {
+    const it = sampleItem(L.rng, S.env.prod, S.env, L.idx++);
+    const ps = L.model.allP(it);
+    const o = L.s.policy(it, L.model);
+    const pPred = ps[Math.round((o - 0.30) / 0.05)] ?? L.model.pdrop(it, o);
+    const out = outcome(it, o);
+    L.cur = { it, o, ps, pPred, out, t0, dur: cycleTime(o) };
+  }
+  function finishPick(L) {
+    const c = L.cur; const { it, o, out } = c;
+    L.model.update(it, o, out);
+    L.cal.push([c.pPred, out.dropped ? 1 : 0]); if (L.cal.length > 4000) L.cal.shift();
+    const row = { n: it.idx + 1, t: c.t0 + c.dur, it, o, p: c.pPred, out, dur: c.dur };
+    L.log.push(row); if (L.log.length > 60) L.log.shift();
+    L.fin.push({ t: c.t0 + c.dur, good: !out.dropped && !out.misplaced, drop: out.dropped, mis: out.misplaced, stop: out.stop, o });
+    L.trace.push({ o, drop: out.dropped, n: it.idx }); if (L.trace.length > 600) L.trace.shift();
+    if (!out.dropped) L.placed.push({ t: c.t0 + c.dur * 0.68, it, out });
+    if (L.placed.length > 14) L.placed.shift();
+    S.env.cupCycles++;
+    let next = c.t0 + c.dur;
+    if (out.stop) { next += 4; L.stopUntil = next; }
+    if (L === lane(S.view)) logDirty = true;
+    return next;
+  }
+  function lane(k) { return S.lanes.find(L => L.s.key === k); }
+  function advance(dt) {
+    S.T += dt;
+    // scenario
+    if (S.tour) {
+      const tt = S.T % TOUR_LEN;
+      let pi = 0; TOUR.forEach((p, i) => { if (tt >= p.t) pi = i; });
+      if (pi !== S.phase) applyPhase(pi);
+    }
+    S.env.hum += clamp(S.env.humT - S.env.hum, -4 * dt, 4 * dt);
+    S.env.wear += clamp(S.env.wearT - S.env.wear, -dt / 30, dt / 30);
+    for (const L of S.lanes) {
+      if (!L.cur) startPick(L, S.T);
+      let guard = 0;
+      while (L.cur && S.T >= L.cur.t0 + L.cur.dur && guard++ < 50) {
+        const nt = finishPick(L);
+        startPick(L, nt);
+      }
+      const cutoff = S.T - 60;
+      while (L.fin.length && L.fin[0].t < cutoff - 5) L.fin.shift();
+      // falling products
+      for (const f of L.floor) stepFall(f, dt);
+      L.floor = L.floor.filter(f => S.T - f.t0 < 25);
+    }
+  }
+
+  // ================= scene geometry (metres, side view, z up) =================
+  const PICK_X = 0.40, PLACE_X = 0.72, BASE = { x: 0.55, z: 0.93 }, L1 = 0.20, L2 = 0.42, CUP = 0.06;
+  const IN_TOP = 0.38, TRAY_TOP = 0.365, FLOOR = 0.19, UPZ = 0.58, VOUT = 0.22, PITCH = 0.13;
+  function groundAt(x) { if (x > -0.35 && x < 0.49) return IN_TOP; if (x > 0.61 && x < 1.45) return TRAY_TOP; return FLOOR; }
+  function effAt(c, u) {
+    const it = c.it, hM = it.dims[2] / 1000;
+    const zt = IN_TOP + hM + CUP, zp = TRAY_TOP + 0.012 + hM + CUP;
+    if (u < 0.12) { const s = sstep(u / 0.12); return { x: PICK_X, z: lerp(UPZ, zt, s), carry: false }; }
+    if (u < 0.18) return { x: PICK_X, z: zt, carry: u > 0.15 };
+    if (u < 0.62) { const s = sstep((u - 0.18) / 0.44); return { x: lerp(PICK_X, PLACE_X, s), z: lerp(zt, zp, s) + 0.12 * Math.sin(Math.PI * s), carry: true, s }; }
+    if (u < 0.68) return { x: PLACE_X, z: zp, carry: u < 0.65 };
+    const s = sstep((u - 0.68) / 0.32); return { x: lerp(PLACE_X, PICK_X, s), z: lerp(zp, UPZ, Math.min(1, s * 2.5)) + 0.06 * Math.sin(Math.PI * s), carry: false };
+  }
+  function stepFall(f, dt) {
+    if (f.rest) return;
+    const h = 0.004; let left = dt;
+    while (left > 0) { const d = Math.min(h, left); left -= d; f.vz -= G * d; f.x += f.vx * d; f.z += f.vz * d; f.rot += f.spin * d; const gz = groundAt(f.x) + f.hM / 2; if (f.z <= gz) { f.z = gz; f.rest = true; f.rot = 0.25 * Math.sign(f.spin || 1); break; } }
+  }
+
+  // ================= canvas helpers =================
+  function fit(cv, LW, LH) {
+    const cssW = cv.clientWidth || 800, cssH = Math.round(cssW * LH / LW), dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (cv.width !== Math.round(cssW * dpr) || cv.height !== Math.round(cssH * dpr)) { cv.width = Math.round(cssW * dpr); cv.height = Math.round(cssH * dpr); cv.style.height = cssH + 'px'; }
+    const ctx = cv.getContext('2d'); const k = dpr * cssW / LW; ctx.setTransform(k, 0, 0, k, 0, 0);
+    ctx.fillStyle = C['--card']; ctx.fillRect(0, 0, LW, LH);
+    return { ctx, W: LW, H: LH, cssW };
+  }
+  function txt(ctx, s, x, y, o = {}) {
+    ctx.font = `${o.weight || 400} ${o.size || 13}px ${o.mono ? '"IBM Plex Mono", monospace' : o.display ? '"Space Grotesk", sans-serif' : '"IBM Plex Sans", sans-serif'}`;
+    ctx.textAlign = o.align || 'left'; ctx.textBaseline = o.base || 'alphabetic';
+    if (o.bg) { const w = ctx.measureText(s).width, p = 5, sz = o.size || 13; const bx = o.align === 'center' ? x - w / 2 - p : o.align === 'right' ? x - w - p : x - p; ctx.fillStyle = o.bg; ctx.fillRect(bx, y - sz - 3, w + 2 * p, sz + 8); if (o.border) { ctx.strokeStyle = o.border; ctx.lineWidth = 1.2; ctx.strokeRect(bx, y - sz - 3, w + 2 * p, sz + 8); } }
+    ctx.fillStyle = o.color || C['--ink']; ctx.globalAlpha = o.alpha ?? 1; ctx.fillText(s, x, y); ctx.globalAlpha = 1;
+  }
+  function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); }
+
+  // ================= line scene =================
+  function drawLine() {
+    const cv = $('cv-line'), narrow = (cv.clientWidth || 800) < 640;
+    const LW = narrow ? 640 : 1000, LH = narrow ? 300 : 450;
+    const g = fit(cv, LW, LH), ctx = g.ctx;
+    const x0 = -0.32, x1 = 1.42, sc = LW / (x1 - x0), ztop = 0.97;
+    const X = x => (x - x0) * sc, Y = z => (ztop - z) * sc + (narrow ? 4 : 6), SZ = v => v * sc;
+    const L = lane(S.view), c = L.cur, u = c ? clamp((S.T - c.t0) / c.dur, 0, 1) : 0;
+    const p = PRODUCTS[S.env.prod];
+    // floor and frame
+    ctx.fillStyle = C['--panel']; ctx.fillRect(0, Y(FLOOR), LW, LH - Y(FLOOR));
+    ctx.strokeStyle = C['--steel']; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, Y(FLOOR)); ctx.lineTo(LW, Y(FLOOR)); ctx.stroke();
+    // robot frame
+    ctx.fillStyle = C['--line']; ctx.fillRect(X(0.18), Y(0.985), SZ(0.74), SZ(0.03));
+    ctx.fillRect(X(0.18), Y(0.985), SZ(0.02), SZ(0.985 - FLOOR)); ctx.fillRect(X(0.90), Y(0.985), SZ(0.02), SZ(0.985 - FLOOR));
+    // infeed belt
+    const beltIn = (x, w) => { ctx.fillStyle = C['--belt']; ctx.fillRect(X(x), Y(IN_TOP), SZ(w), SZ(0.018)); };
+    beltIn(-0.34, 0.83);
+    ctx.fillStyle = C['--belt-soft']; const sh = ((S.T * 0.3) % 0.05);
+    for (let x = -0.34 + sh; x < 0.49; x += 0.05) ctx.fillRect(X(x), Y(IN_TOP) + 1, SZ(0.015), SZ(0.006));
+    ctx.fillStyle = C['--steel']; ctx.fillRect(X(-0.34), Y(IN_TOP - 0.018), SZ(0.83), SZ(0.03));
+    [0.0, 0.3].forEach(x => ctx.fillRect(X(x), Y(IN_TOP - 0.048), SZ(0.012), SZ(IN_TOP - 0.048 - FLOOR)));
+    // outfeed belt with trays
+    ctx.fillStyle = C['--steel']; ctx.fillRect(X(0.61), Y(TRAY_TOP - 0.018), SZ(0.84), SZ(0.03));
+    [0.8, 1.2].forEach(x => ctx.fillRect(X(x), Y(TRAY_TOP - 0.048), SZ(0.012), SZ(TRAY_TOP - 0.048 - FLOOR)));
+    ctx.fillStyle = C['--belt']; ctx.fillRect(X(0.61), Y(TRAY_TOP), SZ(0.84), SZ(0.018));
+    const trayOff = (S.T * VOUT) % PITCH;
+    for (let x = PLACE_X - PITCH * 2 + trayOff; x < 1.45; x += PITCH) {
+      if (x < 0.61) continue;
+      ctx.fillStyle = '#ffffff'; ctx.strokeStyle = C['--steel']; ctx.lineWidth = 1;
+      ctx.fillRect(X(x - 0.055), Y(TRAY_TOP + 0.014), SZ(0.11), SZ(0.014)); ctx.strokeRect(X(x - 0.055), Y(TRAY_TOP + 0.014), SZ(0.11), SZ(0.014));
+    }
+    txt(ctx, 'infeed conveyor', X(-0.05), Y(IN_TOP - 0.06), { size: 12, mono: true, color: C['--muted'], align: 'center' });
+    txt(ctx, 'trays to flow-wrapper', X(1.08), Y(TRAY_TOP - 0.06), { size: 12, mono: true, color: C['--muted'], align: 'center' });
+    // upcoming products on infeed
+    const prog = c ? (u < 0.15 ? 0 : clamp((u - 0.15) / 0.85, 0, 1)) : 0;
+    for (let k = (u < 0.15 ? 0 : 1); k <= 6; k++) {
+      const x = PICK_X - k * PITCH + (k > 0 ? PITCH * prog : 0);
+      if (x < -0.33) continue;
+      if (k === 0 && c && u >= 0.15) continue;
+      drawProduct(ctx, X, Y, SZ, S.env.prod, { x, z: IN_TOP + p.dims[2] / 2000 }, 0, 1);
+    }
+    // placed products riding the outfeed
+    for (const pl of L.placed) {
+      const x = PLACE_X + VOUT * (S.T - pl.t) + pl.out.placeOff / 1000 * Math.sign(pl.out.placeRot || 1);
+      if (S.T < pl.t || x > 1.44) continue;
+      drawProduct(ctx, X, Y, SZ, pl.it.prod, { x, z: TRAY_TOP + 0.012 + pl.it.dims[2] / 2000 }, (pl.out.placeRot || 0) * Math.PI / 180 * 0.4, 1, pl.out.misplaced);
+    }
+    // floor drops
+    for (const f of L.floor) drawProduct(ctx, X, Y, SZ, f.prod, f, f.rot, f.rest ? 0.75 : 1, true);
+    // delta robot
+    const e = c ? effAt(c, u) : { x: PICK_X, z: UPZ, carry: false };
+    let carrying = c && e.carry;
+    if (c && c.out.dropped && u >= 0.18 && u < 0.62 && e.s >= c.out.detach) {
+      carrying = false;
+      if (!c.fell) {
+        c.fell = true;
+        const e2 = effAt(c, Math.max(0, u - 0.01)), dt = 0.01 * c.dur, hM = c.it.dims[2] / 1000;
+        L.floor.push({ prod: c.it.prod, x: e.x, z: e.z - CUP - hM / 2, vx: (e.x - e2.x) / dt, vz: (e.z - e2.z) / dt, rot: 0, spin: 4, hM, t0: S.T });
+      }
+    }
+    drawDelta(ctx, X, Y, SZ, e);
+    if (carrying) {
+      const hM = c.it.dims[2] / 1000;
+      const sway = c.out.U > 0.8 && u > 0.18 && u < 0.62 ? (c.out.U - 0.8) * 0.5 * Math.sin((u - 0.18) * 40) : 0;
+      drawProduct(ctx, X, Y, SZ, c.it.prod, { x: e.x, z: e.z - CUP - hM / 2 }, sway, 1);
+    }
+    // vacuum gauge on the effector
+    if (c && u > 0.13 && u < 0.66) {
+      const vac = c.out.dropped && e.s >= c.out.detach ? c.out.vacMin : (u < 0.18 ? c.it.seal : lerp(c.it.seal, c.out.vacMin, Math.sin(Math.PI * clamp((u - 0.18) / 0.44, 0, 1))));
+      txt(ctx, `${vac.toFixed(0)} kPa`, X(e.x) + SZ(0.05), Y(e.z) - 4, { size: 12, mono: true, weight: 600, color: vac < c.it.seal * 0.75 ? C['--bad'] : C['--tab'], bg: '#ffffff' });
+    }
+    // banner
+    const col = L.s.color();
+    txt(ctx, L.s.name, 12, 22, { size: 15, display: true, weight: 600, color: col });
+    if (c) txt(ctx, `speed ${Math.round(c.o * 100)}% · ${(c.o * AMAX).toFixed(0)} m/s² · cycle ${c.dur.toFixed(2)} s`, 12, 42, { size: 12, mono: true, color: C['--muted'] });
+    txt(ctx, `humidity ${S.env.hum.toFixed(0)}% · cup wear ${(S.env.wear * 100).toFixed(0)}%`, LW - 12, 22, { size: 12, mono: true, color: C['--muted'], align: 'right' });
+    if (S.T < L.stopUntil) txt(ctx, 'LINE STOP: clearing a dropped product', LW / 2, 60, { size: 15, display: true, weight: 600, align: 'center', color: C['--bad'], bg: '#ffffff', border: C['--bad'] });
+    else if (c && c.out.dropped && u > 0.4 && u < 0.95) txt(ctx, 'Dropped', X(PLACE_X - 0.15), Y(0.78), { size: 15, display: true, weight: 600, color: C['--bad'], bg: '#ffffff', border: C['--bad'], align: 'center' });
+    else if (c && c.out.misplaced && u > 0.62 && u < 0.98) txt(ctx, 'Misplaced in tray', X(PLACE_X), Y(0.78), { size: 15, display: true, weight: 600, color: C['--warn'], bg: '#ffffff', border: C['--warn'], align: 'center' });
+  }
+  function drawDelta(ctx, X, Y, S, e) {
+    // base plate with three motors
+    ctx.fillStyle = C['--steel-dark']; rrect(ctx, X(BASE.x - 0.17), Y(BASE.z + 0.03), S(0.34), S(0.05), 6); ctx.fill();
+    const pivots = [{ x: BASE.x - 0.12, side: -1 }, { x: BASE.x + 0.12, side: 1 }, { x: BASE.x, side: 0 }];
+    for (const pv of pivots.slice().reverse()) {
+      const P = { x: pv.x, z: BASE.z }, Q = { x: e.x + pv.side * 0.035, z: e.z + 0.012 };
+      const dx = Q.x - P.x, dz = Q.z - P.z, d = Math.max(1e-6, Math.hypot(dx, dz)), dd = clamp(d, 0.05, L1 + L2 - 1e-3);
+      const a = (L1 * L1 - L2 * L2 + dd * dd) / (2 * dd), h = Math.sqrt(Math.max(0, L1 * L1 - a * a));
+      const mx = P.x + a * dx / d, mz = P.z + a * dz / d;
+      const c1 = { x: mx - h * dz / d, z: mz + h * dx / d }, c2 = { x: mx + h * dz / d, z: mz - h * dx / d };
+      let E = pv.side < 0 ? (c1.x < c2.x ? c1 : c2) : pv.side > 0 ? (c1.x > c2.x ? c1 : c2) : (c1.z > c2.z ? c1 : c2);
+      const alpha = pv.side === 0 ? 0.35 : 1;
+      ctx.globalAlpha = alpha; ctx.lineCap = 'round';
+      ctx.strokeStyle = C['--ink']; ctx.lineWidth = S(0.022); ctx.beginPath(); ctx.moveTo(X(P.x), Y(P.z)); ctx.lineTo(X(E.x), Y(E.z)); ctx.stroke();
+      ctx.strokeStyle = C['--steel']; ctx.lineWidth = S(0.008);
+      for (const off of [-0.012, 0.012]) { ctx.beginPath(); ctx.moveTo(X(E.x + off), Y(E.z)); ctx.lineTo(X(Q.x + off), Y(Q.z)); ctx.stroke(); }
+      ctx.fillStyle = C['--ink']; ctx.beginPath(); ctx.arc(X(P.x), Y(P.z), S(0.02), 0, 7); ctx.fill();
+      ctx.fillStyle = C['--steel-dark']; ctx.beginPath(); ctx.arc(X(E.x), Y(E.z), S(0.011), 0, 7); ctx.fill();
+      ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+    }
+    // effector + vacuum cup
+    ctx.fillStyle = C['--steel-dark']; rrect(ctx, X(e.x - 0.05), Y(e.z + 0.016), S(0.10), S(0.022), 4); ctx.fill();
+    ctx.fillStyle = C['--steel']; ctx.fillRect(X(e.x - 0.008), Y(e.z - 0.006), S(0.016), S(CUP - 0.02));
+    ctx.fillStyle = C['--ink']; ctx.beginPath(); ctx.moveTo(X(e.x - 0.016), Y(e.z - CUP)); ctx.lineTo(X(e.x + 0.016), Y(e.z - CUP)); ctx.lineTo(X(e.x + 0.008), Y(e.z - CUP + 0.016)); ctx.lineTo(X(e.x - 0.008), Y(e.z - CUP + 0.016)); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = C['--belt']; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(e.x + 0.05), Y(e.z + 0.005)); ctx.quadraticCurveTo(X(e.x + 0.16), Y(e.z + 0.15), X(BASE.x + 0.17), Y(BASE.z + 0.01)); ctx.stroke();
+  }
+  function drawProduct(ctx, X, Y, S, prodKey, pos, rot, alpha, flag) {
+    const p = PRODUCTS[prodKey], w = S(p.dims[0] / 1000), h = S(p.dims[2] / 1000);
+    ctx.save(); ctx.translate(X(pos.x), Y(pos.z)); ctx.rotate(-(rot || 0)); ctx.globalAlpha = alpha ?? 1;
+    ctx.fillStyle = p.color; ctx.strokeStyle = flag ? C['--bad'] : p.edge; ctx.lineWidth = flag ? 2 : 1.2;
+    if (prodKey === 'cheese') { ctx.beginPath(); ctx.moveTo(-w / 2, h / 2); ctx.lineTo(w / 2, h / 2); ctx.lineTo(w / 2, -h / 2); ctx.lineTo(-w / 2 + w * 0.25, -h / 2); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.35 * (alpha ?? 1); ctx.fillRect(-w * 0.1, -h / 2 + 2, w * 0.4, 2); }
+    else if (prodKey === 'pouch') { rrect(ctx, -w / 2, -h / 2, w, h, Math.min(6, h / 2)); ctx.fill(); ctx.stroke(); ctx.fillStyle = p.edge; ctx.fillRect(-w / 2, -h / 2, 3, h); ctx.fillRect(w / 2 - 3, -h / 2, 3, h); }
+    else { rrect(ctx, -w / 2, -h / 2, w, h, h / 2); ctx.fill(); ctx.stroke(); ctx.fillStyle = p.edge; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.arc(i * w / 6, 0, 1.1, 0, 7); ctx.fill(); } }
+    ctx.restore();
+  }
+
+  // ================= HUD, scoreboard, log =================
+  let logDirty = true, lastLogN = -1;
+  function pct(p) { return p < 0.0001 ? '<0.01%' : p < 0.01 ? (p * 100).toFixed(2) + '%' : (p * 100).toFixed(1) + '%'; }
+  function updateHud() {
+    const L = lane(S.view), c = L.cur; if (!c) return;
+    const u = clamp((S.T - c.t0) / c.dur, 0, 1);
+    $('h-prod').textContent = `${PRODUCTS[c.it.prod].name}`;
+    $('h-w').textContent = `${(c.it.m * 1000).toFixed(1)} g`;
+    $('h-seal').textContent = `${c.it.seal.toFixed(1)} kPa`;
+    $('h-seal-g').style.width = `${c.it.seal / SETPOINT * 100}%`;
+    $('h-o').textContent = `${Math.round(c.o * 100)}%`;
+    $('h-o-g').style.width = `${c.o * 100}%`; $('h-o-g').style.background = L.s.color();
+    $('h-p').textContent = pct(c.pPred);
+    $('h-p').style.color = c.pPred > RISK ? C['--bad'] : C['--good'];
+    const o = $('h-out');
+    if (u < 0.62) { o.textContent = 'in flight'; o.style.color = C['--muted']; }
+    else if (c.out.dropped) { o.textContent = 'dropped'; o.style.color = C['--bad']; }
+    else if (c.out.misplaced) { o.textContent = 'misplaced'; o.style.color = C['--warn']; }
+    else { o.textContent = `placed, dip ${(c.out.dip * 100).toFixed(0)}%`; o.style.color = C['--good']; }
+  }
+  function rates(L) {
+    const w = L.fin.filter(f => f.t >= S.T - 60), span = Math.min(60, Math.max(1, S.T));
+    const n = w.length, good = w.filter(f => f.good).length, drop = w.filter(f => f.drop).length, mis = w.filter(f => f.mis).length, stops = w.filter(f => f.stop).length;
+    const avgO = n ? w.reduce((a, f) => a + f.o, 0) / n : 0;
+    return { n, ppm: n / span * 60, gpm: good / span * 60, drop, mis, stops, avgO, fail: n ? (drop + mis) / n : 0 };
+  }
+  function updateScore() {
+    const R = S.lanes.map(L => ({ L, r: rates(L) }));
+    const best = Math.max(...R.map(x => x.r.gpm));
+    $('score').innerHTML = R.map(({ L, r }) => `<tr class="${r.gpm === best && r.n ? 'best' : ''}"><td><span class="swatch" style="background:${L.s.color()}"></span>${L.s.name}</td><td>${Math.round(r.avgO * 100)}%</td><td>${r.ppm.toFixed(0)}</td><td>${r.gpm.toFixed(0)}</td><td style="color:${r.drop ? C['--bad'] : 'inherit'}">${r.drop}</td><td>${r.mis}</td><td>${r.stops}</td><td>${(r.fail * 100).toFixed(1)}%</td></tr>`).join('');
+  }
+  function fmtT(t) { const m = Math.floor(t / 60), s = Math.floor(t % 60); return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`; }
+  function updateLog() {
+    const L = lane(S.view); if (!logDirty) return; logDirty = false;
+    const rows = L.log.slice(-40).reverse();
+    const lastN = rows[0] ? rows[0].n : -1;
+    $('logbody').innerHTML = rows.map((r, i) => {
+      const it = r.it, o = r.out, cls = [o.dropped ? 'drop' : o.misplaced ? 'mis' : '', i === 0 && lastN !== lastLogN ? 'fresh' : ''].join(' ');
+      return `<tr class="${cls}"><td>${r.n}</td><td>${fmtT(r.t)}</td><td>${it.sku}</td><td>${(it.m * 1000).toFixed(1)}</td><td>${it.dims.map(d => d.toFixed(0)).join('×')}</td><td>${it.off.toFixed(1)}</td><td>${it.seal.toFixed(1)}</td><td>${it.evac.toFixed(0)}</td><td>${it.hum.toFixed(0)}</td><td>${it.cupCycles}</td><td>${it.cup}</td><td>${Math.round(r.o * 100)}</td><td>${pct(r.p)}</td><td>${o.dropped ? 'yes' : 'no'}</td><td>${o.vacMin.toFixed(1)}</td><td>${o.dropped ? '–' : o.placeOff.toFixed(1)}</td><td>${o.dropped ? '–' : o.placeRot.toFixed(1)}</td><td>${r.dur.toFixed(2)}</td></tr>`;
+    }).join('');
+    lastLogN = lastN;
+  }
+
+  // ================= column dictionary =================
+  const COLS = [
+    ['Identity'],
+    ['timestamp', 'in', 'ms', 'line PLC', '2026-11-22 07:41:03.412'],
+    ['sku / recipe_id', 'in', '–', 'production order (MES)', 'BIS-0412'],
+    ['lot', 'in', '–', 'production order', 'L4471'],
+    ['Product, measured before the pick'],
+    ['weight_g', 'in', 'g', 'checkweigher upstream', '12.3'],
+    ['length / width / height', 'in', 'mm', 'camera (2D + height sensor or 3D)', '60 × 45 × 8'],
+    ['orientation_deg', 'in', '°', 'camera', '−4.2'],
+    ['pick_offset_mm', 'in', 'mm', 'camera: cup centre vs product centre', '1.8'],
+    ['surface_class', 'in', 'category', 'camera texture or product master data', 'porous'],
+    ['product_temp_C', 'in', '°C', 'IR sensor (chilled or fresh products)', '8.5'],
+    ['Gripper and vacuum'],
+    ['cup_diameter_mm', 'in', 'mm', 'tool configuration', '15'],
+    ['vacuum_setpoint_kPa', 'in', 'kPa', 'vacuum generator setting', '65'],
+    ['seal_kPa', 'in', 'kPa', 'vacuum sensor, read when the cup touches (≈10 ms)', '34.7'],
+    ['evac_time_ms', 'in', 'ms', 'smart ejector (time to reach vacuum)', '29'],
+    ['cup_cycles', 'in', 'count', 'tool counter since last cup change', '18 420'],
+    ['Line and hall'],
+    ['belt_speed_mm_s', 'in', 'mm/s', 'conveyor encoder', '250'],
+    ['humidity_pct / hall_temp_C', 'in', '% / °C', 'hall sensor', '78 / 24'],
+    ['Action (what we choose)'],
+    ['speed_override_pct', 'act', '%', 'robot program (scales velocity, acceleration, jerk)', '75'],
+    ['vacuum_setpoint (optional)', 'act', 'kPa', 'vacuum generator', '65'],
+    ['release_height_mm / blow_off_ms', 'act', 'mm / ms', 'robot program', '4 / 15'],
+    ['Outputs (measured after)'],
+    ['dropped', 'out', '0/1', 'vacuum lost during the move, item missing in tray', '0'],
+    ['vac_min_kPa', 'out', 'kPa', 'lowest vacuum during the move: the near-miss signal', '21.4'],
+    ['place_offset_mm / place_rot_deg', 'out', 'mm / °', 'camera over the tray', '2.1 / 3.4'],
+    ['damaged', 'out', '0/1', 'inspection camera downstream', '0'],
+    ['cycle_s', 'out', 's', 'robot controller', '0.44'],
+    ['Hidden (no sensor)'],
+    ['friction cup/product', 'hid', '–', 'oil, moisture, film type', '≈0.4–0.7'],
+    ['centre-of-mass height, softness', 'hid', 'mm / –', 'filling, product build', '–'],
+  ];
+  $('coldict').innerHTML = COLS.map(r => r.length === 1 ? `<tr class="g"><td colspan="5">${r[0]}</td></tr>` : `<tr><td>${r[0]}</td><td><span class="chip ${r[1]}">${{ in: 'input', act: 'action', out: 'output', hid: 'hidden' }[r[1]]}</span></td><td>${r[2]}</td><td>${r[3]}</td><td class="ex">${r[4]}</td></tr>`).join('');
+
+  // ================= decision bars =================
+  function drawBars() {
+    const cv = $('cv-bars'), narrow = (cv.clientWidth || 500) < 460, LW = narrow ? 460 : 560, LH = 300;
+    const g = fit(cv, LW, LH), ctx = g.ctx;
+    const L = lane(S.view), c = L.cur; if (!c) return;
+    const left = 52, right = LW - 12, top = 18, bot = LH - 42, w = (right - left) / OPTS.length;
+    const ly = p => { const lp = Math.log10(clamp(p, 1e-4, 1)); return bot - (lp + 4) / 4 * (bot - top); };
+    [1e-4, 1e-3, 1e-2, 1e-1, 1].forEach(p => { const y = ly(p); ctx.strokeStyle = C['--line']; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke(); txt(ctx, pct(p).replace('<', ''), left - 6, y + 4, { size: 11, mono: true, align: 'right', color: C['--muted'] }); });
+    const ty = ly(RISK); ctx.strokeStyle = C['--bad']; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(left, ty); ctx.lineTo(right, ty); ctx.stroke(); ctx.setLineDash([]);
+    txt(ctx, 'risk limit 0.5%', right, ty - 6, { size: 11, mono: true, align: 'right', color: C['--bad'] });
+    OPTS.forEach((o, i) => {
+      const p = c.ps[i], x = left + i * w + 3, y = ly(p), ok = p <= RISK;
+      ctx.fillStyle = ok ? C['--tab'] : C['--bad']; ctx.globalAlpha = 0.85; ctx.fillRect(x, y, w - 6, bot - y); ctx.globalAlpha = 1;
+      if (Math.abs(o - c.o) < 1e-6) { ctx.strokeStyle = C['--ink']; ctx.lineWidth = 2.5; ctx.strokeRect(x - 2, Math.min(y, bot - 4) - 2, w - 2, bot - Math.min(y, bot - 4) + 4); }
+      if (i % 2 === 0 || !narrow) txt(ctx, `${Math.round(o * 100)}`, x + (w - 6) / 2, bot + 16, { size: 11, mono: true, align: 'center', color: C['--muted'] });
+    });
+    txt(ctx, 'speed override %', (left + right) / 2, LH - 6, { size: 11, mono: true, align: 'center', color: C['--muted'] });
+    const n = L.model.st(c.it.prod).n;
+    $('bars-note').textContent = `${L.s.name}: ${PRODUCTS[c.it.prod].name}, ${(c.it.m * 1000).toFixed(1)} g, seal ${c.it.seal.toFixed(1)} kPa. Model has ${n} rows about this product. ${L.s.key === 'tabpfn' ? `Chosen: ${Math.round(c.o * 100)}%, the fastest bar under the limit.` : `This strategy runs ${Math.round(c.o * 100)}% regardless; the model predicts ${pct(c.pPred)} risk for it (shadow mode).`}`;
+  }
+
+  // ================= speed trace =================
+  function drawTrace() {
+    const cv = $('cv-trace'), narrow = (cv.clientWidth || 500) < 460, LW = narrow ? 460 : 560, LH = 300;
+    const g = fit(cv, LW, LH), ctx = g.ctx;
+    const A = lane('tabpfn').trace, B = lane('recipe').trace;
+    const left = 40, right = LW - 10, top = 16, bot = LH - 30, N = 220;
+    const yv = o => bot - (o - 0.2) / 0.85 * (bot - top);
+    [0.25, 0.5, 0.75, 1].forEach(o => { ctx.strokeStyle = C['--line']; ctx.beginPath(); ctx.moveTo(left, yv(o)); ctx.lineTo(right, yv(o)); ctx.stroke(); txt(ctx, `${o * 100}%`, left - 4, yv(o) + 4, { size: 11, mono: true, align: 'right', color: C['--muted'] }); });
+    const series = (arr, col, lw) => {
+      const pts = arr.filter(x => !x.ev).slice(-N); if (!pts.length) return [];
+      const xs = i => left + (i + (N - pts.length)) / (N - 1) * (right - left);
+      ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(xs(i), yv(p.o)) : ctx.moveTo(xs(i), yv(p.o))); ctx.stroke();
+      pts.forEach((p, i) => { if (p.drop) { ctx.fillStyle = C['--bad']; ctx.beginPath(); ctx.arc(xs(i), yv(p.o), 4, 0, 7); ctx.fill(); } });
+      return pts;
+    };
+    // events from tabpfn trace
+    const all = A.slice(); let cnt = 0; const evs = [];
+    all.forEach(x => { if (x.ev) evs.push({ label: x.label, at: cnt }); else cnt++; });
+    const total = cnt, start = Math.max(0, total - N);
+    evs.forEach(ev => { if (ev.at < start) return; const x = left + (ev.at - start + (N - Math.min(N, total))) / (N - 1) * (right - left); ctx.strokeStyle = C['--steel']; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bot); ctx.stroke(); ctx.setLineDash([]); txt(ctx, ev.label, x + 3, top + 10, { size: 10, mono: true, color: C['--muted'] }); });
+    series(B, C['--recipe'], 2);
+    series(A, C['--tab'], 1.6);
+    txt(ctx, 'last 220 picks →', right, LH - 8, { size: 11, mono: true, align: 'right', color: C['--muted'] });
+  }
+
+  // ================= reliability =================
+  function drawRel() {
+    const cv = $('cv-rel'), LW = 460, LH = 360, g = fit(cv, LW, LH), ctx = g.ctx;
+    const left = 50, right = LW - 14, top = 14, bot = LH - 40, X = p => left + p * (right - left), Y = p => bot - p * (bot - top);
+    ctx.strokeStyle = C['--line']; [0, 0.25, 0.5, 0.75, 1].forEach(v => { ctx.beginPath(); ctx.moveTo(X(v), top); ctx.lineTo(X(v), bot); ctx.moveTo(left, Y(v)); ctx.lineTo(right, Y(v)); ctx.stroke(); txt(ctx, `${v * 100}%`, X(v), bot + 16, { size: 11, mono: true, align: 'center', color: C['--muted'] }); txt(ctx, `${v * 100}%`, left - 6, Y(v) + 4, { size: 11, mono: true, align: 'right', color: C['--muted'] }); });
+    ctx.strokeStyle = C['--steel']; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(X(0), Y(0)); ctx.lineTo(X(1), Y(1)); ctx.stroke(); ctx.setLineDash([]);
+    txt(ctx, 'predicted drop risk', (left + right) / 2, LH - 6, { size: 11, mono: true, align: 'center', color: C['--muted'] });
+    ctx.save(); ctx.translate(14, (top + bot) / 2); ctx.rotate(-Math.PI / 2); txt(ctx, 'observed drop rate', 0, 0, { size: 11, mono: true, align: 'center', color: C['--muted'] }); ctx.restore();
+    const pairs = S.lanes.flatMap(L => L.cal);
+    const edges = [0, 0.005, 0.02, 0.05, 0.1, 0.2, 0.35, 0.5, 0.7, 0.9, 1.0001];
+    let brier = 0, ece = 0;
+    pairs.forEach(([p, y]) => { brier += (p - y) ** 2; });
+    for (let b = 0; b < edges.length - 1; b++) {
+      const g2 = pairs.filter(([p]) => p >= edges[b] && p < edges[b + 1]); if (g2.length < 5) continue;
+      const pm = g2.reduce((a, x) => a + x[0], 0) / g2.length, om = g2.reduce((a, x) => a + x[1], 0) / g2.length, n = g2.length;
+      ece += n * Math.abs(pm - om);
+      const z = 1.645, den = 1 + z * z / n, ctr = (om + z * z / (2 * n)) / den, half = z * Math.sqrt(om * (1 - om) / n + z * z / (4 * n * n)) / den;
+      ctx.strokeStyle = C['--tab']; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(pm), Y(clamp(ctr - half, 0, 1))); ctx.lineTo(X(pm), Y(clamp(ctr + half, 0, 1))); ctx.stroke();
+      ctx.fillStyle = C['--tab']; ctx.beginPath(); ctx.arc(X(pm), Y(om), clamp(3 + Math.sqrt(n) / 3, 3, 12), 0, 7); ctx.fill();
+    }
+    const N = pairs.length;
+    $('cal-metrics').innerHTML = N ? `<span>picks scored <b>${N}</b></span><span>observed drops <b>${pairs.filter(x => x[1]).length}</b></span><span>Brier score <b>${(brier / N).toFixed(4)}</b></span><span>expected calibration error <b>${(ece / N * 100).toFixed(2)} pts</b></span>` : '<span>collecting picks…</span>';
+  }
+
+  // ================= physics explainer =================
+  const PHYS = ['p-acc', 'p-seal', 'p-m', 'p-d', 'p-mu', 'p-h'];
+  let physT = 0;
+  function physVals() { return { a: num('p-acc', 120), seal: num('p-seal', 40), m: num('p-m', 60) / 1000, d: num('p-d', 25), mu: num('p-mu', 0.55), h: num('p-h', 9) }; }
+  function updatePhysText() {
+    const v = physVals(), ph = physicsU(v.m, v.a, v.seal, v.d, v.h, v.mu, 1);
+    $('p-acc-v').textContent = `${v.a} m/s² (${(v.a / G).toFixed(1)} g)`; $('p-seal-v').textContent = `${v.seal} kPa`; $('p-m-v').textContent = `${(v.m * 1000).toFixed(0)} g`;
+    $('p-d-v').textContent = `${v.d} mm`; $('p-mu-v').textContent = `${v.mu.toFixed(2)}`; $('p-h-v').textContent = `${v.h} mm`;
+    const pc = x => `${(x * 100).toFixed(0)}%`;
+    $('p-formula').innerHTML = `<span>holding force F = ${v.seal} kPa × π(${v.d / 2} mm)² × ${ETA} = <b>${ph.F.toFixed(1)} N</b></span>
+      <span>shear: m·a / (μ·F) = ${(v.m * v.a).toFixed(2)} / ${(v.mu * ph.F).toFixed(2)} = <b>${pc(ph.shear)}</b></span>
+      <span>lift: m·(g + a/2) / F = ${(v.m * (G + v.a / 2)).toFixed(2)} / ${ph.F.toFixed(2)} = <b>${pc(ph.lift)}</b></span>
+      <span>peel: m·a·h / (F·r) = ${(v.m * v.a * v.h / 1000).toFixed(3)} / ${(ph.F * v.d / 2000).toFixed(3)} = <b>${pc(ph.peel)}</b></span>`;
+    const b = $('p-badge'), U = ph.U;
+    if (U > 1) { b.textContent = `DROP · ${pc(U)} of capacity used`; b.style.background = C['--bad-soft']; b.style.color = C['--bad']; }
+    else if (U > 0.8) { b.textContent = `NEAR-MISS · ${pc(U)} used, vacuum dips`; b.style.background = '#fff5d6'; b.style.color = C['--warn']; }
+    else { b.textContent = `HOLDS · ${pc(U)} of capacity used`; b.style.background = C['--tab-soft']; b.style.color = C['--good']; }
+  }
+  PHYS.forEach(id => $(id).addEventListener('input', updatePhysText));
+  updatePhysText();
+  function drawPhys() {
+    const cv = $('cv-phys'), LW = 600, LH = 400, g = fit(cv, LW, LH), ctx = g.ctx;
+    const v = physVals(), ph = physicsU(v.m, v.a, v.seal, v.d, v.h, v.mu, 1), U = ph.U;
+    const cx = 230, cupY = 150, scale = 4.2; // px per mm
+    const boxW = 90 * 1.6, boxH = Math.max(24, (v.h * 2) * scale * 0.9);
+    const swing = U > 0.8 ? Math.min(0.35, (U - 0.8) * 0.9) * Math.sin(physT * 6) : 0;
+    const fallOff = U > 1 ? (physT % 2.2) / 2.2 : 0;
+    // effector + cup
+    ctx.fillStyle = C['--steel-dark']; rrect(ctx, cx - 70, 40, 140, 26, 6); ctx.fill();
+    ctx.fillStyle = C['--steel']; ctx.fillRect(cx - 7, 66, 14, cupY - 80);
+    const cupR = v.d / 2 * scale * 0.9;
+    ctx.fillStyle = C['--ink']; ctx.beginPath(); ctx.moveTo(cx - cupR, cupY); ctx.lineTo(cx + cupR, cupY); ctx.lineTo(cx + 8, cupY - 16); ctx.lineTo(cx - 8, cupY - 16); ctx.closePath(); ctx.fill();
+    // product
+    ctx.save(); ctx.translate(cx + fallOff * 140, cupY + boxH / 2 + fallOff * fallOff * 220); ctx.rotate(swing + fallOff * 1.2);
+    ctx.fillStyle = '#d9a95b'; ctx.strokeStyle = '#a8772f'; ctx.lineWidth = 2; rrect(ctx, -boxW / 2, -boxH / 2, boxW, boxH, 8); ctx.fill(); ctx.stroke();
+    const comY = -boxH / 2 + v.h * scale * 0.9; ctx.fillStyle = C['--ink']; ctx.beginPath(); ctx.arc(0, Math.min(comY, boxH / 2 - 6), 5, 0, 7); ctx.fill();
+    ctx.restore();
+    // arrows
+    const arrow = (x1, y1, x2, y2, col, label, lx, ly) => { const an = Math.atan2(y2 - y1, x2 - x1); ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(x2 - 11 * Math.cos(an - 0.4), y2 - 11 * Math.sin(an - 0.4)); ctx.lineTo(x2 - 11 * Math.cos(an + 0.4), y2 - 11 * Math.sin(an + 0.4)); ctx.closePath(); ctx.fill(); if (label) txt(ctx, label, lx, ly, { size: 13, weight: 600, color: col, bg: C['--card'] }); };
+    if (!fallOff) {
+      const fLen = clamp(ph.F * 3, 14, 110), iLen = clamp(v.m * v.a * 3 / Math.max(0.3, v.mu), 10, 160), gLen = clamp(v.m * (G + v.a / 2) * 3, 8, 110);
+      arrow(cx + boxW / 2 + 30, cupY + 50, cx + boxW / 2 + 30, cupY + 50 - fLen, C['--tab'], `holding ${ph.F.toFixed(1)} N`, cx + boxW / 2 + 40, cupY + 40 - fLen);
+      arrow(cx - boxW / 2 - 20, cupY + boxH / 2, cx - boxW / 2 - 20 - iLen, cupY + boxH / 2, C['--recipe'], `inertia m·a ${(v.m * v.a).toFixed(1)} N`, Math.max(8, cx - boxW / 2 - 20 - iLen), cupY + boxH / 2 - 14);
+      arrow(cx, cupY + boxH + 18, cx, cupY + boxH + 18 + gLen * 0.6, C['--muted'], `weight + lift load ${(v.m * (G + v.a / 2)).toFixed(1)} N`, cx - 60, cupY + boxH + 40 + gLen * 0.6);
+      txt(ctx, 'robot accelerates →', cx + 30, 30, { size: 12, mono: true, color: C['--muted'] });
+    }
+    // utilization bars
+    const bx = 440, bw = 130, rows = [['shear', ph.shear], ['lift', ph.lift], ['peel', ph.peel]];
+    txt(ctx, 'capacity used', bx, 120, { size: 12, mono: true, color: C['--muted'] });
+    rows.forEach(([n, val], i) => {
+      const y = 140 + i * 50; txt(ctx, n, bx, y, { size: 12, mono: true });
+      ctx.fillStyle = C['--panel']; ctx.fillRect(bx, y + 8, bw, 14); ctx.strokeStyle = C['--line']; ctx.strokeRect(bx, y + 8, bw, 14);
+      ctx.fillStyle = val > 1 ? C['--bad'] : val > 0.8 ? C['--warn'] : C['--tab']; ctx.fillRect(bx, y + 8, bw * clamp(val / 1.5, 0, 1), 14);
+      const lx = bx + bw / 1.5; ctx.strokeStyle = C['--ink']; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(lx, y + 4); ctx.lineTo(lx, y + 26); ctx.stroke(); ctx.lineWidth = 1;
+      txt(ctx, `${(val * 100).toFixed(0)}%`, bx + bw + 6, y + 20, { size: 12, mono: true, weight: 600 });
+    });
+    txt(ctx, '| = 100%: fails beyond this', bx, 300, { size: 11, mono: true, color: C['--muted'] });
+  }
+
+  // ================= business calculator =================
+  const CALC = ['c-rob', 'c-ppm', 'c-gain', 'c-mar', 'c-h', 'c-d'];
+  function updateCalc() {
+    const extraPerMin = num('c-rob', 3) * num('c-ppm', 110) * num('c-gain', 8) / 100;
+    const packs = extraPerMin * 60 * num('c-h', 16) * num('c-d', 250);
+    $('c-packs').textContent = `${(packs / 1e6).toFixed(2)} M packs`;
+    $('c-eur').textContent = `€${Math.round(packs * num('c-mar', 0.03) / 1000).toLocaleString('en')}k`;
+  }
+  CALC.forEach(id => $(id).addEventListener('input', updateCalc)); updateCalc();
+  $('c-live').addEventListener('click', () => {
+    const a = rates(lane('tabpfn')), b = rates(lane('recipe'));
+    if (b.gpm > 0) { $('c-gain').value = (Math.max(0, (a.gpm / b.gpm - 1) * 100)).toFixed(1); updateCalc(); }
+  });
+
+  // ================= controls =================
+  function syncButtons() {
+    document.querySelectorAll('.sbtn').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.s === S.view)));
+    document.querySelectorAll('.spd').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === S.speed)));
+    $('b-play').textContent = S.playing ? 'Pause' : 'Play';
+  }
+  document.querySelectorAll('.sbtn').forEach(b => b.addEventListener('click', () => { S.view = b.dataset.s; logDirty = true; syncButtons(); }));
+  document.querySelectorAll('.spd').forEach(b => b.addEventListener('click', () => { S.speed = +b.dataset.v; syncButtons(); }));
+  $('b-play').addEventListener('click', () => { S.playing = !S.playing; syncButtons(); });
+  $('b-reset').addEventListener('click', () => { const v = S.view, sp = S.speed; newWorld(); S.view = v; S.speed = sp; applyPhase(0); logDirty = true; syncButtons(); });
+  function manual() {
+    if (S.tour) { S.tour = false; $('ph-title').textContent = 'Manual control'; $('ph-text').textContent = 'You are driving the hall. Change the product, the humidity or the cup wear and watch how each strategy copes. "Restart shift" brings back the guided scenario.'; [...tl.children].forEach(c => c.classList.remove('on')); }
+  }
+  $('m-prod').addEventListener('change', () => { manual(); S.env.prod = $('m-prod').value; S.lanes.forEach(L => L.trace.push({ ev: true, label: 'changeover', n: 0 })); });
+  $('m-hum').addEventListener('input', () => { manual(); S.env.humT = num('m-hum', 40); });
+  $('m-wear').addEventListener('input', () => { manual(); S.env.wearT = num('m-wear', 0) / 100; });
+  document.querySelectorAll('.go').forEach(b => b.addEventListener('click', () => $(b.dataset.target).scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })));
+  applyPhase(0); syncButtons();
+  if (reduce) { for (let i = 0; i < 200; i++) advance(0.05); }
+
+  // ================= main loop =================
+  let last = performance.now(), slow = 0;
+  function frame(now) {
+    const raw = Math.min(0.05, (now - last) / 1000); last = now;
+    if (S.playing) advance(raw * S.speed);
+    if (!reduce) physT += raw;
+    $('clock').textContent = fmtT(S.T);
+    if (!S.tour) { $('m-hum-v').textContent = `${S.env.hum.toFixed(0)}%`; $('m-wear-v').textContent = `${(S.env.wear * 100).toFixed(0)}%`; }
+    else { $('m-hum').value = S.env.hum.toFixed(0); $('m-wear').value = (S.env.wear * 100).toFixed(0); $('m-hum-v').textContent = `${S.env.hum.toFixed(0)}%`; $('m-wear-v').textContent = `${(S.env.wear * 100).toFixed(0)}%`; }
+    drawLine(); updateHud(); drawPhys();
+    slow += raw;
+    if (slow > 0.25) { slow = 0; updateScore(); updateLog(); drawBars(); drawTrace(); drawRel(); }
+    requestAnimationFrame(frame);
+  }
+  updateScore(); drawBars(); drawTrace(); drawRel();
+  requestAnimationFrame(frame);
+})();
+</script>

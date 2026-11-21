@@ -9,7 +9,7 @@ A small drone flies toward a protected site. A radar sees it, but the readings a
 
 **TabPFN predicts where the drone will be in 1, 3 and 5 seconds, with a range ("it will be somewhere in this cone"), and raises the alarm before it reaches the site.** It has never seen this kind of drone before; it adapts from a few radar readings, without retraining.
 
-We compare it with the standard tool for this job, a Kalman filter.
+We compare it with what real radar trackers use: an **IMM**, three Kalman-type filters (straight, speeding up, turning) that switch automatically.
 
 ## How it works
 
@@ -28,7 +28,7 @@ We compare it with the standard tool for this job, a Kalman filter.
 
 **Inputs** (16 numbers, from the radar only): where the drone is relative to the zone, how fast it goes, whether it is turning, climbing or speeding up, the same a second or two ago, and how many radar readings were missing.
 
-**Outputs**: where it will be after 1, 3 and 5 s (with a range), and **alarm**: will it enter the zone within 5 s?
+**Outputs**: where it will be after 1, 3 and 5 s, as x, y, z (with a range), and **alarm**: will it enter the zone within 5 s?
 
 ## Status
 
@@ -38,7 +38,9 @@ We compare it with the standard tool for this job, a Kalman filter.
 | Data: 2,000 X2 flights, 300 Crazyflie flights | done |
 | Tables | done |
 | Simplest guess ("it keeps flying straight") measured | done |
-| TabPFN vs Kalman vs MLP | **next** (needs `TABPFN_TOKEN` in `.env`) |
+| IMM tracker (what real radars use) | built and checked; tuning now |
+| TabPFN | **next** (needs `TABPFN_TOKEN` in `.env`) |
+| TabPFN fine-tuned | if the GPU allows |
 | Demo: prediction cone + alarm in the viewer | planned |
 
 ## Results so far
@@ -80,5 +82,6 @@ python drone/features.py --preview 2000              # a CSV you can open in Exc
 | `flight.py` | flies a drone: "go this way" → motor commands |
 | `intruder.py` | the random intruder, wind, radar, data recording |
 | `features.py` | radar readings → tables |
+| `imm.py` | the IMM tracker (the baseline to beat) |
 | `view_drones.py` | keyboard flying |
 | `EXPERIMENTS.md` | full detail, results by manoeuvre, everything we tried |

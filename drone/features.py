@@ -40,6 +40,9 @@ FEATURES = [
     "n_missing", "fit_error",
 ]
 TARGETS = [f"d{h}_{axis}" for h in HORIZONS for axis in ("fwd", "left", "up")]
+# The same answers in plain world coordinates: the true position after 1, 3, 5 s. Scoring, plots and
+# the demo use these; models may learn in the drone frame and convert with `to_world`.
+WORLD_TARGETS = [f"{axis}{h}" for h in HORIZONS for axis in ("x", "y", "z")]
 
 DATA = Path(__file__).resolve().parent.parent / "data"
 
@@ -48,6 +51,12 @@ def rotate(xy, psi):
     """Rotate horizontal vectors (n, 2) by -psi: world frame -> drone heading frame (forward, left)."""
     c, s = np.cos(psi), np.sin(psi)
     return np.stack([c * xy[:, 0] + s * xy[:, 1], -s * xy[:, 0] + c * xy[:, 1]], axis=1)
+
+
+def to_world(d, pos, psi):
+    """Drone-frame movement (n, 3) = forward, left, up -> world position (n, 3), given the estimate pos and heading psi."""
+    c, s = np.cos(psi), np.sin(psi)
+    return pos + np.stack([c * d[:, 0] - s * d[:, 1], s * d[:, 0] + c * d[:, 1], d[:, 2]], axis=1)
 
 
 def fit_window(meas, window, degree, min_valid=None):
@@ -103,6 +112,7 @@ def flight_rows(meas, true, breach_at):
     ])
 
     Y = np.full((n, len(TARGETS)), np.nan)
+    Y_world = np.full((n, len(WORLD_TARGETS)), np.nan)
     for j, h in enumerate(HORIZONS):
         k = h * RADAR_HZ
         if k >= n:
@@ -110,11 +120,12 @@ def flight_rows(meas, true, breach_at):
         delta = true[k:] - pos[:-k]
         Y[:-k, 3 * j : 3 * j + 2] = rotate(delta[:, :2], psi[:-k])
         Y[:-k, 3 * j + 2] = delta[:, 2]
+        Y_world[:-k, 3 * j : 3 * j + 3] = true[k:]
 
     steps_to_breach = (breach_at - np.arange(n)) if breach_at is not None else np.full(n, np.inf)
     breach_5s = (steps_to_breach <= 5 * RADAR_HZ).astype(int)
     keep = ~np.isnan(pos[:, 0]) & ~np.isnan(acc[:, 0])
-    return X[keep], Y[keep], breach_5s[keep], pos[keep], psi[keep], keep
+    return X[keep], Y[keep], Y_world[keep], breach_5s[keep], pos[keep], psi[keep], keep
 
 
 def build(drone):
@@ -122,7 +133,7 @@ def build(drone):
     outcomes = list(raw["outcomes"])
     outcome_of = dict(zip(raw["flight_seed"], raw["flight_outcome"]))
     intent_of = dict(zip(raw["flight_seed"], raw["flight_intent"]))
-    parts = {k: [] for k in ["X", "Y", "breach_5s", "pos", "psi", "true", "flight", "t", "behaviour", "intent"]}
+    parts = {k: [] for k in ["X", "Y", "Y_world", "breach_5s", "pos", "psi", "true", "flight", "t", "behaviour", "intent"]}
     dropped = 0
     seeds, starts = np.unique(raw["flight"], return_index=True)  # each flight's readings are contiguous
     ends = np.append(starts[1:], len(raw["flight"]))[np.argsort(starts)]
@@ -136,14 +147,15 @@ def build(drone):
         m = slice(a, b)
         meas, true = raw["meas"][m], raw["true"][m]
         breach_at = len(meas) - 1 if outcome == "breach" else None
-        X, Y, b, pos, psi, keep = flight_rows(meas, true, breach_at)
-        for k, v in [("X", X), ("Y", Y), ("breach_5s", b), ("pos", pos), ("psi", psi), ("true", true[keep]),
+        X, Y, Y_world, b, pos, psi, keep = flight_rows(meas, true, breach_at)
+        for k, v in [("X", X), ("Y", Y), ("Y_world", Y_world), ("breach_5s", b), ("pos", pos), ("psi", psi), ("true", true[keep]),
                      ("flight", np.full(len(X), seed)), ("t", raw["t"][m][keep]),
                      ("behaviour", raw["behaviour"][m][keep]), ("intent", np.full(len(X), intent_of[seed]))]:
             parts[k].append(v)
     table = {k: np.concatenate(v) for k, v in parts.items()}
     out = DATA / f"table_{drone}.npz"
     np.savez_compressed(out, **table, features=np.array(FEATURES), targets=np.array(TARGETS),
+                        world_targets=np.array(WORLD_TARGETS),
                         behaviours=raw["behaviours"], intents=raw["intents"], drone=np.array(drone))
 
     X, Y = table["X"], table["Y"]
@@ -168,8 +180,9 @@ def preview(drone, rows):
     df = pd.concat([
         df,
         pd.DataFrame(z["X"][head], columns=[f"X_{n}" for n in z["features"]]),
-        pd.DataFrame(z["Y"][head], columns=[f"Y_{n}" for n in z["targets"]]),
+        pd.DataFrame(z["Y_world"][head], columns=[f"Y_{n}" for n in z["world_targets"]]),
         pd.DataFrame({"Y_breach_5s": z["breach_5s"][head]}),
+        pd.DataFrame(z["Y"][head], columns=[f"model_{n}" for n in z["targets"]]),
     ], axis=1)
     out = DATA / f"table_{drone}_preview.csv"
     df.to_csv(out, index=False, float_format="%.3f")

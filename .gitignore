@@ -4,3 +4,8 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 *:Zone.Identifier
+
+# Hackathon: external code and downloaded data stay local (large, separately licensed)
+third_party/
+data/
+*.mp4

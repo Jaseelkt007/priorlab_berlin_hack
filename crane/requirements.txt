@@ -1,0 +1,7 @@
+tabpfn>=10.2
+scikit-learn
+numpy
+mujoco>=3
+imageio
+imageio-ffmpeg
+pillow

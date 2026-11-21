@@ -14,3 +14,7 @@ Quick fixes taken to move fast. One line each: file, what was hacked, what the r
 - jax_tabpfn/export.py: supports only 1 estimator, all-numeric columns and TabPFN-3.5's default preprocessing (transform `none`, no categoricals, T=1, no balancing); anything else raises. Real fix: port the remaining TabPFN preprocessing steps (quantile, SVD, categorical encoding) and ensembles.
 - jax_tabpfn/runtime.py: the context size is a static shape, so a new context row count compiles once (15–110 s, then persistent cache). Real fix: mask padded train rows in the ICL/decoder attention and pad the ECDF buckets, so contexts can be bucketed like queries.
 - jax_tabpfn/model.py: the fast-mode decoder asserts at most 64 classes (one flash-attention call of one-hot values). Real fix: loop over 64-class chunks like `_class_attention`.
+- crane/real_data.py, data_tools/*: xlsx read with a regex over the sheet XML (no openpyxl). Real fix: openpyxl or pandas.
+- crane/explainer.html: the in-browser "TabPFN" lane is a kernel-weighted stand-in (stated on the page). Real fix: precompute real TabPFN decisions in Python and replay them.
+- crane/mujoco_demo.py: TabPFN refit every 5 s and video rendered offline (7-8 s fits on a GTX 1650). Real fix: fit_with_cache on a faster GPU or KV-cache reuse for live control.
+- crane/exp*_real.py: one run per condition, one seed; the beam run has a single trolley move. Real fix: more runs and seeds, report spread.

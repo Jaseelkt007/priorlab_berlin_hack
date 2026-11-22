@@ -445,7 +445,11 @@ def render_clip(job: dict) -> dict:
     depth_dir = path[:-4] + ".depth"
     if camd.get("depth") and job.get("depth", True):
         Path(depth_dir).mkdir(exist_ok=True)
-    nsub = {60: 8, 250: 2}.get(int(fps_sim), 1)     # motion blur: 180° shutter on the 1 ms grid (none at 1000)
+    # motion blur: a 180° shutter on the 1 ms state grid. Default by sim_fps (60: 8 sub-states 1 ms apart; 250: 2;
+    # 1000: none); a clip may set nsub / sub_ms (the 4x time-lapse: 8 sub-states 4 ms apart over the 32 ms before
+    # each frame).
+    nsub = clip.get("nsub") or {60: 8, 250: 2}.get(int(fps_sim), 1)
+    sub_dt = clip.get("sub_ms", 1) * MS
     lut = ((np.arange(256) / 255.0) ** 2.2).astype(np.float32)   # sRGB-ish -> linear for the average
     fog_start = camd.get("fog", (camd["dist"] + 0.6, camd["dist"] + 3.5))[0]
     fog_end = camd.get("fog", (camd["dist"] + 0.6, camd["dist"] + 3.5))[1]
@@ -453,8 +457,8 @@ def render_clip(job: dict) -> dict:
         t = t0 + f / fps_sim
         u = ease(f / max(n_frames - 1, 1))
         acc = None
-        for jsub in reversed(range(nsub)):           # sub-states t-(nsub-1) ms ... t; the frame-time state is last
-            k, i = state(max(t - jsub * MS, 0.0))
+        for jsub in reversed(range(nsub)):           # sub-states before t; the frame-time state is rendered last
+            k, i = state(max(t - jsub * sub_dt, 0.0))
             p = picks[k]
             m = p["model"]
             if k not in renderers:
@@ -478,7 +482,7 @@ def render_clip(job: dict) -> dict:
             scn = r.scene
             restyle_scene(m, scn, p["rgba"])
             tl = i * MS
-            items = display_items(m, d, p, picks, k, t - jsub * MS, tl, job["pitch"], camd)
+            items = display_items(m, d, p, picks, k, t - jsub * sub_dt, tl, job["pitch"], camd)
             draw_items(scn, items)
             add_lights(scn)
             img = r.render()
@@ -706,7 +710,10 @@ def make_plan_full():
     events = [("heavy", [30, 33]), ("filmroll", [60, 63]), ("worncup", [90, 93]), ("cupchange", [110, 113])]
     shift = list(range(120))
     ev_clips = [dict(scene="S04", label=ev, camera="D-track", picks=w, sim_fps=250) for ev, w in events]
-    long_clips = [dict(scene="S04", label="shift", camera=c, picks=[0, 119], sim_fps=60) for c in ("A-wide", "A2-mid-lock", "B-top")]
+    # the 120-pick shift plays fast-forwarded in the edit: a 4x time-lapse (one frame per 64 ms of sim time, encoded
+    # at 60 fps = 3.84x), blurred over the 32 ms before each frame (8 sub-states 4 ms apart)
+    long_clips = [dict(scene="S04", label="shift", camera=c, picks=[0, 119], sim_fps=15.625, fps_label="tl4", nsub=8,
+                       sub_ms=4) for c in ("A-wide", "A2-mid-lock", "B-top")]
     return [
         dict(name="recipe50", out=out, stream="shift:bar", policy="recipe50", alpha=0.5, idxs=[3, 4, 5, 6], clips=[
             dict(scene="S02", label="problem", camera="C-close", pick=5, window="touch", sim_fps=250),
@@ -794,9 +801,10 @@ def run_plan(plan, a):
     label = POLICY_LABEL.get(plan["policy"], plan["policy"])
     for c in plan["clips"]:
         t0, t1 = clip_window(picks, c)
-        name = f"{c['scene']}_{c['label']}_{c['camera']}_{label}_{c['sim_fps']}.mp4"
+        name = f"{c['scene']}_{c['label']}_{c['camera']}_{label}_{c.get('fps_label', c['sim_fps'])}.mp4"
         job = dict(picks=picks, pitch=pitch, policy=label, story=story, path=str(out / name),
-                   clip=dict(camera=c["camera"], t0=t0, t1=t1, sim_fps=c["sim_fps"], W=a.W, H=a.H))
+                   clip=dict(camera=c["camera"], t0=t0, t1=t1, sim_fps=c["sim_fps"], W=a.W, H=a.H,
+                             nsub=c.get("nsub"), sub_ms=c.get("sub_ms", 1)))
         if a.stills:      # one look frame: C 8 frames after touch, the others at the acceleration reversal
             by = {p["idx"]: p for p in picks}
             pk = by[c["pick"]] if "pick" in c else next(p for p in picks if p["idx"] >= c["picks"][0] + 1)
@@ -824,7 +832,8 @@ def run_plan(plan, a):
                         sim_t0=rres["sim_t0"], sim_t1=rres["sim_t1"], stream=plan["stream"],
                         speed_override=plan.get("alpha"),
                         pick_ids=[p["idx"] for p in picks if p["t_start_g"] + p["dur"] >= rres["sim_t0"] and p["t_start_g"] <= rres["sim_t1"]],
-                        sim_commit=commit, motion_blur_substates={60: 8, 250: 2}.get(c["sim_fps"], 1),
+                        sim_commit=commit, motion_blur_substates=c.get("nsub") or {60: 8, 250: 2}.get(c["sim_fps"], 1),
+                        motion_blur_step_ms=c.get("sub_ms", 1), playback_speed=round(60.0 / c["sim_fps"], 3),
                         display_only=["infeed queue", "outfeed carry-off", "base housing", "drawn suction cup",
                                       "wrap seal fins", "belt rails"]))
         print(f"{rres['file']}: {rres['frames']} frames, sim {rres['sim_t0']:.3f}-{rres['sim_t1']:.3f} s", flush=True)

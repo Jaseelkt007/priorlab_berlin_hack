@@ -1,0 +1,21 @@
+{
+ "steps": 4096,
+ "rows": 49152,
+ "cols": 105,
+ "query_rows": 12,
+ "torch_default_fit_s": 2.6,
+ "torch_default": {
+  "median_ms": 15.12,
+  "p95_ms": 16.91,
+  "n": 100
+ },
+ "torch_default_peak_gpu_gb": 7.6,
+ "torch_fp32_fit_s": 4.6,
+ "torch_fp32": {
+  "median_ms": 59.86,
+  "p95_ms": 60.72,
+  "n": 100
+ },
+ "export_s": 0.3,
+ "torch_fp32_peak_gpu_gb": 8.7
+}

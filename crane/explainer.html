@@ -161,7 +161,7 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
 <section id="live">
   <div class="eyebrow">1 · The live crane</div>
   <h2>Four strategies, the same jobs, the same physics</h2>
-  <p>Each lane carries the same sequence of loads 10 m between two set-down bays. Each bay sits between racks <span class="mono">0.45 m</span> either side of the load. A load is set down once it has stayed within <span class="mono">±5 cm</span> for 1 s. If its residual swing reaches the racks, that is a collision: a 20 s inspection stop.</p>
+  <p>Each lane carries the same sequence of loads 10 m between two set-down bays. Each bay sits between racks <span class="mono">0.45 m</span> either side of the load. A load is set down once it has stayed within <span class="mono">±5 cm</span> for 1 s. If its residual swing reaches the racks, that is a collision: a 20 s inspection stop. After each set-down the crane lowers the load into the bay, unhooks, hooks the next load and lifts it: a full pick-and-place cycle.</p>
   <div class="shell">
     <div class="bar">
       <div class="grp"><span class="lbl">Sim speed</span>
@@ -368,6 +368,7 @@ ECE: |observed − predicted| rate, averaged over bins of p̂</div>
     <tr><td>Later moves (its own rows added)</td><td class="v"><b>2.6 cm</b></td><td class="v">10.9 cm</td><td class="v"><b>90%</b></td></tr>
   </tbody></table></div>
   <p class="note"><b>How it was made.</b> The physics was checked first: the free-swing period is 5.11 s in MuJoCo, against 5.06 s from the double-pendulum formula in section 2. The small difference comes from the beam's own inertia. The trolley follows its planned trapezoid moves under feedforward plus PD control, within 1.1 cm. The context is 3,000 rows sampled from 30 simulated "fleet" jobs on short slings (0.5–1.5 m) with 1–3 t beams, plus the held-out job's own rows. The features are the same kind as for the real data: load offset now, 0.2 s and 0.5 s ago, its rate, the largest swing in the last 2 s, trolley position, speed and acceleration, rope length, payload from the load cell, and the planned trolley move. The sling length is hidden. TabPFN-3.5 uses <span class="mono">n_estimators=1</span> and gives quantiles 0.05 / 0.5 / 0.95. <b>Caveats:</b> it's a simulation, with one held-out job and one seed. The video was rendered offline: each refit takes 7–8 s on our GTX 1650 laptop GPU, so this laptop could not run it live (the team benchmark had about 0.3 s fits on an RTX 4050). Scripts: <span class="mono">crane/mujoco_crane.py</span>, <span class="mono">mujoco_demo.py</span>; video <span class="mono">results/mujoco_demo.mp4</span>.</p>
+  <p class="note"><b>Live pick and place</b> (<span class="mono">crane/live_pick_place.py</span>, opens a MuJoCo window): the beam is a separate body. The hook lowers on the hoist, grabs the beam, lifts, travels, waits until the swing is within ±5 cm for 1 s, lowers it into the other bay and releases it, then picks it up again. TabPFN's 1-s ghost runs during travel and settling. With a real 2.0 m sling and the anti-sway set for the entered 0.5 m, a cycle took 69.5 s (23.7 s of settle wait). With the anti-sway set for 2.0 m (← / → keys), it took 47 s (1.0–1.6 s of settle wait), placed within ±5 cm. Simulation, one run each.</p>
 </section>
 
 <!-- 6c PLAYGROUND -->
@@ -925,7 +926,15 @@ function commissioning(seed, n = 90) { // pre-existing logs: phase-0-like jobs a
       }
       const c = L.c; if (!c) return;
       const t1 = L.st[0], t2 = L.st[2];
-      const hx = L.x + c.L1 * Math.sin(t1), hy = rail + VS * c.L1 * Math.cos(t1);
+      // pick and place: during set-down the hook lowers the load into the bay, unhooks, hooks the next load, lifts
+      const bh0 = 10 + 10 * Math.min(1, c.m2 / 3000);
+      let drop = 0, pp = -1;
+      if (L.mode === 'down') {
+        pp = Math.max(0, L.t - (L.wait - CFG.SETDOWN)) / CFG.SETDOWN;
+        const full = Math.max(0, floor - 2 - (rail + VS * (c.L1 + c.L2) + bh0));
+        drop = L.t < L.wait - CFG.SETDOWN ? 0 : pp < 0.35 ? full * pp / 0.35 : pp < 0.65 ? full : full * (1 - (pp - 0.65) / 0.35);
+      }
+      const hx = L.x + c.L1 * Math.sin(t1), hy = rail + VS * c.L1 * Math.cos(t1) + drop;
       const lx = hx + c.L2 * Math.sin(t2), ly = hy + VS * c.L2 * Math.cos(t2);
       ctx.strokeStyle = C['--steel-dark']; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(px(L.x), rail); ctx.lineTo(px(hx), hy); ctx.stroke();
       ctx.fillStyle = C['--ink']; ctx.fillRect(px(hx) - 3, hy - 2, 6, 5);
@@ -934,7 +943,7 @@ function commissioning(seed, n = 90) { // pre-existing logs: phase-0-like jobs a
       ctx.fillStyle = col; ctx.globalAlpha = 0.9; ctx.fillRect(px(lx) - bw / 2, ly, bw, bh); ctx.globalAlpha = 1;
       ctx.fillStyle = C['--ink']; ctx.fillRect(px(L.x) - 14, rail - 9, 28, 9);
       txt(ctx, L.s.name, 12, y0 + 14, { size: 12, w: 600, color: col });
-      const status = L.mode === 'move' ? `moving · ${Math.round(L.p.vFrac * 100)}%${L.tu != null ? ` · shaper for ${L.tu} m sling` : ''}` : L.mode === 'settle' ? `waiting for swing · ${L.t.toFixed(1)} s · |offset| ${Math.abs(offset(L.st, c)).toFixed(2)} m` : L.res && L.res.hit ? 'COLLISION · inspection stop' : 'setting down';
+      const status = L.mode === 'down' && pp >= 0 && !(L.res && L.res.hit && L.t < L.wait - CFG.SETDOWN) ? (pp < 0.35 ? 'lowering into the bay' : pp < 0.65 ? 'unhooking · hooking the next load' : 'lifting the next load') : L.mode === 'move' ? `moving · ${Math.round(L.p.vFrac * 100)}%${L.tu != null ? ` · shaper for ${L.tu} m sling` : ''}` : L.mode === 'settle' ? `waiting for swing · ${L.t.toFixed(1)} s · |offset| ${Math.abs(offset(L.st, c)).toFixed(2)} m` : L.res && L.res.hit ? 'COLLISION · inspection stop' : 'setting down';
       txt(ctx, status, w - 12, y0 + 14, { mono: true, size: 10.5, align: 'right', color: L.mode === 'down' && L.res && L.res.hit ? C['--bad'] : C['--muted'] });
       txt(ctx, `rope ${c.L1.toFixed(1)} m · sling ${c.L2.toFixed(1)} m · ${(c.m2 / 1000).toFixed(1)} t`, w - 12, y0 + 28, { mono: true, size: 9.5, align: 'right' });
     });

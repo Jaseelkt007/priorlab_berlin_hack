@@ -202,11 +202,35 @@ Each experiment in four lines: what happened, why, what we changed, and the resu
 - **Result:** everyone gets worse (harder pilot). IMM 1.80 m, re-tuned IMM 1.82 m (its tuning fitted pilot a), TabPFN A 2.25 m, **TabPFN B 1.67 m: still 8% better** (6.6-8.6% over resamples, better on 217 of 250 flights); its 90% range holds the truth 90% of the time. Alarm: IMM 100%, TabPFN B 96% of breaches caught.
 - **So:** the examples of the **drone** matter most; TabPFN's gain is not only the pilot's habits.
 
+### 15. IMM + TabPFN: TabPFN corrects the radar's tracker
+- **Idea:** keep the IMM a radar already runs, and let TabPFN correct it. The IMM's answer at each reading goes into the row as 6 extra inputs: its predicted move in 1 s (forward, left, up, in the drone frame) and its 3 model probabilities (straight / accelerating / turning). TabPFN learns from the examples when the IMM is right and how it is usually wrong. Still no training.
+- **Not cheating:** the IMM only uses readings up to now, and its settings were tuned on other flights (X2). It is the same information TabPFN already has, worked through physics first.
+- **How:** `imm.py --drone <x2|cf2|cf2_pilotb>` (now also saves the model probabilities), then `tabpfn_model.py --versions B --imm-features --test cf2_pilotb --every 1 --out data/tabpfn_cf2_pilotb_combo.npz`. Same examples as TabPFN B; tested only on **pilot b**, the pilot no model has seen.
+- **Result:** IMM 1.80 m, TabPFN B 1.67 m, **IMM + TabPFN 1.62 m**: **10% better than the IMM** (9.2-10.9% over flight resamples, better on 232 of 250 flights), **2.7% better than TabPFN B** (2.2-3.1%). Better or equal on every manoeuvre except climb (2.06 vs the IMM's 1.96 m); on dive it now ties the IMM. 90% range holds the truth 89% of the time; alarm 97% of breaches caught.
+- **So:** the gain over TabPFN alone is small but real; the strongest claim is against the IMM: "TabPFN upgrades the tracker you already run by 10%, on a pilot it never saw".
+
+### 16. Is it fast enough for live use?
+- **Budget:** the radar gives a reading every 100 ms; all 4 TabPFN models (forward, left, up, alarm) must answer within that. Measured with `python drone/latency.py` on an H100, IMM + TabPFN, one reading at a time (and 10 drones at once).
+- **As used so far: 5.2 s per reading.** In batch it looked fast (about 0.5 ms per row), but every call re-reads all example rows, for each of the 4 models.
+- **Speed-ups (error on pilot b, every 10th reading):**
+
+| Setting | Delay per reading | Error |
+|---|---|---|
+| as used so far (5,000 examples) | 5,166 ms | 1.62 m |
+| + example cache (`fit_mode="fit_with_cache"`) | 620 ms | 1.62 m |
+| + 2 internal passes (`n_estimators=2`) | 320 ms | 1.62 m |
+| + 1 pass | 256 ms | 1.63 m |
+| + 1 pass, 1,000 X2 + 1,000 Crazyflie examples | **252 ms** | **1.56 m** |
+
+- **So:** 20x faster with no accuracy lost. Fewer X2 examples even helped (the Crazyflie rows are then half of the examples); that was measured on pilot b only. Still **not under 100 ms**: what is left is about 60 ms of fixed cost per model call, 4 calls per reading, and 10 drones cost the same as 1.
+- **Live design that fits today:** the IMM tracks every 100 ms (microseconds), and TabPFN updates its correction about 4 times a second (every 250 ms). Untested ways to reach 100 ms: run the 4 models in parallel (separate GPU streams or GPUs), or one model for all 3 directions.
+
 ## 5. Known limits
 
 - All data is simulated; no real radar or drone.
 - Scripted pilots only (two styles, experiment 14); no human pilots.
 - Close range: intruders start 60 m out; a real counter-drone radar sees 1-5 km.
+- The examples' answers are perfect: "where the drone really was 1 s later" comes from the simulator. In real use it would come from radar tracks of past flights smoothed afterwards (readings before and after each point), which is noisier, so real accuracy would be somewhat lower. The live drone's future is never shown to any model.
 - The radar gives x, y, z with simple noise; a real radar measures distance and angles.
 - The Crazyflie is limited to 3 m/s by its weak turning motors (model as menagerie ships it).
 - At 3 m/s, Crazyflie flybys rarely leave the arena in 60 s, so they end as timeouts.

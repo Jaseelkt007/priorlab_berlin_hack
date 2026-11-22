@@ -165,6 +165,25 @@ flowchart TB
 
 ---
 
+### IMM + TabPFN: TabPFN corrects the tracker the radar already runs
+
+```mermaid
+flowchart LR
+    R["📡 radar readings"] --> I["IMM (physics)<br/>'in 1 s it moves 2.6 m forward'<br/>'70% sure: straight'"]
+    R --> F["16 radar inputs"]
+    I -->|"6 extra columns"| T["TabPFN<br/>examples show when the IMM<br/>is right and how it is usually wrong"]
+    F --> T
+    T --> O["corrected position in 1 s"]
+```
+
+| On pilot b (never seen) | Error 1 s ahead |
+|---|---|
+| IMM | 1.80 m |
+| TabPFN B | 1.67 m |
+| **IMM + TabPFN** | **1.62 m: 10% better than the IMM**, better on 232 of 250 flights |
+
+---
+
 ## 9. See it
 
 ![IMM vs TabPFN](../results/charts/imm_vs_tabpfn.jpg)
@@ -201,7 +220,8 @@ In our video the X2 defender only hovers; using the predictions to intercept is 
 | Close range (60 m) | close-in defence: the last 20 to 30 seconds |
 | Scripted pilots | two styles tested (TabPFN wins on both); human pilots are next |
 | Example rows are scattered | "25 s of radar" means rows from 50 flights, not one continuous track |
-| Speed measured in batch | real-time delay per reading is not measured yet |
+| Perfect example answers | in real use "where it really went" comes from smoothed radar tracks of past flights, slightly noisier; the live drone's future is never shown |
+| Speed | measured: 5.2 s → **252 ms per reading** with TabPFN's example cache and 1 pass, no accuracy lost; not yet under the radar's 100 ms, so the IMM tracks live and TabPFN corrects 4 times a second |
 
 ---
 

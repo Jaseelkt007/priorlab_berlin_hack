@@ -93,6 +93,42 @@ Every flight so far (examples and tests) was flown by the same scripted pilot, s
 
 TabPFN B is still **8% better** than the best IMM on a pilot it never saw. TabPFN B's 90% range holds the truth 90% of the time on pilot b.
 
+## IMM + TabPFN: TabPFN corrects the radar's tracker
+
+The IMM's own answer goes into TabPFN as 6 extra inputs: its predicted move in 1 s (forward, left, up) and how sure it is the drone goes straight / accelerates / turns (`tabpfn_model.py --imm-features`). TabPFN then learns from the examples when the IMM is right and how it is usually wrong. Same examples as TabPFN B, tested on **pilot b** (the pilot no model has seen), 116,914 moments.
+
+| Model | Error on pilot b | 90% of errors below |
+|---|---|---|
+| IMM | **1.80 m** | 3.25 m |
+| TabPFN B | **1.67 m** | 3.16 m |
+| IMM + TabPFN | **1.62 m** | 3.12 m |
+
+- **10% better than the IMM** (95% range 9.2-10.9%, better on 232 of 250 flights).
+- **2.7% better than TabPFN B** (95% range 2.2-3.1%, better on 193 of 250 flights): real, but small.
+- Its 90% range holds the truth 89% of the time; alarm catches 97% of breaches (TabPFN B 96%).
+
+| manoeuvre | IMM | TabPFN B | IMM + TabPFN |
+|---|---|---|---|
+| straight | 1.64 | 1.44 | 1.38 |
+| zigzag | 1.82 | 1.59 | 1.56 |
+| orbit | 1.68 | 1.50 | 1.47 |
+| hover | 1.86 | 1.62 | 1.62 |
+| dash | 1.70 | 1.60 | 1.53 |
+| dive | 2.03 | 2.07 | 2.03 |
+| climb | 1.96 | 2.13 | 2.06 |
+
+## Is it fast enough for live use?
+
+The radar gives a reading every **100 ms**, so all 4 TabPFN models (forward, left, up, alarm) must answer within that. IMM + TabPFN on an H100 (`python drone/latency.py`), median of 30 readings:
+
+| setting | examples | error_pilot_b_m | ms_1_drone | ms_10_drones | fits_100ms |
+|---|---|---|---|---|---|
+| as used so far | 5000 | 1.62 | 5166.00 | 5152.00 | False |
+| + example cache | 5000 | 1.62 | 619.60 | 625.30 | False |
+| + cache, 2 passes | 5000 | 1.62 | 320.10 | 360.50 | False |
+| + cache, 1 pass | 5000 | 1.62 | 255.60 | 272.20 | False |
+| + cache, 1 pass, 1,000 X2 rows | 2000 | 1.56 | 252.10 | 258.40 | False |
+
 ## How many examples of the new drone does TabPFN need?
 
 Same test moments for every point (every 5th reading, 22,501 moments). TabPFN beats both IMMs from **250 Crazyflie rows** (about 25 s of radar on the new drone).
@@ -113,6 +149,10 @@ Same test moments for every point (every 5th reading, 22,501 moments). TabPFN be
 - **Simulation only:** one simulator, scripted intruder pilots (see "A pilot no model has seen" for a second pilot).
 - **Context:** 4,000 random X2 rows out of ~400,000; larger or similarity-picked contexts are untested.
 - **The IMM is told the true radar noise level;** TabPFN is not.
+- **The examples' answers are perfect:** "where the drone really was 1 s later" comes from the simulator. In real use
+  it would come from radar tracks of past flights, smoothed afterwards (using readings before and after each point),
+  which is close to the truth but noisier, so real accuracy would be somewhat lower. The live drone's future is never
+  shown to any model, in the simulation or in real use.
 
 ## Videos
 

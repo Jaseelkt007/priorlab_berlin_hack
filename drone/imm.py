@@ -317,10 +317,10 @@ def main():
     seeds, meas, lengths = load_tracks(args.drone)
     settings = SETTINGS[args.settings]
     mean, cov, mu = run(meas, lengths, settings)
-    m, c = align(seeds, mean, table), align(seeds, cov, table)
+    m, c, mu = align(seeds, mean, table), align(seeds, cov, table), align(seeds, mu, table)
     score(m, table, f"IMM ({args.settings} tuning) on {args.drone}")
     out = DATA / (f"imm_{args.drone}.npz" if args.settings == "x2" else f"imm_{args.drone}_{args.settings}tuned.npz")
-    np.savez_compressed(out, mean=m, cov=c, horizons=HORIZONS, settings=np.array(str(asdict(settings))))
+    np.savez_compressed(out, mean=m, cov=c, mu=mu, horizons=HORIZONS, settings=np.array(str(asdict(settings))))
     print(f"-> {out}")
 
 

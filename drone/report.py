@@ -74,6 +74,18 @@ def warning_times(p, table, rows, threshold):
     return np.array(out)
 
 
+def gain_range(new, base, flights, n=1000):
+    """How much lower `new`'s median error is than `base`'s (%), with a 95% range from resampling whole flights."""
+    idx = [np.where(flights == f)[0] for f in np.unique(flights)]
+    rng = np.random.default_rng(0)
+    draws = []
+    for _ in range(n):
+        pick = np.concatenate([idx[i] for i in rng.integers(0, len(idx), len(idx))])
+        draws.append(1 - np.median(new[pick]) / np.median(base[pick]))
+    better = sum(np.median(new[i]) < np.median(base[i]) for i in idx)
+    return 100 * (1 - np.median(new) / np.median(base)), *np.percentile(100 * np.array(draws), [2.5, 97.5]), better, len(idx)
+
+
 def main():
     OUT.mkdir(exist_ok=True)
     (OUT / "charts").mkdir(exist_ok=True)
@@ -282,6 +294,47 @@ def main():
                                   f"{caught_at(palarm[m], plabel):.0%} |" for m in order)
                       + f"\n\n{verdict} TabPFN B's 90% range holds the truth {pcover['TabPFN B']:.0%} of the time on pilot b.")
 
+    # IMM + TabPFN: the IMM's answer as 6 extra inputs (tabpfn_model.py --imm-features), tested on pilot b
+    combo_text = "Not run yet."
+    if (DATA / "tabpfn_cf2_pilotb_combo.npz").exists():
+        pt = dict(np.load(DATA / "table_cf2_pilotb.npz"))
+        cb, pb = np.load(DATA / "tabpfn_cf2_pilotb_combo.npz"), np.load(DATA / "tabpfn_cf2_pilotb.npz")
+        im = np.load(DATA / "imm_cf2_pilotb.npz")
+        r = cb["test_rows"]
+        t = pt["Y_world"][r, :3]
+        ce = {"IMM": np.linalg.norm(im["mean"][r, hi].astype(float) - t, axis=1),
+              "TabPFN B": np.linalg.norm(pb["B_x2_plus_cf2_world"][:, 0] - t, axis=1),
+              "IMM + TabPFN": np.linalg.norm(cb["B_x2_plus_cf2_world"][:, 0] - t, axis=1)}
+        q = cb["B_x2_plus_cf2_quantiles"][:, :3]
+        ccover = ((pt["Y"][r] >= q[:, :, 0]) & (pt["Y"][r] <= q[:, :, 2])).mean()
+        cl = pt["breach"][cb["alarm_rows"]]
+        fl = pt["flight"][r]
+        g_imm, g_b = gain_range(ce["IMM + TabPFN"], ce["IMM"], fl), gain_range(ce["IMM + TabPFN"], ce["TabPFN B"], fl)
+        pbeh = pt["behaviour"][r]
+        combo = pd.DataFrame({"manoeuvre": behaviours,
+                              **{m: [np.median(e[pbeh == b]) for b in range(len(behaviours))] for m, e in ce.items()}})
+        combo.round(3).to_csv(OUT / "combo_pilot_b.csv", index=False)
+        combo_text = (
+            "The IMM's own answer goes into TabPFN as 6 extra inputs: its predicted move in 1 s (forward, left, up) and "
+            "how sure it is the drone goes straight / accelerates / turns (`tabpfn_model.py --imm-features`). TabPFN "
+            "then learns from the examples when the IMM is right and how it is usually wrong. Same examples as TabPFN B, "
+            f"tested on **pilot b** (the pilot no model has seen), {len(r):,} moments.\n\n"
+            "| Model | Error on pilot b | 90% of errors below |\n|---|---|---|\n"
+            + "\n".join(f"| {m} | **{np.median(e):.2f} m** | {np.percentile(e, 90):.2f} m |" for m, e in ce.items())
+            + f"\n\n- **{g_imm[0]:.0f}% better than the IMM** (95% range {g_imm[1]:.1f}-{g_imm[2]:.1f}%, better on "
+            f"{g_imm[3]} of {g_imm[4]} flights).\n- **{g_b[0]:.1f}% better than TabPFN B** (95% range {g_b[1]:.1f}-"
+            f"{g_b[2]:.1f}%, better on {g_b[3]} of {g_b[4]} flights): real, but small.\n- Its 90% range holds the truth "
+            f"{ccover:.0%} of the time; alarm catches {caught_at(cb['B_x2_plus_cf2_p_breach'], cl):.0%} of breaches "
+            f"(TabPFN B {caught_at(pb['B_x2_plus_cf2_p_breach'], cl):.0%}).\n\n{md(combo)}")
+
+    # speed: drone/latency.py
+    speed_text = "Not measured yet (`python drone/latency.py`)."
+    if (OUT / "latency.csv").exists():
+        lat = pd.read_csv(OUT / "latency.csv")
+        speed_text = ("The radar gives a reading every **100 ms**, so all 4 TabPFN models (forward, left, up, alarm) must "
+                      "answer within that. IMM + TabPFN on an H100 (`python drone/latency.py`), median of 30 readings:"
+                      f"\n\n{md(lat)}")
+
     fair_text = "Not run yet: the IMM was tuned on X2 flights only."
     fair_bullet = ""
     if "IMM re-tuned" in imms:
@@ -356,6 +409,14 @@ The radar is noisier far away (1% of range), so everything gets harder with dist
 
 {pilot_text}
 
+## IMM + TabPFN: TabPFN corrects the radar's tracker
+
+{combo_text}
+
+## Is it fast enough for live use?
+
+{speed_text}
+
 ## How many examples of the new drone does TabPFN need?
 
 {sweep_text}
@@ -365,6 +426,10 @@ The radar is noisier far away (1% of range), so everything gets harder with dist
 - **Simulation only:** one simulator, scripted intruder pilots (see "A pilot no model has seen" for a second pilot).
 - **Context:** 4,000 random X2 rows out of ~400,000; larger or similarity-picked contexts are untested.
 - **The IMM is told the true radar noise level;** TabPFN is not.
+- **The examples' answers are perfect:** "where the drone really was 1 s later" comes from the simulator. In real use
+  it would come from radar tracks of past flights, smoothed afterwards (using readings before and after each point),
+  which is close to the truth but noisier, so real accuracy would be somewhat lower. The live drone's future is never
+  shown to any model, in the simulation or in real use.
 
 ## Videos
 

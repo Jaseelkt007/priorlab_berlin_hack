@@ -24,7 +24,7 @@ from pathlib import Path
 import numpy as np
 from dotenv import load_dotenv
 
-from features import ADAPT_FLIGHTS, DATA, HORIZONS, to_world
+from features import ADAPT_FLIGHTS, DATA, FEATURES, HORIZONS, rotate, to_world
 
 QUANTILES = [0.05, 0.5, 0.95]
 SEED = 0
@@ -32,6 +32,17 @@ SEED = 0
 
 def load(drone):
     return dict(np.load(DATA / f"table_{drone}.npz"))
+
+
+def imm_columns(name, table):
+    """The IMM's own answer as 6 extra inputs (experiment 15, "IMM + TabPFN"): its predicted move in 1 s in the
+    drone's frame (forward, left, up) and how sure it is the drone goes straight / accelerates / turns.
+    Needs data/imm_<name>.npz from `imm.py --drone <name>` (X2 tuning). NaN where the IMM has no answer yet;
+    TabPFN handles missing values."""
+    imm = np.load(DATA / f"imm_{name}.npz")
+    hi = int(np.argmin(np.abs(imm["horizons"] - 1.0)))
+    d = imm["mean"][:, hi].astype(float) - table["pos"]
+    return np.column_stack([rotate(d[:, :2], table["psi"]), d[:, 2], imm["mu"].astype(float)])
 
 
 def complete(table):
@@ -43,16 +54,17 @@ def sample(rng, idx, n):
     return idx if len(idx) <= n else np.sort(rng.choice(idx, n, replace=False))
 
 
-def make_regressor():
+def make_regressor(**options):
+    """options: TabPFN settings, e.g. fit_mode="fit_with_cache", n_estimators=1 (latency.py measures them)."""
     from tabpfn import TabPFNRegressor
 
-    return TabPFNRegressor(device="cuda" if _cuda() else "cpu", random_state=SEED)
+    return TabPFNRegressor(device="cuda" if _cuda() else "cpu", random_state=SEED, **options)
 
 
-def make_classifier():
+def make_classifier(**options):
     from tabpfn import TabPFNClassifier
 
-    return TabPFNClassifier(device="cuda" if _cuda() else "cpu", random_state=SEED)
+    return TabPFNClassifier(device="cuda" if _cuda() else "cpu", random_state=SEED, **options)
 
 
 def _cuda():
@@ -114,6 +126,7 @@ def main():
     parser.add_argument("--batch", type=int, default=2000)
     parser.add_argument("--versions", default="A,B", help="which versions to run: A, B or A,B")
     parser.add_argument("--out", type=Path, default=DATA / "tabpfn_cf2.npz")
+    parser.add_argument("--imm-features", action="store_true", help="add the IMM's answer as 6 extra inputs (IMM + TabPFN)")
     parser.add_argument("--test", default="cf2", help="test table: cf2 (flights 50-299) or cf2_pilotb (all flights, a new pilot)")
     args = parser.parse_args()
 
@@ -135,6 +148,10 @@ def main():
     adapt = sample(rng, np.where(complete(cf2) & is_adapt)[0], args.adapt_rows)
     adapt_alarm = sample(rng, np.where(is_adapt)[0], args.adapt_rows)
     tt = cf2 if args.test == "cf2" else load(args.test)  # the examples always come from cf2 flights 0-49
+    if args.imm_features:
+        for name, table in {"x2": x2, "cf2": cf2, args.test: tt}.items():
+            if table["X"].shape[1] == len(FEATURES):  # tt may be cf2 itself: add the columns once
+                table["X"] = np.column_stack([table["X"], imm_columns(name, table)])
     if args.test == "cf2":
         test, alarm_test = test_rows(cf2, args.every)
     else:
@@ -168,6 +185,7 @@ def main():
     path = args.out
     out["adapt_rows"] = np.array(len(adapt))
     out["test_set"] = np.array(args.test)
+    out["imm_features"] = np.array(args.imm_features)
     np.savez_compressed(path, **out)
     print(f"-> {path}; score with: python drone/compare.py")
 

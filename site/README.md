@@ -25,6 +25,13 @@ Opening `site/index.html` as a file also works. On GitHub Pages or Vercel, deplo
 
 Keys: `1`–`4` open a project, `Esc` returns to the overview (click the header first if the report has focus).
 
+## Live site
+
+Production: https://priorlabberlinhack.vercel.app (the pitch: https://priorlabberlinhack.vercel.app/pitch).
+Deploy from the repo root with the Vercel CLI: `vercel deploy --prod`. `.vercelignore` is an allowlist,
+so only the site and the reports, videos and images its pages show are uploaded (never `.env`, venvs or data);
+`vercel.json` marks the project as static files and redirects `/` and `/pitch`.
+
 ## Drone page
 
 After `drone/README.md` changes, re-render it from the repo root:

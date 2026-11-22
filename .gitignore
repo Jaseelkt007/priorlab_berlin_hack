@@ -13,3 +13,4 @@ jax_tabpfn/golden/
 
 # MuJoCo writes this to the current folder (drone, crane scripts run from the repo root)
 MUJOCO_LOG.TXT
+.vercel

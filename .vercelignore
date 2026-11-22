@@ -1,0 +1,23 @@
+# Deploy only the website and the files its pages show. The repo also holds .env, virtual
+# environments, data and research files, which must never be uploaded. (Same syntax as .gitignore.)
+/*
+!/vercel.json
+!/site
+!/docs
+!/crane
+!/drone
+!/fly
+/docs/handoff
+/docs/*.pdf
+/crane/*
+!/crane/docs
+/fly/*
+!/fly/docs
+/drone/*
+!/drone/README.md
+!/drone/EXPLAINED.md
+!/drone/EXPERIMENTS.md
+!/drone/results
+!/drone/models
+/drone/models/*
+!/drone/models/README.md

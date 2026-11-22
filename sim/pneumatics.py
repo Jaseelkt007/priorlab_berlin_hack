@@ -49,6 +49,23 @@ class EjectorCurve:
     def mdot(self, dp_pa):
         return RHO0 * self.q_m3s(dp_pa)
 
+    def parallel(self, n: int) -> "EjectorCurve":
+        """n identical cartridges in parallel (Piab COAX cartridges stack in one housing): n× the flow, same max vacuum."""
+        if n == 1:
+            return self
+        dp = np.linspace(0.0, self.dp_max / 1e3, 60)[:-1]
+        return EjectorCurve(f"{n}x {self.name}", dp, n * self.q_m3s(dp * 1e3) * 1e3, self.dp_max / 1e3)
+
+    def regulated(self, p_set_kpa: float, band_kpa: float = 2.0) -> "EjectorCurve":
+        """The generator behind a vacuum regulator set to p_set (e.g. −150 mbar for chocolate, Schmalz SPG): full
+        generator flow well below p_set, throttled linearly over the last `band_kpa` (proportional band, [E]), zero at
+        p_set. A set point above the generator's maximum leaves the curve unchanged."""
+        if p_set_kpa * 1e3 >= self.dp_max:
+            return self
+        dp = np.linspace(0.0, p_set_kpa, 60)[:-1]
+        q = self.q_m3s(dp * 1e3) * 1e3 * np.clip((p_set_kpa - dp) / band_kpa, 0.0, 1.0)
+        return EjectorCurve(f"{self.name} regulated {p_set_kpa:g} kPa", dp, q, p_set_kpa)
+
 
 # Piab COAX cartridges [26][27] (model-suction.md §3.2 table). Si02-2: scfm at inHg converted (1 inHg = 3.386 kPa, 1 scfm = 0.47195 l/s).
 EJECTORS = {

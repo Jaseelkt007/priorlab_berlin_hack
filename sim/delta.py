@@ -43,7 +43,7 @@ class DeltaParams:
     fric_vs: float = 0.01      # rad/s, smoothing velocity of the Coulomb term
     fric_viscous: float = 1.6  # N·m·s/rad
     tau_max: float = 123.9    # N·m at the gearbox output: not published; calibrated on ABB 25/305/25 @ 1 kg (V5)
-    r_elbow: float = 0.5      # strut mass share lumped at the elbow in Model B
+    r_elbow: float = 2 / 3    # strut mass share lumped at the elbow in Model B (chosen by V4: 4.1 % vs 8.0 % for ½)
     r_plat: float | None = None  # strut mass share lumped at the platform (default 1 − r_elbow). Chosen by test V4.
     # numerics
     dt: float = 0.0005
@@ -236,11 +236,11 @@ def plant_friction(m: mujoco.MjModel, d: mujoco.MjData, P: DeltaParams, arm_dof:
     d.qfrc_applied[arm_dof] = -P.fric_coulomb * np.tanh(d.qvel[arm_dof] / P.fric_vs)
 
 
-def base_force_lumped(pw, vw, aw, P: DeltaParams, h: float = 1e-6) -> np.ndarray:
+def base_force_lumped(pw, vw, aw, P: DeltaParams, h: float = 1e-6, js=None) -> np.ndarray:
     """Dynamic base force Σ m_i a_i (weight excluded) of the lumped model: arms (CoM on the arm), elbow masses
     (r_elbow of the struts), platform + tool + the rest of the struts. Point accelerations on each arm come from
     r(θ): a = r'(θ) θ̈ + r''(θ) θ̇²."""
-    th, thd, thdd = joint_state(pw, vw, aw, P)
+    th, thd, thdd = joint_state(pw, vw, aw, P) if js is None else js
     r_plat = (1 - P.r_elbow) if P.r_plat is None else P.r_plat
     F = (P.m_plat + P.m_tool + 6 * P.m_strut * r_plat) * np.asarray(aw, float)
     m_el = 2 * P.m_strut * P.r_elbow
@@ -266,8 +266,9 @@ class Feedforward:
         self.S = np.zeros((3, self.m.nv))
         self.S[0, 0] = self.S[1, 1] = self.S[2, 2] = 1.0
 
-    def torque(self, pw, vw, aw):
-        th, thd, thdd = joint_state(pw, vw, aw, self.P)
+    def torque(self, pw, vw, aw, js=None):
+        """js: the platform state's joint_state(), if the caller already has it."""
+        th, thd, thdd = joint_state(pw, vw, aw, self.P) if js is None else js
         m, d = self.m, self.d
         d.qpos[:] = np.r_[th - self.th0, np.asarray(pw) - self.p0]
         d.qvel[:] = np.r_[thd, vw]
@@ -283,7 +284,7 @@ class Feedforward:
 
 class DeltaController:
     """τ = τ_ff (at t + dt/2) + Kp (θ_ref(t) − θ) + Kd (θ̇_ref(t − dt/2) − θ̇), clipped to ±τ_max.
-    Friction (Coulomb + viscous at the gearbox output) is compensated in the feedforward."""
+    Friction (Coulomb + viscous at the gearbox output) is compensated in the feedforward. Call prepare() per move."""
 
     def __init__(self, P: DeltaParams, model: mujoco.MjModel, p0w: np.ndarray, kp: float = 2e4, kd: float = 300.0):
         self.P, self.m = P, model
@@ -294,20 +295,32 @@ class DeltaController:
         self.th0 = ik(to_motor(p0w, P), P)
         self.last_tau = np.zeros(3)
 
-    def use_table(self, tff_table: np.ndarray | None) -> None:
-        """Use precomputed exact feedforward (FeedforwardA.precompute) instead of the lumped Model B."""
-        self.tff_table = tff_table
+    def prepare(self, ref, T: float, exact=None, h: float = 5e-4) -> None:
+        """Precompute the move's reference tables once (industrial controllers evaluate their dynamic model per path
+        segment, not per servo tick): tau_ff, theta_ref, thetadot_ref on an h grid over [-2h, T + 3h]. tau_ff comes from
+        the exact closed chain if `exact` (a FeedforwardA) is given, else from the lumped model.
+        ref(t) -> platform (p, v, a), clamped at its ends."""
+        ts = np.arange(-2 * h, T + 3 * h, h)
+        tff, th, thd = [], [], []
+        for t in ts:
+            p, v, a = ref(t)
+            js = joint_state(p, v, a, self.P)
+            tff.append(exact.torque(ref, t) if exact is not None else self.ff.torque(p, v, a, js)[0])
+            th_t, thd_t, _ = js
+            th.append(th_t)
+            thd.append(thd_t)
+        self.tab = (ts, np.array(tff), np.array(th), np.array(thd))
 
-    def torque(self, d: mujoco.MjData, ref, t: float) -> np.ndarray:
-        """ref(t) -> (p, v, a) of the platform centre in world coordinates."""
+    def _at(self, k: int, t: float) -> np.ndarray:
+        ts, tab = self.tab[0], self.tab[k]
+        return np.array([np.interp(t, ts, tab[:, i]) for i in range(3)])
+
+    def torque(self, d: mujoco.MjData, t: float) -> np.ndarray:
+        """Motor torques at time t from the prepared tables: tau_ff at t + dt/2, theta_ref at t, thetadot_ref at t - dt/2."""
         dt = self.P.dt
-        table = getattr(self, "tff_table", None)
-        if table is not None:
-            tff = table[min(int(round(t / dt)), len(table) - 1)]
-        else:
-            tff, _, _ = self.ff.torque(*ref(t + dt / 2))
-        th_ref, _, _ = joint_state(*ref(t), self.P)
-        _, thd_ref, _ = joint_state(*ref(t - dt / 2), self.P)
+        tff = self._at(1, t + dt / 2)
+        th_ref = self._at(2, t)
+        thd_ref = self._at(3, t - dt / 2)
         q = d.qpos[self.qadr] + self.th0
         qd = d.qvel[self.vadr]
         fric = self.P.fric_viscous * qd + self.P.fric_coulomb * np.tanh(thd_ref / self.P.fric_vs)
@@ -320,7 +333,7 @@ class DeltaController:
 class FeedforwardA:
     """Exact feedforward from the full closed chain (Model A): projected inverse dynamics with every strut DOF.
     Needed because the lumped (Codourey) model is off by ~10 % of peak torque at light payloads (gate 4, V4).
-    Use precompute() once per path; the controller then reads τ_ff from the table."""
+    Pass it to DeltaController.prepare(); it is evaluated once per move."""
 
     def __init__(self, P: DeltaParams, p0w: np.ndarray, extra_platform_xml: str = ""):
         import dataclasses
@@ -392,8 +405,3 @@ class FeedforwardA:
         qf = d.qfrc_inverse.copy()
         sol, *_ = np.linalg.lstsq(np.vstack([self.S, Jeq]).T, qf, rcond=None)
         return sol[:3]
-
-    def precompute(self, ref, T: float, dt: float) -> np.ndarray:
-        """τ_ff on the half-step grid t_k + dt/2, k = 0..N (what the controller needs)."""
-        n = int(np.ceil(T / dt)) + 2
-        return np.array([self.torque(ref, k * dt + dt / 2) for k in range(n)])

@@ -4,6 +4,10 @@
 
 We recorded a trained AI flying a simulated fruit fly, turned every 0.2 ms of flight into a row of a table, and asked **TabPFN**, a model that learns from the examples it is shown instead of from training, to predict where the fly goes and to fly it.
 
+![TabPFN flying the fruit fly through a 360°/s tight curve](docs/img/tabpfn_tight_curve.gif)
+
+*TabPFN flies all 12 controls of the fly through a 360°/s tight curve for the full 1 s, 0.16 mm from the target on average, with no training: it reads 393k example rows from the trained policy's flights. Playback is 6.7× slow motion.*
+
 | Predicting position | Adapting to a new body | Flying, big context | Still fails |
 |---|---|---|---|
 | **2.2×** lower error than gradient-boosted trees, one wingbeat ahead | **−44%** error on a 20% heavier fly after adding 16 example flights | **0.10 mm** off the path on an S-curve with 393k–1M rows, as precise as the trained policy | sudden **80° turns**: the path is lost within 30–80 ms |
@@ -60,14 +64,44 @@ The **ghost** is a see-through copy of the fly moved along the target path on ra
 ## How it works
 
 ```mermaid
-flowchart LR
-  P[RL policy<br/>the teacher] -- 12 actions --> M[MuJoCo fly<br/>272 paths × 6 passes]
-  M -- 104 senses --> P
-  M -- log every 0.2 ms --> T[(Flight table<br/>1.54M steps)]
-  T -- sample --> O[TabPFN offline<br/>A · B · C]
-  T -- sample --> C[TabPFN controller<br/>D · E · F · G]
-  C -- 12 actions every 0.2 ms --> M
+flowchart TB
+  subgraph REC["① Record the teacher · MuJoCo"]
+    direction LR
+    FLY1["Simulated fruit fly<br/>272 recorded flight paths"] -- "104 senses" --> POL["Trained RL policy<br/>the teacher, ~165k weights"]
+    POL -- "12 actions" --> FLY1
+  end
+
+  REC == "log every 0.2 ms · 6 passes:<br/>clean · noise ×2 · strong noise · weak wing · heavy body" ==> TAB[("Flight table<br/>1.54M steps<br/>104 senses + 12 actions each")]
+  TAB == "unroll: 1 step → 12 rows<br/>[104 senses, action_id] → y" ==> CTX[("TabPFN context<br/>49k – 1M rows<br/>27 held-out flight pairs never included")]
+
+  subgraph OFF["② Predict offline · cloud API"]
+    direction TB
+    A["A · where will the fly be<br/>in 1 / 3 / 10 wingbeats?"]
+    B["B · adapt to a weak wing or<br/>heavier body by adding rows"]
+    C["C · copy the policy's actions"]
+  end
+
+  subgraph LOOP["③ Fly in closed loop · GPU, no policy"]
+    direction LR
+    FLY2["Simulated fruit fly<br/>held-out and synthetic paths"] -- "live 104 senses<br/>→ 12 query rows" --> TP["TabPFN<br/>context fitted once"]
+    TP -- "12 actions<br/>every 0.2 ms" --> FLY2
+  end
+
+  CTX --> OFF
+  CTX --> LOOP
+  LOOP -.-> R["D–G · sweep<br/>distance to target, time until lost"]
+
+  classDef teacher fill:#d5efec,stroke:#0f766e,color:#0f172a
+  classDef tabpfn fill:#dbe7fd,stroke:#2563eb,color:#0f172a
+  classDef data fill:#ece4fd,stroke:#7c3aed,color:#0f172a
+  classDef sim fill:#f7f8fa,stroke:#64748b,color:#0f172a
+  class POL teacher
+  class TP,A,B,C tabpfn
+  class TAB,CTX data
+  class FLY1,FLY2,R sim
 ```
+
+Read it top to bottom: **①** the trained policy flies every recorded path while we log what the fly senses and what the policy does; **②** a sample of that table is TabPFN's context for offline predictions; **③** the policy is removed and TabPFN, reading the same kind of table, sets all 12 controls of the fly itself.
 
 ### Data: six passes over every recorded flight
 

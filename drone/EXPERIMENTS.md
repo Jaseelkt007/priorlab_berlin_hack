@@ -81,15 +81,16 @@ In the example the drone was at (19.9, -43.4, 20.6) and still climbing, so 1 s l
 
 We predict **one thing: where the drone will be 1 s from now (x, y, z)**, plus the alarm (experiment 9 says why).
 
-**Test set:** the 250 Crazyflie flights after the first 50 (those 50 are kept for "adapting" TabPFN, version B), one row per 0.5 s: 22,501 position rows, 22,973 alarm rows (428 breaches). Scored by `python drone/compare.py`; every model is scored on exactly these rows.
+**Test set:** the 250 Crazyflie flights after the first 50 (those 50 are kept for TabPFN B's examples and the IMM's fairness tuning). Every radar reading with a known future: 112,501 moments. Every model is scored on exactly these moments (`python drone/report.py`).
 
 | Model | Error 1 s ahead (median) | Truth inside its 90% range | Alarm AUC | Breaches caught (1 false alarm per 20) |
 |---|---|---|---|---|
-| IMM (tuned on X2 flights) | **1.54 m** | 89% | 0.989 | 99% |
+| IMM (tuned on X2 flights) | 1.54 m | 89% | 0.991 | 99% |
+| IMM re-tuned on Crazyflie flights 0-49 (experiment 12) | 1.50 m | 82% | 0.987 | 98% |
 | TabPFN A (learned from X2 only) | 1.70 m | 93% | 0.989 | 95% |
-| TabPFN B (X2 + rows from 50 other Crazyflie flights) | **1.37 m** | 93% | 0.993 | 98% |
+| **TabPFN B (X2 + rows from 50 other Crazyflie flights)** | **1.37 m** | 93% | 0.993 | 98% |
 
-Scored on all 112,501 test moments (every radar reading with a known future). Full analysis: `results/README.md`.
+TabPFN B against the re-tuned IMM: **8% better** (95% range over flights: 7.1-9.5%), better on 208 of 250 flights. On a new pilot (experiment 14): 1.67 vs 1.80 m, still 8% better. Full analysis: `results/README.md`.
 
 **Error** = distance between the predicted and the real position. **Range:** how often the real position is inside the 5%-95% range, per direction (should be 90%): the IMM's range is honest.
 
@@ -183,11 +184,29 @@ Each experiment in four lines: what happened, why, what we changed, and the resu
 - **What:** TabPFN v3.5 (package 10.2.0), no training. Context: 4,000 random X2 rows (A), plus 1,000 rows from 50 Crazyflie flights that are never tested on (B). One regressor per movement (forward, left, up) with 5/50/95% quantiles, one classifier for the alarm.
 - **What happened:** on the laptop GPU (GTX 1650, 4 GB) it ran out of memory and took 3.5 min per model for a tenth of the data. Moved to an H100: the full run takes about 1 minute.
 - **Result:** A 1.70 m (10% worse than the IMM), **B 1.37 m (11% better)**; B is closer than the IMM at 62% of moments, better on straight, zigzag, orbit, hover and dash, slightly worse on dive and climb. Its 90% range holds the truth 93% of the time. Alarm: about a tie.
-- **Not yet fair in one respect:** B saw Crazyflie data, the IMM was tuned only on X2. Next check: re-tune the IMM on the same 50 Crazyflie flights.
+- **Not yet fair in one respect:** B saw Crazyflie data, the IMM was tuned only on X2. Experiment 12 fixes that.
+
+### 12. Fairness check: the IMM gets the same Crazyflie data
+- **What:** re-tuned the IMM's 5 settings on Crazyflie flights 0-49, the flights TabPFN B takes its examples from (`imm.py --tune --drone cf2`). The first search ended on the edge of the grid for 3 settings, so the grid was widened and searched again.
+- **Result:** settings `q_cv 0.3, q_ca 0.0001, q_ct 0.001, q_turn 0.0001, p_stay 0.9997`. Test error **1.54 → 1.50 m**. TabPFN B (1.37 m) is still **8% better**; over 1,000 resamples of the 250 flights the gain stays between 7.1% and 9.5%, and B is better on 208 of 250 flights.
+- **Side effect:** the re-tuned IMM is overconfident (its 90% range holds the truth 82% of the time) and its alarm warns a little later (3.5 vs 3.9 s).
+
+### 13. How many examples of the new drone does TabPFN need?
+- **What:** TabPFN B with 0, 100, 250, 500, 1,000 and 2,000 Crazyflie rows in its context, the same 4,000 X2 rows, every 5th test reading (22,501 moments).
+- **Result:** 1.70, 1.56, **1.45**, 1.40, 1.37, 1.37 m. From **250 rows (about 25 s of radar)** it beats both IMMs (1.54 and 1.50 m); it stops improving at about 1,000.
+- **Careful:** the rows are scattered over 50 flights; 25 s of one continuous track has less variety.
+
+### 14. A pilot no model has seen
+- **Why:** every flight so far was flown by the same scripted pilot, so TabPFN could have learned that pilot's habits rather than how drones move.
+- **What:** pilot b (`intruder.py --pilot b`): other manoeuvre mix (more zigzag, dash, dive, climb), switches about twice as often, sharper zigzags, bigger height changes. 250 new Crazyflie flights. Nothing re-tuned: TabPFN keeps its pilot-a examples, the IMMs their settings.
+- **Result:** everyone gets worse (harder pilot). IMM 1.80 m, re-tuned IMM 1.82 m (its tuning fitted pilot a), TabPFN A 2.25 m, **TabPFN B 1.67 m: still 8% better** (6.6-8.6% over resamples, better on 217 of 250 flights); its 90% range holds the truth 90% of the time. Alarm: IMM 100%, TabPFN B 96% of breaches caught.
+- **So:** the examples of the **drone** matter most; TabPFN's gain is not only the pilot's habits.
 
 ## 5. Known limits
 
 - All data is simulated; no real radar or drone.
+- Scripted pilots only (two styles, experiment 14); no human pilots.
+- Close range: intruders start 60 m out; a real counter-drone radar sees 1-5 km.
 - The radar gives x, y, z with simple noise; a real radar measures distance and angles.
 - The Crazyflie is limited to 3 m/s by its weak turning motors (model as menagerie ships it).
 - At 3 m/s, Crazyflie flybys rarely leave the arena in 60 s, so they end as timeouts.

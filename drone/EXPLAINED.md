@@ -2,7 +2,7 @@
 
 > **One line:** a radar sees an intruder drone. TabPFN predicts **where it will be in 1 second** and **whether it
 > breaks into the protected zone within 2 seconds**. No training, only examples, and it beats the radar industry's
-> standard tracker (IMM) by **11%**.
+> standard tracker (IMM) by **8%**, even after the IMM is re-tuned on the same data and against a pilot it never saw.
 
 ---
 
@@ -130,22 +130,36 @@ This is what real radar trackers use. It is physics with 5 hand-set knobs, which
 
 ## 8. Results (250 test flights, 112,501 moments)
 
-| Model | Error 1 s ahead | Breaches caught | Warning before breach |
+| Model | Error 1 s ahead | New pilot (never seen) | Breaches caught |
 |---|---|---|---|
-| IMM (radar standard) | 1.54 m | 99% | 3.9 s |
-| TabPFN A (big drone examples only) | 1.70 m | 95% | 4.5 s |
-| **TabPFN B (+ 1,000 small drone examples)** | **1.37 m** ✅ | 98% | 4.4 s |
+| IMM (radar standard), tuned on big drone | 1.54 m | 1.80 m | 99% |
+| IMM re-tuned on the same small-drone flights | 1.50 m | 1.82 m | 98% |
+| TabPFN A (big drone examples only) | 1.70 m | 2.25 m | 95% |
+| **TabPFN B (+ 1,000 small drone examples)** | **1.37 m** ✅ | **1.67 m** ✅ | 98% |
 
 ![error by model](../results/charts/error_by_model.png)
 
 ```mermaid
 flowchart LR
-    A["TabPFN A<br/>never saw the small drone<br/><b>10% worse</b> than IMM"] -->|"+ 1,000 example rows<br/>no training"| B["TabPFN B<br/><b>11% better</b> than IMM<br/>closer at 62% of moments"]
+    A["TabPFN A<br/>never saw the small drone<br/><b>10% worse</b> than IMM"] -->|"+ small-drone example rows<br/>no training"| B["TabPFN B<br/><b>8% better</b> than the<br/>fairly re-tuned IMM"]
+    B -->|"new pilot style<br/>nothing changed"| C["still <b>8% better</b><br/>better on 217 of 250 flights"]
 ```
+
+### Three checks a judge will ask about
+
+```mermaid
+flowchart TB
+    Q1["❓ Did TabPFN only win because it saw small-drone data?"] --> A1["IMM re-tuned on the SAME data: 1.50 m<br/>TabPFN B: 1.37 m → <b>still 8% better</b>"]
+    Q2["❓ How much data on a new drone is needed?"] --> A2["<b>250 rows ≈ 25 s of radar</b><br/>beats both IMMs"]
+    Q3["❓ Did it just learn the pilot's habits?"] --> A3["new pilot, nothing re-tuned<br/><b>still 8% better</b>"]
+```
+
+![example sweep](../results/charts/example_sweep.png)
 
 - **Better on:** straight, zigzag, orbit, hover, dash. **Slightly worse on:** dive, climb.
 - **Alarm:** all models are near perfect at 2 s (AUC 0.99).
 - **In the 250 test flights 108 drones breached**; TabPFN B warned for 98% of them, about 4 s before.
+- **The gain is solid:** resampling the 250 flights 1,000 times keeps it between 7% and 10%.
 
 ![error by manoeuvre](../results/charts/error_by_manoeuvre.png)
 
@@ -185,8 +199,8 @@ In our video the X2 defender only hovers; using the predictions to intercept is 
 |---|---|
 | Simulation only | real drone models and physics, realistic radar; real radar data is next |
 | Close range (60 m) | close-in defence: the last 20 to 30 seconds |
-| One scripted pilot | other pilot styles and humans are next |
-| IMM tuned on the big drone only | fairness check: re-tune it on the same 50 small-drone flights |
+| Scripted pilots | two styles tested (TabPFN wins on both); human pilots are next |
+| Example rows are scattered | "25 s of radar" means rows from 50 flights, not one continuous track |
 | Speed measured in batch | real-time delay per reading is not measured yet |
 
 ---

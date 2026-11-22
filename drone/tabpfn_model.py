@@ -24,9 +24,8 @@ from pathlib import Path
 import numpy as np
 from dotenv import load_dotenv
 
-from features import DATA, HORIZONS, to_world
+from features import ADAPT_FLIGHTS, DATA, HORIZONS, to_world
 
-ADAPT_FLIGHTS = 50  # Crazyflie flights whose rows may go into version B's context; never tested on
 QUANTILES = [0.05, 0.5, 0.95]
 SEED = 0
 
@@ -113,6 +112,9 @@ def main():
     parser.add_argument("--adapt-rows", type=int, default=1000, help="Crazyflie rows added in version B")
     parser.add_argument("--every", type=int, default=5, help="test on every Nth reading (5 = one per 0.5 s)")
     parser.add_argument("--batch", type=int, default=2000)
+    parser.add_argument("--versions", default="A,B", help="which versions to run: A, B or A,B")
+    parser.add_argument("--out", type=Path, default=DATA / "tabpfn_cf2.npz")
+    parser.add_argument("--test", default="cf2", help="test table: cf2 (flights 50-299) or cf2_pilotb (all flights, a new pilot)")
     args = parser.parse_args()
 
     load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -132,10 +134,13 @@ def main():
     ctx_alarm = sample(rng, np.arange(len(x2["X"])), args.context)
     adapt = sample(rng, np.where(complete(cf2) & is_adapt)[0], args.adapt_rows)
     adapt_alarm = sample(rng, np.where(is_adapt)[0], args.adapt_rows)
-    test, alarm_test = test_rows(cf2, args.every)
+    tt = cf2 if args.test == "cf2" else load(args.test)  # the examples always come from cf2 flights 0-49
+    if args.test == "cf2":
+        test, alarm_test = test_rows(cf2, args.every)
+    else:
+        test, alarm_test = np.where(complete(tt))[0][:: args.every], np.arange(len(tt["X"]))[:: args.every]
     print(f"context: {len(ctx)} X2 rows (+{len(adapt)} Crazyflie rows in version B); test: {len(test)} position rows, "
-          f"{len(alarm_test)} alarm rows ({cf2['breach'][alarm_test].sum()} breaches) from "
-          f"{len(cf2_flights) - ADAPT_FLIGHTS} Crazyflie flights")
+          f"{len(alarm_test)} alarm rows ({tt['breach'][alarm_test].sum()} breaches), test set {args.test}")
 
     def both(a, b):
         return np.concatenate([a, b])
@@ -148,16 +153,21 @@ def main():
     }
     out = {"test_rows": test, "alarm_rows": alarm_test, "horizons": np.array(HORIZONS),
            "quantiles": np.array(QUANTILES)}
+    wanted = {v.strip() for v in args.versions.split(",")}
     for name, (cX, cY, aX, aB) in versions.items():
+        if name[0] not in wanted:
+            continue
         t0 = time.time()
-        q, p = run_version(name, cX, cY, aX, aB, cf2["X"][test], cf2["X"][alarm_test], args.batch)
-        world_median = np.stack([to_world(q[:, 3 * j : 3 * j + 3, 1], cf2["pos"][test], cf2["psi"][test])
+        q, p = run_version(name, cX, cY, aX, aB, tt["X"][test], tt["X"][alarm_test], args.batch)
+        world_median = np.stack([to_world(q[:, 3 * j : 3 * j + 3, 1], tt["pos"][test], tt["psi"][test])
                                  for j in range(len(HORIZONS))], axis=1)  # (n, H, 3)
         out[f"{name}_quantiles"] = q
         out[f"{name}_world"] = world_median
         out[f"{name}_p_breach"] = p
         print(f"{name}: {time.time() - t0:.0f} s", flush=True)
-    path = DATA / "tabpfn_cf2.npz"
+    path = args.out
+    out["adapt_rows"] = np.array(len(adapt))
+    out["test_set"] = np.array(args.test)
     np.savez_compressed(path, **out)
     print(f"-> {path}; score with: python drone/compare.py")
 

@@ -39,22 +39,28 @@ We compare it with what real radar trackers use: an **IMM**, three Kalman-type f
 | Simulation, both drones, intruder flights | done |
 | Data: 2,000 X2 flights, 300 Crazyflie flights | done |
 | Tables | done |
-| IMM tracker (what real radars use) | done: tuned on X2, tested on Crazyflie |
+| IMM tracker (what real radars use) | done: tuned on X2, and re-tuned on Crazyflie flights 0-49 for a fair check |
 | TabPFN | done (run on an H100; 1 minute) |
-| TabPFN fine-tuned | if the GPU allows |
-| 3D demo: real vs predicted x, y, z + alarm, live or as video | done for the IMM; TabPFN next |
+| Fairness check, example sweep, new pilot | done (experiments 12-14) |
+| TabPFN fine-tuned | dropped: the point is "no training" |
+| 3D demo: real vs predicted x, y, z + alarm, live or as video | done for the IMM and TabPFN |
 
 ## Results so far
 
-Small-drone test flights. Error = how far the prediction for 1 s ahead is from where the drone really was (median):
+250 small-drone test flights per pilot. Error = how far the prediction for 1 s ahead is from where the drone
+really was (median). Pilot a flew every example; pilot b is a more evasive pilot no model has seen.
 
-| Model | Error 1 s ahead | Alarm: breaches caught |
-|---|---|---|
-| IMM (what real radars use) | 1.54 m | 99% |
-| TabPFN A (examples from X2 only) | 1.70 m | 95% |
-| **TabPFN B (X2 + 1,000 rows from 50 other Crazyflie flights)** | **1.37 m** | 98% |
+| Model | Error, pilot a | Error, pilot b (new) | Alarm: breaches caught (a / b) |
+|---|---|---|---|
+| IMM (what real radars use), tuned on X2 | 1.54 m | 1.80 m | 99% / 100% |
+| IMM re-tuned on the same 50 Crazyflie flights as TabPFN B | 1.50 m | 1.82 m | 98% / 97% |
+| TabPFN A (examples from X2 only) | 1.70 m | 2.25 m | 95% / 85% |
+| **TabPFN B (X2 + 1,000 rows from 50 other Crazyflie flights)** | **1.37 m** | **1.67 m** | 98% / 96% |
 
-**TabPFN B is 11% more accurate than the IMM, with no training and no tuning**: only examples in its context. Without any Crazyflie examples (A) it is 10% worse. Full analysis, charts and caveats: [`../results/README.md`](../results/README.md). `python drone/compare.py` scores every model on the same test rows.
+**With the same Crazyflie data and no training, TabPFN B is 8% more accurate than the IMM** (pilot a: 1.37 vs 1.50 m;
+pilot b: 1.67 vs 1.80 m; better on 208 and 217 of 250 flights). About **250 Crazyflie rows (25 s of radar)** are
+enough to beat both IMMs. The alarm is about a tie. Full analysis, charts and caveats:
+[`../results/README.md`](../results/README.md).
 
 ## Try it
 
@@ -68,6 +74,10 @@ python drone/intruder.py --drone cf2 --view 54 --record results/videos/scene_54.
 python drone/demo_imm.py --view radar --tabpfn   # a test flight: real vs IMM (blue) and TabPFN (pink), live
 python drone/demo_imm.py --view chase --tabpfn --record results/videos/imm_vs_tabpfn_chase_54.mp4
 # videos need: pip install imageio-ffmpeg. They render offscreen, so a server GPU works: MUJOCO_GL=egl
+python drone/imm.py --tune --drone cf2 && python drone/imm.py --settings cf2   # fairness check: IMM tuned on cf2 flights 0-49
+python drone/tabpfn_model.py --versions B --adapt-rows 250 --out data/sweep/B_250.npz   # example sweep, one point
+python drone/intruder.py --drone cf2 --pilot b --flights 250                    # the new pilot (then features.py, imm.py, tabpfn_model.py --test cf2_pilotb)
+python drone/report.py                                                          # results/: write-up, CSVs, charts
 ```
 
 Make the data again (it is not in git):

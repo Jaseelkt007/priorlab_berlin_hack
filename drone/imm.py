@@ -22,7 +22,7 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 
-from features import DATA, HORIZONS as TABLE_HORIZONS
+from features import ADAPT_FLIGHTS, DATA, HORIZONS as TABLE_HORIZONS
 from intruder import RADAR_EVERY, RADAR_NOISE
 
 DT = RADAR_EVERY
@@ -264,17 +264,22 @@ def score(mean, table, label=""):
     return errs
 
 
-def tune(n_flights):
-    """Coordinate search on X2 training flights: lowest median error 1 s ahead."""
-    table = dict(np.load(DATA / "table_x2.npz"))
-    seeds, meas, lengths = load_tracks("x2", n_flights)
+def tune(drone, n_flights):
+    """Coordinate search on the first n_flights flights of this drone: lowest median error 1 s ahead.
+    x2: training flights. cf2: flights 0-49, the same ones TabPFN B may see (never tested on)."""
+    table = dict(np.load(DATA / f"table_{drone}.npz"))
+    seeds, meas, lengths = load_tracks(drone)
+    first = np.unique(table["flight"])[:n_flights]  # flight seeds in order: flight 0, 1, 2, ...
+    keep = np.isin(seeds, first)
+    seeds, meas, lengths = seeds[keep], meas[keep], lengths[keep]
+    print(f"tuning on {len(seeds)} {drone} flights", flush=True)
     sel = np.isin(table["flight"], seeds)
     table = {k: v[sel] if v.ndim and len(v) == len(sel) else v for k, v in table.items()}
-    grid = {"q_cv": [0.1, 0.3, 1, 3, 10], "q_ca": [0.001, 0.003, 0.03, 0.3, 3], "q_ct": [0.01, 0.05, 0.3, 1, 4],
-            "q_turn": [0.0003, 0.003, 0.03, 0.3], "p_stay": [0.9, 0.95, 0.98, 0.995, 0.999]}
+    grid = {"q_cv": [0.1, 0.3, 1, 3, 10], "q_ca": [0.0001, 0.0003, 0.001, 0.003, 0.03, 0.3, 3], "q_ct": [0.001, 0.003, 0.01, 0.05, 0.3, 1, 4],
+            "q_turn": [0.00003, 0.0001, 0.0003, 0.003, 0.03, 0.3], "p_stay": [0.9, 0.95, 0.98, 0.995, 0.999, 0.9997, 0.9999]}
     best = None
     # coordinate search: vary one setting at a time around the current best, two passes
-    current = Settings(q_cv=1.0, q_ca=0.001, q_ct=0.3, q_turn=0.003, p_stay=0.995)  # the 1.5 s tuning
+    current = SETTINGS.get(drone, TUNED)  # start from this drone's last tuning
     for _ in range(2):
         for key, values in grid.items():
             for v in values:
@@ -292,24 +297,30 @@ def tune(n_flights):
 # Best settings from tuning on 150 X2 flights (--tune; EXPERIMENTS.md, experiments 7-9). Tuning for 1 s ahead
 # picked the same values as for 1.5 s. X2 median error 1 s ahead: 2.16 m.
 TUNED = Settings(q_cv=1.0, q_ca=0.001, q_ct=0.3, q_turn=0.003, p_stay=0.995)
+# Fairness check: tuned on Crazyflie flights 0-49 (the flights TabPFN B may see). Filled in after --tune --drone cf2.
+TUNED_CF2 = Settings(q_cv=0.3, q_ca=0.0001, q_ct=0.001, q_turn=0.0001, p_stay=0.9997)  # 2 searches, widened grid
+SETTINGS = {"x2": TUNED, "cf2": TUNED_CF2}
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tune", action="store_true", help="grid search on X2 training flights")
-    parser.add_argument("--tune-flights", type=int, default=150)
+    parser.add_argument("--tune", action="store_true", help="grid search on the first --tune-flights flights of --drone")
+    parser.add_argument("--tune-flights", type=int, default=None, help="default: 150 for x2, 50 (the context flights) for cf2")
     parser.add_argument("--drone", default="cf2")
+    parser.add_argument("--settings", choices=list(SETTINGS), default="x2",
+                        help="which tuning to run with: x2 (default) or cf2 (tuned on Crazyflie flights 0-49)")
     args = parser.parse_args()
     if args.tune:
-        tune(args.tune_flights)
+        tune(args.drone, args.tune_flights or (150 if args.drone == "x2" else ADAPT_FLIGHTS))
         return
     table = dict(np.load(DATA / f"table_{args.drone}.npz"))
     seeds, meas, lengths = load_tracks(args.drone)
-    mean, cov, mu = run(meas, lengths, TUNED)
+    settings = SETTINGS[args.settings]
+    mean, cov, mu = run(meas, lengths, settings)
     m, c = align(seeds, mean, table), align(seeds, cov, table)
-    score(m, table, f"IMM on {args.drone}")
-    out = DATA / f"imm_{args.drone}.npz"
-    np.savez_compressed(out, mean=m, cov=c, horizons=HORIZONS, settings=np.array(str(asdict(TUNED))))
+    score(m, table, f"IMM ({args.settings} tuning) on {args.drone}")
+    out = DATA / (f"imm_{args.drone}.npz" if args.settings == "x2" else f"imm_{args.drone}_{args.settings}tuned.npz")
+    np.savez_compressed(out, mean=m, cov=c, horizons=HORIZONS, settings=np.array(str(asdict(settings))))
     print(f"-> {out}")
 
 

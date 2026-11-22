@@ -1,0 +1,5 @@
+model,median_error_m,same_model_on_pilot_a_m,alarm_caught_at_5pct_false
+"IMM (radar standard, tuned on X2)",1.802,1.544,0.997
+TabPFN A (X2 context only),2.253,1.698,0.852
+"TabPFN B (X2 + 1,000 rows from 50 other Crazyflie flights)",1.666,1.375,0.962
+IMM re-tuned on the same 50 Crazyflie flights (fairness check),1.819,1.499,0.97

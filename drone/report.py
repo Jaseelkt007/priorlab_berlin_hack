@@ -19,11 +19,13 @@ from compare import Z90, auc, caught_at, change_ahead, drone_frame, imm_breach_p
 from features import DATA  # noqa: E402
 
 OUT = Path(__file__).resolve().parent.parent / "results"
-MODELS = ["IMM", "TabPFN A", "TabPFN B"]
+IMM_FILES = {"IMM": "imm_cf2.npz", "IMM re-tuned": "imm_cf2_cf2tuned.npz"}  # the second only if the fairness check ran
+MODELS = ["IMM", "TabPFN A", "TabPFN B"]  # + "IMM re-tuned" when its file exists (set in main)
 LONG = {"IMM": "IMM (radar standard, tuned on X2)", "TabPFN A": "TabPFN A (X2 context only)",
-        "TabPFN B": "TabPFN B (X2 + 1,000 rows from 50 other Crazyflie flights)"}
-# categorical slots 1-3 of the dataviz reference palette, fixed order; ink and chrome from the same palette
-COLOR = {"IMM": "#2a78d6", "TabPFN A": "#eb6834", "TabPFN B": "#1baf7a"}
+        "TabPFN B": "TabPFN B (X2 + 1,000 rows from 50 other Crazyflie flights)",
+        "IMM re-tuned": "IMM re-tuned on the same 50 Crazyflie flights (fairness check)"}
+# categorical slots 1-4 of the dataviz reference palette, fixed order; ink and chrome from the same palette
+COLOR = {"IMM": "#2a78d6", "TabPFN A": "#eb6834", "TabPFN B": "#1baf7a", "IMM re-tuned": "#eda100"}
 INK, MUTED, GRID, AXIS, SURFACE = "#0b0b0b", "#898781", "#e1e0d9", "#c3c2b7", "#fcfcfb"
 DIST_BINS = [0, 15, 25, 35, 45, 70]
 
@@ -42,10 +44,11 @@ def style(ax, title, ylabel):
 
 def grouped_bars(ax, groups, values, fmt="{:.2f}"):
     """values: {model: [one per group]}; thin bars with a 2px gap, value labels on the TabPFN B bars only."""
-    width = 0.26
+    width = 0.8 / len(MODELS)
     x = np.arange(len(groups))
     for i, m in enumerate(MODELS):
-        bars = ax.bar(x + (i - 1) * width, values[m], width - 0.03, color=COLOR[m], label=LONG[m], zorder=2)
+        bars = ax.bar(x + (i - (len(MODELS) - 1) / 2) * width, values[m], width - 0.03, color=COLOR[m],
+                      label=LONG[m], zorder=2)
         if m == "TabPFN B":
             for b, v in zip(bars, values[m]):
                 ax.text(b.get_x() + b.get_width() / 2, v, fmt.format(v), ha="center", va="bottom", fontsize=8, color=INK)
@@ -75,24 +78,28 @@ def main():
     OUT.mkdir(exist_ok=True)
     (OUT / "charts").mkdir(exist_ok=True)
     table = dict(np.load(DATA / "table_cf2.npz"))
-    imm = np.load(DATA / "imm_cf2.npz")
+    imms = {m: np.load(DATA / f) for m, f in IMM_FILES.items() if (DATA / f).exists()}
+    if "IMM re-tuned" in imms and "IMM re-tuned" not in MODELS:
+        MODELS.append("IMM re-tuned")
     tab = dict(np.load(DATA / "tabpfn_cf2.npz"))
     rows, alarm_rows = tab["test_rows"], tab["alarm_rows"]
-    hi = int(np.argmin(np.abs(imm["horizons"] - 1.0)))
+    hi = int(np.argmin(np.abs(imms["IMM"]["horizons"] - 1.0)))
     truth = table["Y_world"][rows, :3]
     psi = table["psi"][rows]
-    pred = {"IMM": imm["mean"][rows, hi].astype(float),
-            "TabPFN A": tab["A_x2_only_world"][:, 0], "TabPFN B": tab["B_x2_plus_cf2_world"][:, 0]}
+    pred = {m: imm["mean"][rows, hi].astype(float) for m, imm in imms.items()}
+    pred["TabPFN A"], pred["TabPFN B"] = tab["A_x2_only_world"][:, 0], tab["B_x2_plus_cf2_world"][:, 0]
     err = {m: np.linalg.norm(pred[m] - truth, axis=1) for m in MODELS}
 
     # range (cone) coverage, per direction, in the drone's frame
-    imm_cov = imm["cov"][rows, hi].astype(float)
     c, s = np.cos(psi), np.sin(psi)
     R = np.zeros((len(rows), 3, 3))
     R[:, 0, 0], R[:, 0, 1], R[:, 1, 0], R[:, 1, 1], R[:, 2, 2] = c, s, -s, c, 1
-    sd = np.sqrt(np.einsum("nij,njk,nlk->nil", R, imm_cov, R).diagonal(axis1=1, axis2=2))
-    cover = {"IMM": (np.abs(drone_frame(truth - pred["IMM"], psi)) <= Z90 * sd).mean()}
-    width = {"IMM": (2 * Z90 * sd).mean()}
+    cover, width = {}, {}
+    for m, imm in imms.items():
+        cov = imm["cov"][rows, hi].astype(float)
+        sd = np.sqrt(np.einsum("nij,njk,nlk->nil", R, cov, R).diagonal(axis1=1, axis2=2))
+        cover[m] = (np.abs(drone_frame(truth - pred[m], psi)) <= Z90 * sd).mean()
+        width[m] = (2 * Z90 * sd).mean()
     Y = table["Y"][rows]
     for m, key in (("TabPFN A", "A_x2_only"), ("TabPFN B", "B_x2_plus_cf2")):
         q = tab[f"{key}_quantiles"][:, :3]
@@ -101,9 +108,11 @@ def main():
 
     # alarm
     label = table["breach"][alarm_rows]
-    ok = ~np.isnan(imm["mean"][alarm_rows]).any((1, 2))
-    p_alarm = {"IMM": np.zeros(len(alarm_rows))}
-    p_alarm["IMM"][ok] = imm_breach_probability(imm["mean"][alarm_rows][ok].astype(float),
+    p_alarm = {}
+    for m, imm in imms.items():
+        ok = ~np.isnan(imm["mean"][alarm_rows]).any((1, 2))
+        p_alarm[m] = np.zeros(len(alarm_rows))
+        p_alarm[m][ok] = imm_breach_probability(imm["mean"][alarm_rows][ok].astype(float),
                                                 imm["cov"][alarm_rows][ok].astype(float), np.random.default_rng(0))
     p_alarm["TabPFN A"], p_alarm["TabPFN B"] = tab["A_x2_only_p_breach"], tab["B_x2_plus_cf2_p_breach"]
     alarm = {}
@@ -190,6 +199,103 @@ def main():
         lines = ["| " + " | ".join(df.columns) + " |", "|" + "---|" * len(df.columns)]
         return "\n".join(lines + ["| " + " | ".join(cell(v) for v in r) + " |" for r in df.itertuples(index=False)])
 
+    # example sweep: TabPFN B with 0, 100, ... Crazyflie rows in its context (tabpfn_model.py --out data/sweep/B_<n>.npz)
+    sweep_text = "Not run yet."
+    sweep_files = sorted((DATA / "sweep").glob("B_*.npz"), key=lambda f: int(f.stem[2:]))
+    if sweep_files:
+        out_rows = []
+        for f in sweep_files:
+            sw = np.load(f)
+            r = sw["test_rows"]
+            t = table["Y_world"][r, :3]
+            row = {"crazyflie_rows_in_context": int(sw["adapt_rows"]), "test_rows": len(r),
+                   "TabPFN B": np.median(np.linalg.norm(sw["B_x2_plus_cf2_world"][:, 0] - t, axis=1))}
+            for m, imm in imms.items():
+                row[m] = np.median(np.linalg.norm(imm["mean"][r, hi].astype(float) - t, axis=1))
+            out_rows.append(row)
+        sweep = pd.DataFrame(out_rows)
+        sweep.round(3).to_csv(OUT / "example_sweep.csv", index=False)
+        fig, ax = plt.subplots(figsize=(8, 3.8), facecolor=SURFACE)
+        x = np.arange(len(sweep))
+        ax.plot(x, sweep["TabPFN B"], color=COLOR["TabPFN B"], linewidth=2, marker="o", markersize=8, zorder=3,
+                label="TabPFN (X2 examples + this many Crazyflie rows)")
+        for xi, v in zip(x, sweep["TabPFN B"]):
+            ax.text(xi, v + 0.02, f"{v:.2f}", ha="center", va="bottom", fontsize=9, color=INK)
+        for m in imms:
+            v = sweep[m].iloc[0]
+            ax.axhline(v, color=COLOR[m], linewidth=2, linestyle="--", zorder=2, label=f"{LONG[m]}: {v:.2f} m")
+        ax.set_ylim(top=sweep["TabPFN B"].max() + 0.06)  # room for the top value label under the title
+        ax.set_xticks(x, [f"{n:,}" for n in sweep["crazyflie_rows_in_context"]])
+        ax.set_xlabel("Crazyflie example rows in TabPFN's context (10 rows = 1 s of radar)", color=MUTED)
+        style(ax, "How many examples of the new drone does TabPFN need? Median error 1 s ahead", "metres")
+        ax.legend(frameon=False, fontsize=8, loc="upper right", labelcolor=INK)
+        fig.tight_layout()
+        fig.savefig(OUT / "charts" / "example_sweep.png", dpi=150)
+        plt.close(fig)
+        below = sweep[sweep["TabPFN B"] < sweep[list(imms)].min(axis=1)]["crazyflie_rows_in_context"]
+        beat = (f"TabPFN beats {'both IMMs' if len(imms) > 1 else 'the IMM'} from **{below.iloc[0]:,} Crazyflie rows** "
+                f"(about {below.iloc[0] / 10:.0f} s of radar on the new drone)." if len(below)
+                else "TabPFN does not beat the IMM at any of these amounts.")
+        sweep_text = (f"Same test moments for every point (every 5th reading, {sweep['test_rows'].iloc[0]:,} moments). "
+                      f"{beat}\n\n{md(sweep)}\n\n![example sweep](charts/example_sweep.png)")
+
+    # new pilot: 250 Crazyflie flights by pilot b, whom no model has seen (intruder.py --pilot b)
+    pilot_text = "Not run yet."
+    if (DATA / "tabpfn_cf2_pilotb.npz").exists():
+        pt = dict(np.load(DATA / "table_cf2_pilotb.npz"))
+        pb = np.load(DATA / "tabpfn_cf2_pilotb.npz")
+        r, ar = pb["test_rows"], pb["alarm_rows"]
+        t = pt["Y_world"][r, :3]
+        perr = {"TabPFN A": np.linalg.norm(pb["A_x2_only_world"][:, 0] - t, axis=1),
+                "TabPFN B": np.linalg.norm(pb["B_x2_plus_cf2_world"][:, 0] - t, axis=1)}
+        pcover = {m: ((pt["Y"][r] >= pb[f"{k}_quantiles"][:, :3, 0]) & (pt["Y"][r] <= pb[f"{k}_quantiles"][:, :3, 2])).mean()
+                  for m, k in (("TabPFN A", "A_x2_only"), ("TabPFN B", "B_x2_plus_cf2"))}
+        palarm = {"TabPFN A": pb["A_x2_only_p_breach"], "TabPFN B": pb["B_x2_plus_cf2_p_breach"]}
+        for m, f in (("IMM", "imm_cf2_pilotb.npz"), ("IMM re-tuned", "imm_cf2_pilotb_cf2tuned.npz")):
+            im = np.load(DATA / f)
+            perr[m] = np.linalg.norm(im["mean"][r, hi].astype(float) - t, axis=1)
+            ok = ~np.isnan(im["mean"][ar]).any((1, 2))
+            palarm[m] = np.zeros(len(ar))
+            palarm[m][ok] = imm_breach_probability(im["mean"][ar][ok].astype(float), im["cov"][ar][ok].astype(float),
+                                                   np.random.default_rng(0))
+        plabel = pt["breach"][ar]
+        order = [m for m in MODELS if m in perr]
+        pilot = pd.DataFrame({"model": [LONG[m] for m in order],
+                              "median_error_m": [np.median(perr[m]) for m in order],
+                              "same_model_on_pilot_a_m": [np.median(err[m]) for m in order],
+                              "alarm_caught_at_5pct_false": [caught_at(palarm[m], plabel) for m in order]})
+        pilot.round(3).to_csv(OUT / "new_pilot.csv", index=False)
+        best_imm = min(np.median(perr["IMM"]), np.median(perr["IMM re-tuned"]))
+        e_b = np.median(perr["TabPFN B"])
+        verdict = (f"TabPFN B is still **{(1 - e_b / best_imm) * 100:.0f}% better** than the best IMM on a pilot it never saw."
+                   if e_b < best_imm else
+                   f"On the new pilot the best IMM is **{(1 - best_imm / e_b) * 100:.0f}% better** than TabPFN B: part of "
+                   "TabPFN's win on pilot a was learning that pilot's habits.")
+        n_fl = len(np.unique(pt["flight"][r]))
+        pilot_text = (f"Every flight so far (examples and tests) was flown by the same scripted pilot, so TabPFN could have "
+                      f"learned that pilot's habits. Here {n_fl} new Crazyflie flights are flown by **pilot b**: another "
+                      f"manoeuvre mix, switching about twice as often, sharper zigzags, bigger height changes "
+                      f"(`python drone/intruder.py --drone cf2 --pilot b`). Nothing was re-tuned: TabPFN keeps its pilot-a "
+                      f"examples, the IMM its settings. {len(r):,} moments, {int(plabel.sum())} breach rows.\n\n"
+                      + "| Model | Error on pilot b | Same model on pilot a | Breaches caught |\n|---|---|---|---|\n"
+                      + "\n".join(f"| {LONG[m]} | **{np.median(perr[m]):.2f} m** | {np.median(err[m]):.2f} m | "
+                                  f"{caught_at(palarm[m], plabel):.0%} |" for m in order)
+                      + f"\n\n{verdict} TabPFN B's 90% range holds the truth {pcover['TabPFN B']:.0%} of the time on pilot b.")
+
+    fair_text = "Not run yet: the IMM was tuned on X2 flights only."
+    fair_bullet = ""
+    if "IMM re-tuned" in imms:
+        settings = str(imms["IMM re-tuned"]["settings"])
+        e_old, e_new, e_b = (np.median(err[m]) for m in ("IMM", "IMM re-tuned", "TabPFN B"))
+        verdict = (f"TabPFN B is still **{(1 - e_b / e_new) * 100:.0f}% better** with the same data."
+                   if e_b < e_new else f"The re-tuned IMM is now **{(1 - e_new / e_b) * 100:.0f}% better** than TabPFN B.")
+        fair_bullet = (f"- **Fair comparison:** with the IMM re-tuned on the same 50 Crazyflie flights ({e_new:.2f} m), "
+                       f"TabPFN B is still **{(1 - e_b / e_new) * 100:.0f}% better**. See the fairness check below.\n")
+        fair_text = (f"TabPFN B saw 1,000 rows from Crazyflie flights 0-49. To be fair, the IMM's 5 settings were tuned "
+                     f"again on the same 50 flights (`python drone/imm.py --tune --drone cf2`): `{settings}`.\n\n"
+                     f"| | Median error 1 s ahead |\n|---|---|\n| IMM tuned on X2 | {e_old:.2f} m |\n"
+                     f"| IMM re-tuned on Crazyflie flights 0-49 | {e_new:.2f} m |\n| TabPFN B | {e_b:.2f} m |\n\n{verdict}")
+
     rel = lambda m: (np.median(err[m]) / np.median(err["IMM"]) - 1) * 100  # noqa: E731
     report = f"""# Results: IMM vs TabPFN, where will the drone be in 1 second?
 
@@ -214,7 +320,7 @@ context; version B also sees 1,000 rows from 50 other Crazyflie flights (never t
 
 - **TabPFN B is {-rel('TabPFN B'):.0f}% more accurate than the IMM** ({np.median(err['TabPFN B']):.2f} vs
   {np.median(err['IMM']):.2f} m) and closer than the IMM at **{wins:.0%} of all moments**.
-- **TabPFN A (never saw a Crazyflie) is {rel('TabPFN A'):+.0f}%** against the IMM: X2 examples (10 m/s) do not
+{fair_bullet}- **TabPFN A (never saw a Crazyflie) is {rel('TabPFN A'):+.0f}%** against the IMM: X2 examples (10 m/s) do not
   transfer fully to a 3 m/s drone. A few examples of the new drone in the context are enough to close that gap.
 - **The alarm is close to solved by every model** (AUC near 1): 2 s ahead, a 3 m/s drone cannot surprise much.
 
@@ -242,19 +348,29 @@ The radar is noisier far away (1% of range), so everything gets harder with dist
 
 {md(by_change)}
 
+## Fairness check: the IMM gets the same Crazyflie data
+
+{fair_text}
+
+## A pilot no model has seen
+
+{pilot_text}
+
+## How many examples of the new drone does TabPFN need?
+
+{sweep_text}
+
 ## Caveats (read before quoting the numbers)
 
-- **Simulation only:** one simulator, one scripted intruder pilot; the test flights use the same pilot as the context
-  (different drone, different random flights).
-- **TabPFN B saw Crazyflie data, the IMM did not:** the IMM's 5 settings were tuned on X2 flights only. A fully fair
-  check re-tunes the IMM on the same 50 Crazyflie flights (planned).
+- **Simulation only:** one simulator, scripted intruder pilots (see "A pilot no model has seen" for a second pilot).
 - **Context:** 4,000 random X2 rows out of ~400,000; larger or similarity-picked contexts are untested.
 - **The IMM is told the true radar noise level;** TabPFN is not.
 
 ## Videos
 
-In `videos/` (not in git, too large): `demo_radar_54.mp4` (camera on the building), `demo_chase_54.mp4` (behind the
-drone, close-up inset), and `imm_vs_tabpfn_54.mp4` if present (both predictions on the same flight).
+In `videos/` (not in git, too large): `scene_54.mp4` (the world: building, intruder, defender),
+`imm_vs_tabpfn_chase_54.mp4` (behind the drone, both predictions, close-up inset) and `imm_vs_tabpfn_54.mp4` (the same
+from the radar on the roof).
 """
     (OUT / "README.md").write_text(report)
     print(summary.to_string(index=False))

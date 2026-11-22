@@ -46,6 +46,7 @@ TARGETS = [f"d{h:g}s_{axis}" for h in HORIZONS for axis in ("fwd", "left", "up")
 WORLD_TARGETS = [f"{axis}_{h:g}s" for h in HORIZONS for axis in ("x", "y", "z")]
 
 DATA = Path(__file__).resolve().parent.parent / "data"
+ADAPT_FLIGHTS = 50  # the first Crazyflie flights: TabPFN B's examples and the IMM's fairness tuning; never tested on
 
 
 def rotate(xy, psi):

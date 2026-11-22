@@ -12,6 +12,8 @@ Full detail and every experiment: [`EXPERIMENTS.md`](EXPERIMENTS.md).
 
 ## The idea
 
+A radar knows where a drone **is**. To stop it, you need where it **will be**, and a small drone can change course within a second. This matters wherever small drones are a threat: airports, stadiums, power plants, prisons.
+
 A small drone flies toward a protected site. A radar sees it, but the readings are noisy and sometimes missing.
 
 **TabPFN predicts where the drone will be in 1 second, with a range ("it will be somewhere in this cone"), and raises the alarm before it reaches the site.** It has never seen this kind of drone before; it adapts from a few radar readings, without retraining.
@@ -72,6 +74,7 @@ really was (median). Pilot a flew every example; pilot b is a more evasive pilot
 pilot b: 1.67 vs 1.80 m; better on 208 and 217 of 250 flights). About **250 Crazyflie rows (25 s of radar)** are
 enough to beat both IMMs. **IMM + TabPFN**, where TabPFN corrects the IMM, is **10% better than the IMM** on pilot b.
 Live (TabPFN needs 252 ms, so it corrects every 0.3 s) it keeps **4%**: the gap is speed, not accuracy.
+**It knows when it is unsure:** TabPFN B's 90% range holds the real position 93% of the time on pilot a and 90% on pilot b, as promised; the IMM re-tuned on the small drone only 82% (pilot a).
 The alarm is about a tie. Full analysis, charts and caveats:
 [`../results/README.md`](../results/README.md).
 

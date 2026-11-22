@@ -6,6 +6,8 @@ HackLab #2 Berlin, Prior Labs track: **TabPFN for spatial awareness**. The brief
 
 ![IMM, TabPFN B and IMM + TabPFN on the same flight](results/compare.gif)
 
+A radar knows where a drone **is**. To stop it, you need where it **will be**, and a small drone can change course within a second. It matters wherever small drones are a threat: airports, stadiums, power plants, prisons.
+
 A radar tracks a small intruder drone. **TabPFN predicts where it will be in 1 s and raises the alarm before it enters
 the protected zone, with no training**: only example radar rows. We compare it with the IMM, the tracker real radars use.
 
@@ -15,6 +17,8 @@ the protected zone, with no training**: only example radar rows. We compare it w
 | TabPFN B (no training) | 1.67 m |
 | **IMM + TabPFN (TabPFN corrects the IMM)** | **1.62 m: 10% better than the IMM** |
 | IMM + TabPFN live (correction every 0.3 s) | 1.72 m: 4% better |
+
+**It knows when it is unsure:** TabPFN B's 90% range holds the real position 93% of the time on pilot a and 90% on pilot b, as promised; the IMM re-tuned on the small drone only 82% (pilot a).
 
 - The idea in diagrams: [`drone/EXPLAINED.md`](drone/EXPLAINED.md)
 - How to run and reproduce everything: [`drone/README.md`](drone/README.md)

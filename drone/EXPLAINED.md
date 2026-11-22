@@ -8,6 +8,8 @@
 
 ## 1. The problem
 
+A radar knows where a drone **is**. To stop it, you need where it **will be**, and a small drone can change course within a second. This matters wherever small drones are a threat: airports, stadiums, power plants, prisons.
+
 ![the world: building, red zone, an intruder flying in, the X2 defender hovering](../results/world.gif)
 
 ```mermaid
@@ -230,7 +232,7 @@ flowchart LR
     G --> O["👤 Operator screen<br/>+ alarm"]
 ```
 
-In our video the X2 defender only hovers; using the predictions to intercept is the next step.
+In our video the X2 defender only hovers. Flying it to where the intruder **will be** is what the predictions enable; building that is the next step.
 
 ---
 

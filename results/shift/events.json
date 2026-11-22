@@ -1,0 +1,22 @@
+[
+ {
+  "first": 30,
+  "last": 119,
+  "label": "heavy SKU mixed in (60 g, every 3rd bar)"
+ },
+ {
+  "first": 60,
+  "last": 89,
+  "label": "new film roll (creased film)"
+ },
+ {
+  "first": 90,
+  "last": 109,
+  "label": "overdue cup (750k\u20131.04M cycles)"
+ },
+ {
+  "first": 110,
+  "last": 119,
+  "label": "cup changed"
+ }
+]

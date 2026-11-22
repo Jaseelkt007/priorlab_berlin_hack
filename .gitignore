@@ -4,10 +4,12 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 *:Zone.Identifier
-
-# Hackathon: external code and downloaded data stay local (large, separately licensed)
 third_party/
-data/
-*.mp4
-drone/models/mujoco_menagerie/
+.venv-jax/
+jax_tabpfn/golden/
+*.safetensors
+/data/
+/logs/
+
+# MuJoCo writes this to the current folder (drone, crane scripts run from the repo root)
 MUJOCO_LOG.TXT

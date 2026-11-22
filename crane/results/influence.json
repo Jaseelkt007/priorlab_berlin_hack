@@ -1,0 +1,144 @@
+{
+ "slider_effects": {
+  "rope": [
+   {
+    "value": 3.0,
+    "peak_swing_m": 0.4,
+    "tabpfn_cm": 0.94,
+    "physics_cm": 3.1,
+    "coverage90": 0.72,
+    "runs": 27
+   },
+   {
+    "value": 4.5,
+    "peak_swing_m": 0.52,
+    "tabpfn_cm": 0.59,
+    "physics_cm": 2.24,
+    "coverage90": 0.82,
+    "runs": 27
+   },
+   {
+    "value": 6.0,
+    "peak_swing_m": 0.64,
+    "tabpfn_cm": 0.8,
+    "physics_cm": 1.8,
+    "coverage90": 0.84,
+    "runs": 27
+   }
+  ],
+  "sling": [
+   {
+    "value": 0.5,
+    "peak_swing_m": 0.42,
+    "tabpfn_cm": 0.94,
+    "physics_cm": 0.73,
+    "coverage90": 0.77,
+    "runs": 27
+   },
+   {
+    "value": 1.5,
+    "peak_swing_m": 0.52,
+    "tabpfn_cm": 0.69,
+    "physics_cm": 1.73,
+    "coverage90": 0.81,
+    "runs": 27
+   },
+   {
+    "value": 2.5,
+    "peak_swing_m": 0.63,
+    "tabpfn_cm": 0.7,
+    "physics_cm": 4.67,
+    "coverage90": 0.8,
+    "runs": 27
+   }
+  ],
+  "payload_t": [
+   {
+    "value": 0.5,
+    "peak_swing_m": 0.52,
+    "tabpfn_cm": 1.09,
+    "physics_cm": 2.09,
+    "coverage90": 0.7,
+    "runs": 27
+   },
+   {
+    "value": 1.5,
+    "peak_swing_m": 0.52,
+    "tabpfn_cm": 0.62,
+    "physics_cm": 2.46,
+    "coverage90": 0.81,
+    "runs": 27
+   },
+   {
+    "value": 3.0,
+    "peak_swing_m": 0.52,
+    "tabpfn_cm": 0.63,
+    "physics_cm": 2.59,
+    "coverage90": 0.88,
+    "runs": 27
+   }
+  ],
+  "speed": [
+   {
+    "value": 0.5,
+    "peak_swing_m": 0.3,
+    "tabpfn_cm": 0.63,
+    "physics_cm": 1.41,
+    "coverage90": 0.83,
+    "runs": 27
+   },
+   {
+    "value": 0.75,
+    "peak_swing_m": 0.44,
+    "tabpfn_cm": 0.66,
+    "physics_cm": 2.09,
+    "coverage90": 0.77,
+    "runs": 27
+   },
+   {
+    "value": 1.0,
+    "peak_swing_m": 0.82,
+    "tabpfn_cm": 1.04,
+    "physics_cm": 3.63,
+    "coverage90": 0.78,
+    "runs": 27
+   }
+  ]
+ },
+ "real_importance": {
+  "target": "swing angle +1.0 s, beam run held out",
+  "base_error_cm": 0.348,
+  "increase_cm": {
+   "th": 2.125,
+   "th_m02": 0.226,
+   "th_m05": 0.308,
+   "dth": 0.235,
+   "amp2s": 0.048,
+   "x": 0.0,
+   "dx": 0.0,
+   "ddx": 0.0,
+   "L": 0.0,
+   "dL": 0.0,
+   "plan_dx05": 0.0,
+   "plan_dx10": 0.0
+  }
+ },
+ "mujoco_importance": {
+  "target": "load offset +1 s, 81 playground runs",
+  "base_error_cm": 0.73,
+  "increase_cm": {
+   "off": 1.385,
+   "off_m02": 0.674,
+   "off_m05": 2.808,
+   "doff": 30.87,
+   "amp2s": 1.026,
+   "x": 3.996,
+   "dx": 7.314,
+   "ddx": 1.21,
+   "L1": 0.453,
+   "payload_t": 0.364,
+   "plan_dx05": 0.458,
+   "plan_dx10": 1.885
+  }
+ }
+}

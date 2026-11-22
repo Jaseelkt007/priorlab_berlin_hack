@@ -145,6 +145,7 @@ def main():
     threading.Thread(target=worker, daemon=True).start()
 
     c = cond(P); m, d = mc.make(c); tid = m.body('trolley').id
+    m.geom_rgba[m.body_geomadr[m.body('load').id]] = (0.22, 0.30, 0.42, 1)          # real beam: dark steel blue
     mover = Mover(mc.BAYS[0]); hist = collections.deque(maxlen=40); preds = {}; phys_at = {}; errs = collections.deque(maxlen=100)
     state = dict(wait_until=1.0, phys=None, last_row_t=-1.0, quit=False)
 
@@ -210,14 +211,14 @@ def main():
         zl = mc.RAIL_Z - 0.15 - c['L1'] - 0.3 - c['L2'] - 0.18
         if r and t - r[0] < 0.5:
             xf = mover.ref(r[0] + H); _, lo, md, hi = r
-            ghost(scn, mujoco.mjtGeom.mjGEOM_BOX, [1.0 + (hi - lo) / 2, 1.1, 0.02], [xf + (lo + hi) / 2, 0, 0.02], (0.04, 0.48, 0.49, 0.25))
-            ghost(scn, mujoco.mjtGeom.mjGEOM_BOX, [1.0, 0.55, 0.02], [xf + md, 0, 0.05], (0.04, 0.48, 0.49, 0.9))
-            ghost(scn, mujoco.mjtGeom.mjGEOM_BOX, [1.0, 0.26, 0.19], [xf + md, 0, zl], (0.04, 0.48, 0.49, 0.3))
+            ghost(scn, mujoco.mjtGeom.mjGEOM_BOX, [1.0 + (hi - lo) / 2, 1.1, 0.02], [xf + (lo + hi) / 2, 0, 0.02], (0.10, 0.85, 0.35, 0.22))
+            ghost(scn, mujoco.mjtGeom.mjGEOM_BOX, [1.0, 0.55, 0.02], [xf + md, 0, 0.05], (0.10, 0.85, 0.35, 0.95))
+            ghost(scn, mujoco.mjtGeom.mjGEOM_BOX, [1.0, 0.26, 0.19], [xf + md, 0, zl], (0.10, 0.85, 0.35, 0.45))
         if state['phys']:
-            ghost(scn, mujoco.mjtGeom.mjGEOM_BOX, [1.0, 0.3, 0.02], [mover.ref(state['phys'][0] + H) + state['phys'][1], 0, 0.08], (0.77, 0.35, 0.09, 0.9))
+            ghost(scn, mujoco.mjtGeom.mjGEOM_BOX, [1.0, 0.3, 0.02], [mover.ref(state['phys'][0] + H) + state['phys'][1], 0, 0.08], (1.00, 0.45, 0.00, 0.95))
         e = list(errs); ep = np.mean([x[0] for x in e]) * 100 if e else float('nan'); ef = [x[1] for x in e if x[1] is not None]; ef = np.mean(ef) * 100 if ef else float('nan')
         with lock: nxt = dict(pending)
-        left = (f"Where will the load be in 1 s?\nrope {P['rope']} m  sling {P['sling']} m (hidden)  payload {P['payload']} t  speed {int(P['speed'] * 100)}%\n"
+        left = (f"Where will the load be in 1 s?  GREEN = TabPFN, ORANGE = physics\nrope {P['rope']} m  sling {P['sling']} m (hidden)  payload {P['payload']} t  speed {int(P['speed'] * 100)}%\n"
                 f"TabPFN (teal): {('%+.2f m  90%%: %+.2f..%+.2f' % (r[2], r[1], r[3])) if r else '-'}\nphysics (orange): {('%+.2f m' % state['phys'][1]) if state['phys'] else '-'}\n"
                 f"mean error, last 10 s: TabPFN {ep:.1f} cm  physics {ef:.1f} cm\nTabPFN {res['ms']:.0f} ms per prediction   sim speed {state.get('rt', 0):.2f}x real time")
         keys = (f"next move: rope {nxt['rope']}  sling {nxt['sling']}  payload {nxt['payload']}  speed {int(nxt['speed'] * 100)}%\n"

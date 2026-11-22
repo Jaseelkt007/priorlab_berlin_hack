@@ -108,7 +108,7 @@ def build_xml(L1, L2, payload_t, zeta=0.03):
     </body>
     <body name="load" pos="{mc.BAYS[0]} 0 {LOAD_H / 2 + 0.01}">
       <freejoint/>
-      <geom type="box" size="{BEAM / 2} 0.25 {LOAD_H / 2}" mass="{m_load}" rgba="0.04 0.48 0.49 1" friction="1 0.01 0.001"/>
+      <geom type="box" size="{BEAM / 2} 0.25 {LOAD_H / 2}" mass="{m_load}" rgba="0.22 0.30 0.42 1" friction="1 0.01 0.001"/>
       <site name="load_c" pos="0 0 0" size="0.05"/>
     </body>
     <camera name="side" pos="6 -23 6.8" xyaxes="1 0 0 0 0.08 1" fovy="42"/>
@@ -356,26 +356,33 @@ def main():
         scn = viewer.user_scn; scn.ngeom = 0; r = res['pred']; show = S['phase'] in ('TRAVEL', 'SETTLE')
         if show and r and d.time - r[0] < 0.5:
             xf = mover.ref(r[0] + H); _, lo, md, hi = r; zl = d.site_xpos[m.site('load_c').id][2]
-            ghost(scn, [BEAM / 2 + (hi - lo) / 2, 1.1, 0.02], [xf + (lo + hi) / 2, 0, 0.02], (0.04, 0.48, 0.49, 0.25))
-            ghost(scn, [BEAM / 2, 0.55, 0.02], [xf + md, 0, 0.05], (0.04, 0.48, 0.49, 0.9))
-            ghost(scn, [BEAM / 2, 0.26, LOAD_H / 2], [xf + md, 0, zl], (0.04, 0.48, 0.49, 0.3))
+            ghost(scn, [BEAM / 2 + (hi - lo) / 2, 1.1, 0.02], [xf + (lo + hi) / 2, 0, 0.02], (0.10, 0.85, 0.35, 0.22))
+            ghost(scn, [BEAM / 2, 0.55, 0.02], [xf + md, 0, 0.05], (0.10, 0.85, 0.35, 0.95))
+            ghost(scn, [BEAM / 2, 0.30, LOAD_H / 2 + 0.02], [xf + md, 0, zl], (0.10, 0.85, 0.35, 0.45))
         if show and S['phys']:
-            ghost(scn, [BEAM / 2, 0.3, 0.02], [mover.ref(S['phys'][0] + H) + S['phys'][1], 0, 0.08], (0.77, 0.35, 0.09, 0.9))
+            xp = mover.ref(S['phys'][0] + H) + S['phys'][1]; zl2 = d.site_xpos[m.site('load_c').id][2]
+            ghost(scn, [BEAM / 2, 0.3, 0.02], [xp, 0, 0.08], (1.00, 0.45, 0.00, 0.95))
+            ghost(scn, [BEAM / 2, 0.22, LOAD_H / 2], [xp, -0.6, zl2], (1.00, 0.45, 0.00, 0.40))
         e = list(errs); ep = np.mean([x[0] for x in e]) * 100 if e else float('nan'); ef = [x[1] for x in e if x[1] is not None]; ef = np.mean(ef) * 100 if ef else float('nan')
-        label = dict(IDLE='stopped: press Enter (or type start)' if S['mode'] == 'auto' else 'manual: press Enter for one cycle', LOWER='lowering the hook' if not S['attached'] else 'lowering into the bay', GRAB='grabbing the beam', RAISE='lifting' if S['attached'] else 'raising the empty hook',
+        label = dict(IDLE='press Enter to start' if S['mode'] == 'auto' else 'press Enter for one cycle', LOWER='lowering the hook' if not S['attached'] else 'lowering into the bay', GRAB='grabbing the beam', RAISE='lifting' if S['attached'] else 'raising the empty hook',
                      TRAVEL='travelling', SETTLE=f"waiting for the swing to settle ({d.time - S['t0']:.1f} s)", RELEASE='releasing', NEXT='next pick')[S['phase']]
         last = S['cycles'][-1] if S['cycles'] else None
         with lock: nxt = dict(pending)
-        runst = 'running' if S['run'] else ('stopping after this cycle' if S['phase'] != 'IDLE' else 'stopped')
-        left = (f"Pick and place · {S['mode'].upper()} · {runst} · {label}\nrope {P['rope']} m  sling {P['sling']} m (hidden)  payload {P['payload']} t  speed {int(P['speed'] * 100)}%\n"
-                f"TabPFN (teal) in 1 s: {('%+.2f m  90%%: %+.2f..%+.2f' % (r[2], r[1], r[3])) if (r and show) else '-'}\nphysics (orange): {('%+.2f m' % S['phys'][1]) if S['phys'] else '-'}\n"
-                f"mean error last 10 s: TabPFN {ep:.1f} cm  physics {ef:.1f} cm\n"
-                f"anti-sway ({'TabPFN chooses' if T['auto'] else 'you choose'}): " + (f"ZV tuned for a {TUNES[T['i']]} m sling" if TUNES[T['i']] else 'off')
-                + ((f"  · TabPFN predicted settle {S['decision']['best']['settle']:.1f} s, swing {S['decision']['best']['amp50']:.2f} m (99%: {S['decision']['best']['amp99']:.2f}) · own rows {len(own)}") if (T['auto'] and S.get('decision')) else ('  · deciding...' if T['auto'] and S['phase'] == 'RAISE' and S['attached'] else '')) + "\n"
-                f"cycles {len(S['cycles'])}" + (f"  last: {last['cycle_s']} s, settle {last['settle_s']} s, placed {last['placed_cm']:+d} cm from bay centre" if last else ''))
+        runst = 'RUNNING' if S['run'] else ('STOPPING after this cycle' if S['phase'] != 'IDLE' else 'STOPPED')
+        status = f"{S['mode'].upper()} - {runst}\n{label}"
+        tl = TUNES[T['i']]
+        nums = (f"GREEN  TabPFN in 1 s: {('%+.2f m  (90%%: %+.2f..%+.2f)' % (r[2], r[1], r[3])) if (r and show) else '-'}\n"
+                f"ORANGE physics in 1 s: {('%+.2f m' % S['phys'][1]) if S['phys'] else '-'}\n"
+                f"error last 10 s: TabPFN {ep:.1f} cm | physics {ef:.1f} cm\n"
+                f"anti-sway: {('%.1f m sling' % tl) if tl else 'off'} ({'TabPFN chooses' if T['auto'] else 'you choose'})"
+                + ((f"\nTabPFN expects: wait {S['decision']['best']['settle']:.1f} s, swing {S['decision']['best']['amp50']:.2f} m, own rows {len(own)}") if (T['auto'] and S.get('decision')) else '')
+                + (f"\nlast cycle: {last['cycle_s']} s, wait {last['settle_s']} s, placed {last['placed_cm']:+d} cm" if last else '')
+                + f"\ncycles: {len(S['cycles'])}   rope {P['rope']} m  sling {P['sling']} m  {P['payload']} t  {int(P['speed'] * 100)}%")
         keys = (f"next pick: rope {nxt['rope']}  sling {nxt['sling']}  payload {nxt['payload']}  speed {int(nxt['speed'] * 100)}%\n"
-                "Enter start/stop  1 auto  2 manual  3 TabPFN tunes anti-sway  |  Up/Down speed  PgUp/PgDn sling  Home/End rope  Ins/Del payload  Left/Right anti-sway")
-        return [(mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_TOPLEFT, left, None), (mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_BOTTOMLEFT, keys, None)]
+                "Enter start/stop | 1 auto | 2 manual | 3 TabPFN tunes anti-sway | Left/Right anti-sway | Up/Down speed | PgUp/PgDn sling | Home/End rope | Ins/Del payload")
+        return [(mujoco.mjtFont.mjFONT_BIG, mujoco.mjtGridPos.mjGRID_TOPLEFT, status, None),
+                (mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_TOPRIGHT, nums, None),
+                (mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_BOTTOMLEFT, keys, None)]
 
     if a.headless:
         t0 = time.time(); last_print = -5

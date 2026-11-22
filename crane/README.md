@@ -10,14 +10,14 @@ An overhead crane's load keeps swinging after every start and stop. Anti-sway co
 
 | The crane | Live forecast | TabPFN chooses the anti-sway | It learns in a few cycles |
 |---|---|---|---|
-| ![crane](docs/img/crane_scene.jpg) | ![forecast](docs/img/forecast_live.jpg) | ![closed loop](docs/img/closed_loop.jpg) | ![cycles](docs/img/live_cycles.jpg) |
+| ![crane](docs/img/crane_scene.jpg) | ![forecast](docs/img/forecast.gif) | ![closed loop](docs/img/closed_loop.jpg) | ![cycles](docs/img/live_cycles.jpg) |
 | MuJoCo overhead crane: trolley, rope, hook, slings, 2 m beam, racks beside two bays | Ghost = TabPFN's predicted load position 1 s ahead, next to the physics model | Left: industry anti-sway set for the wrong sling; right: TabPFN choosing, done in 261 s vs 403 s | Live pick and place: wrong setting in cycle 1, right setting from cycle 5, 7 of 9 OK |
 
 ## Documentation
 
 | Page | What it covers | Live | Source |
 |---|---|---|---|
-| **Crane Sway**: full project report | problem, what is predicted and TabPFN's role, physics and anti-sway, inputs and outputs with a glossary, real-crane and MuJoCo results, interactive playground, closed loop, live pick and place, limits, sources | [open](https://claude.ai/artifact/7rjNJLFjPqkE2g74ekxL31) | [`docs/report.html`](docs/report.html) |
+| **Crane Sway**: full project report | TabPFN, the crane and anti-sway, our implementation, results on the real lab crane and in MuJoCo (forecast, closed loop, live pick and place, set-down timing, which inputs matter), limitations, improvements, glossary, sources | [open](https://claude.ai/artifact/7rjNJLFjPqkE2g74ekxL31) | [`docs/report.html`](docs/report.html) |
 | **Explained in pictures** | the whole idea in diagrams | | [`EXPLAINED.md`](EXPLAINED.md) |
 | **Result files** | what each file in `results/` is and which script made it | | [`results/README.md`](results/README.md) |
 
@@ -78,7 +78,7 @@ flowchart LR
 | Real lab crane | 13 trolley runs, 99 s each at 100 Hz | ~12,500 rows at 10 Hz | forecast on held-out runs (cable length, beam payload, hoisting) |
 | MuJoCo fleet | 40 back-and-forth jobs, random rope / sling / payload / speed | 3,000 sampled | context for the live forecast |
 | MuJoCo commissioning | 120 single moves with random anti-sway settings | 120 | context for the anti-sway choice |
-| MuJoCo grid | 81 runs: rope × sling × payload × speed | 19,440 predictions | playground and parameter effects |
+| MuJoCo grid | 81 runs: rope × sling × payload × speed | 19,440 predictions | parameter effects (report 4b) |
 
 ### One anti-sway decision
 
@@ -163,7 +163,7 @@ crane/.venv/bin/python crane/exp2_real.py                 # adaptation curve + p
 MUJOCO_GL=egl crane/.venv/bin/python crane/mujoco_crane.py --check --frame
 MUJOCO_GL=egl crane/.venv/bin/python crane/mujoco_demo.py # fleet data, held-out job, TabPFN, video (~5 min)
 MUJOCO_GL=egl crane/.venv/bin/python crane/mujoco_closed_loop.py   # closed loop, 3 strategies x 12 loads + video (~10 min)
-MUJOCO_GL=egl crane/.venv/bin/python crane/playground_precompute.py # page playground data + fleet rows (~2 min)
+MUJOCO_GL=egl crane/.venv/bin/python crane/playground_precompute.py # 81-setting grid + fleet rows (~2 min)
 MUJOCO_GL=egl crane/.venv/bin/python crane/render_clip.py --rope 5.2 --sling 2.8 --payload 0.7 --speed 0.9
 MUJOCO_GL=glfw crane/.venv/bin/python crane/live_crane.py      # LIVE 3D window: TabPFN predicts 1 s ahead in real time
 MUJOCO_GL=glfw crane/.venv/bin/python crane/live_pick_place.py # LIVE pick and place with anti-sway tuning keys
@@ -183,7 +183,7 @@ MUJOCO_GL=glfw crane/.venv/bin/python crane/live_pick_place.py --auto-tune # Tab
 | `mujoco_closed_loop.py` | closed loop: TabPFN chooses speed and anti-sway tuning per move, vs. industry anti-sway |
 | `live_pick_place.py` | **live pick and place**: hoist lowers, grabs the beam (weld), lifts, travels, settles, places it in the other bay, releases, repeats; Enter start/stop, 1 auto / 2 manual; ←/→ change the anti-sway's assumed sling (wrong 0.5 m: 69.5 s cycle; right 2.0 m: 47 s) |
 | `live_crane.py` | **live** MuJoCo window: the crane shuttles between bays, TabPFN's 1-s-ahead ghost updates in real time; change rope/sling/payload/speed with keys (Up/Down, PgUp/PgDn, Home/End, Ins/Del) or by typing `rope 5` in the terminal |
-| `playground_precompute.py`, `render_clip.py` | page playground (option A, 81 precomputed runs) and any-parameter MP4 clip (option B) |
+| `playground_precompute.py`, `render_clip.py` | 81-setting grid with precomputed predictions, and an MP4 clip for any parameters |
 | `make_figures.py` | slide figures in `figures/` from the saved results (no simulation needed) |
 | `docs/` | `report.html` (the full project report) and `img/` (README pictures) |
 | `data_tools/` | dataset download, the period check (measured vs. textbook pendulum), an xlsx reader |

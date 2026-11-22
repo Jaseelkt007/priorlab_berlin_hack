@@ -9,7 +9,9 @@ travel height -> TRAVEL to the other bay -> SETTLE (|swing| < 5 cm for 1 s, the 
 -> RELEASE (weld off) -> RAISE empty -> pick the same beam again and carry it back.
 TabPFN (teal ghost + 90% floor band) and the physics model (orange) predict the load 1 s ahead during TRAVEL and SETTLE.
 TabPFN chooses the anti-sway setting: key 3, 'tune auto' or --auto-tune. While the beam is lifted, one batched
-TabPFN call per target predicts residual swing and settle time for every setting (off, 0.5 ... 3.0 m) from 120
+TabPFN call per target predicts residual swing and settle time for every setting (off, 0.5 ... 3.0 m) from 3 inputs
+(measured sway period, speed, tuning error = shaper period / measured period - 1; the ablation showed rope and payload
+add nothing) and 120
 simulated commissioning moves (results/pickplace_decision_fleet.json, built once) plus this session's own moves, and
 takes the fastest expected cycle whose 99% swing clears the racks. Each move's outcome is added as a row.
 Start / stop: Enter (or type start / stop). Modes: 1 = AUTO (cycles until stopped; a stop finishes the current cycle and
@@ -177,10 +179,13 @@ def build_decision_fleet(n=120, seed=11):
     print(); return rows
 
 
+DEC_COLS = [2, 3, 4]      # measured sway period, speed, tuning error: as good as all 5 (crane/ablation.py)
+
+
 def decide_tune(ctx, L1, payload_t, meas, speed):
     """One batched TabPFN call per target over all anti-sway settings: fastest expected cycle with 99% swing < clearance."""
     from tabpfn import TabPFNRegressor
-    X = np.array([r['x'] for r in ctx]); C = np.array([dfeat(L1, payload_t, meas, speed, tu) for tu in TUNES])
+    X = np.array([[r['x'][j] for j in DEC_COLS] for r in ctx]); C = np.array([[dfeat(L1, payload_t, meas, speed, tu)[j] for j in DEC_COLS] for tu in TUNES])
     a50, a99 = (np.asarray(v) for v in TabPFNRegressor(n_estimators=1).fit(X, np.array([r['amp'] for r in ctx])).predict(C, output_type='quantiles', quantiles=[0.5, 0.99]))
     s50 = np.asarray(TabPFNRegressor(n_estimators=1).fit(X, np.array([r['settle'] for r in ctx])).predict(C, output_type='median'))
     cands = [dict(tune=tu, amp50=float(x), amp99=float(y), settle=float(max(0, z)), extra=(math.pi * math.sqrt(tune_len(L1, tu) / mc.G) if tu else 0.0)) for tu, x, y, z in zip(TUNES, a50, a99, s50)]

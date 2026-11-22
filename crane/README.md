@@ -1,6 +1,6 @@
 # Crane track: where will the load be in 1 second?
 
-**New to the project? Start with [`EXPLAINED.md`](EXPLAINED.md): the whole idea in diagrams.** Pitch slides and video script: [`PITCH.md`](PITCH.md). Slide figures: [`figures/`](figures/).
+**New to the project? Start with [`EXPLAINED.md`](EXPLAINED.md): the whole idea in diagrams.** Pitch slides: [`slides/`](slides/README.md) (PDF: [`slides/crane_pitch.pdf`](slides/crane_pitch.pdf)); outline and video script: [`PITCH.md`](PITCH.md). Slide figures: [`figures/`](figures/).
 
 Part of our Prior Labs entry ("TabPFN for spatial awareness"). Branch: `crane`.
 

@@ -4,7 +4,7 @@ Every number here is measured; the source file is given in brackets. Figures are
 `make_figures.py`), clips in `crane/results/`. "Lab crane" = real data; "MuJoCo" = simulation. Always say which.
 Interactive page: https://claude.ai/artifact/7rjNJLFjPqkE2g74ekxL31 · diagrams: [`EXPLAINED.md`](EXPLAINED.md).
 
-## Slides (6 slides; the deck: https://claude.ai/artifact/4EJUDBdYFHaYS2yYs6DnKQ, speaker notes on every slide)
+## Slides (6 slides; the deck: https://claude.ai/artifact/4EJUDBdYFHaYS2yYs6DnKQ; offline copy with speaker notes: [`slides/`](slides/README.md), PDF: [`slides/crane_pitch.pdf`](slides/crane_pitch.pdf))
 
 1. **Title.** "Where will the load be in 1 second? TabPFN tunes an overhead crane's anti-sway for every load: no training, just new rows in a table." Team names. Prior Labs track.
 2. **The problem.** The load keeps swinging after every stop; operators wait, swinging loads hit racks or people. 154 of 297 US crane-related work deaths (2011–17) were workers struck by an object or equipment [BLS]. 20+ s of waiting per move when the anti-sway is set for the wrong sling [`results/live_runs.json`]. Visual: `results/still_b.png`.

@@ -34,20 +34,29 @@ def random_state(rng: np.random.Generator):
                      batch_seal_shift=float(rng.normal(0, 3.0)))
 
 
+def instance_setup(task: dict, alpha: float):
+    """The pick of task["seed"] (item, line state, belt speed; the vision error follows from the seed in PickCell) at
+    speed setting alpha -> (PickSetup, logged features, hidden truth). The one place a task becomes a pick."""
+    from .line import PickSetup
+    from .products import LineState, sample
+    rng = np.random.default_rng(task["seed"])
+    st = LineState(**task["state"]) if task.get("state") else random_state(rng)
+    v_b = task.get("belt_mps", float(rng.uniform(0.2, 0.5)))
+    cfg, logged, hidden = sample(task["product"], rng, st)
+    return PickSetup(cup=cfg, alpha=float(alpha), v_belt=v_b, seed=task["seed"]), logged, hidden
+
+
 def simulate_instance(task: dict) -> list[dict]:
     """One pick instance (product item, line state, belt speed and vision error, all drawn from task["seed"]) simulated
     at each speed setting in task["alphas"] (default: all ALPHAS). The rows are exact counterfactuals of one another:
     only alpha differs. task: product, seed, optional state (LineState fields), belt_mps, alphas, and any extra keys
     (copied into the rows, e.g. a stream id). Returns one log row per alpha."""
-    from .line import PickCell, PickSetup
-    from .products import LineState, sample
+    from .line import PickCell
     rows = []
     for alpha in task.get("alphas", ALPHAS):
-        rng = np.random.default_rng(task["seed"])
-        st = LineState(**task["state"]) if task.get("state") else random_state(rng)
-        v_b = task.get("belt_mps", float(rng.uniform(0.2, 0.5)))
-        cfg, logged, hidden = sample(task["product"], rng, st)
-        out = PickCell(PickSetup(cup=cfg, alpha=float(alpha), v_belt=v_b, seed=task["seed"])).run()
+        setup, logged, hidden = instance_setup(task, alpha)
+        v_b = setup.v_belt
+        out = PickCell(setup).run()
         row = {k: v for k, v in task.items() if k not in ("product", "seed", "state", "belt_mps", "alphas")}
         row.update(logged, belt_mps=v_b, alpha=float(alpha), seed=task["seed"])
         row.update({k: out[k] for k in ("seal_kpa", "evac_ms", "dropped", "place_offset_mm", "slip_mm", "vac_min_kpa",

@@ -23,6 +23,7 @@ import toppra.constraint as constraint
 import mujoco
 
 from .delta import (DeltaController, DeltaParams, Feedforward, FeedforwardA, base_force_lumped, build_model_a, ik,
+                    joint_state,
                     jacobians, plant_friction, to_motor, tool_xml)
 
 ta.setup_logging("WARNING")
@@ -99,8 +100,8 @@ POLY_SCALE = _poly_scale(NORMALS)
 class Planner:
     def __init__(self, P: DeltaParams, p_home_platform: np.ndarray):
         self.P = P
-        # torque model: lumped ⅔/⅓ (V4: 4.1 % of peak vs the exact model)
-        self.dyn = Feedforward(dataclasses.replace(P, r_elbow=2 / 3, r_plat=1 / 3), p_home_platform)
+        # torque model: the lumped model with the V4-chosen strut split (4.1 % of peak vs the exact model)
+        self.dyn = Feedforward(P, p_home_platform)
 
     def plan(self, tcp_a, tcp_b, h1: float, h2: float, spec: MoveSpec, max_iter: int = 15):
         """Time-optimal move under all limits. The FIR jerk filter and the path curvature couple speed and acceleration,
@@ -146,8 +147,9 @@ class Planner:
 
         def inv_dyn(q, qd, qdd):
             pw, vw, aw = np.asarray(q) + off, np.asarray(qd), np.asarray(qdd)
-            tau, _, _ = self.dyn.torque(pw, vw, aw)
-            return np.r_[tau, base_force_lumped(pw, vw, aw, Pl)]
+            js = joint_state(pw, vw, aw, Pl)
+            tau, _, _ = self.dyn.torque(pw, vw, aw, js)
+            return np.r_[tau, base_force_lumped(pw, vw, aw, Pl, js=js)]
 
         I6 = np.eye(6)
         F_tau, g_tau = np.vstack([I6, -I6]), np.r_[np.full(3, tau_lim), spec.F_base, np.full(3, tau_lim), spec.F_base]
@@ -210,18 +212,20 @@ class Planner:
             return p + off, dp * v1, dp * a1 + ddp * v1 * v1
 
         # re-check the limits on the filtered profile
-        chk = np.linspace(0, T, 600)
-        acc = np.array([np.linalg.norm(ref(x)[2]) for x in chk])
-        vel = np.array([np.linalg.norm(ref(x)[1]) for x in chk])
-        thd_pk = max(np.abs(self.dyn.torque(*ref(x))[2]).max() for x in chk)
-        jerk = np.linalg.norm(np.gradient(np.array([ref(x)[2] for x in chk]), chk, axis=0), axis=1).max()
-        # motor torque incl. the gearbox friction the plant has (Gnad et al.: Coulomb + viscous)
-        tau = []
-        for x in chk:
-            tq, _, thd = self.dyn.torque(*ref(x))
+        chk = np.linspace(0, T, 300)   # ≤ 1.4 ms spacing: finer than the 1.9 ms jerk ramps
+        R = [ref(x) for x in chk]
+        acc = np.array([np.linalg.norm(r[2]) for r in R])
+        vel = np.array([np.linalg.norm(r[1]) for r in R])
+        jerk = np.linalg.norm(np.gradient(np.array([r[2] for r in R]), chk, axis=0), axis=1).max()
+        # motor torque incl. the gearbox friction the plant has (Gnad et al.: Coulomb + viscous); base force
+        tau, Fb, thd_pk = [], [], 0.0
+        for r in R:
+            js = joint_state(*r, Pl)
+            tq, _, thd = self.dyn.torque(*r, js)
+            thd_pk = max(thd_pk, np.abs(thd).max())
             tau.append(tq + P.fric_coulomb * np.tanh(thd / P.fric_vs) + P.fric_viscous * thd)
-        tau = np.array(tau)
-        Fb = np.array([base_force_lumped(*ref(x), self.dyn.P) for x in chk])
+            Fb.append(base_force_lumped(*r, Pl, js=js))
+        tau, Fb = np.array(tau), np.array(Fb)
         rF = float((np.abs(Fb) / np.array(spec.F_base)).max())
         tau_static = float(np.abs(self.dyn.torque(ref(0)[0], np.zeros(3), np.zeros(3))[0]).max())
         info = dict(thd_peak=thd_pk, rF=rF, F_peak=np.abs(Fb).max(axis=0), tau_static=tau_static, T_topp=T0, T=T, a_peak=acc.max(), v_peak=vel.max(), j_peak=jerk, tau_peak=np.abs(tau).max(),
@@ -253,13 +257,13 @@ def base_loads(P: DeltaParams, cyc: str, spec: MoveSpec):
     d = mujoco.MjData(m)
     mujoco.mj_forward(m, d)
     ctrl = DeltaController(P, m, p_start)
-    ctrl.use_table(FeedforwardA(P, p_start, extra_platform_xml=tool_xml(P)).precompute(ref, T + 0.02, P.dt))
+    ctrl.prepare(ref, T + 0.02, exact=FeedforwardA(P, p_start, extra_platform_xml=tool_xml(P)))
     Pm, e_tcp, tau_pk = [], 0.0, 0.0
     tcp = m.site("tcp").id
     M = float(m.body_mass[1:].sum())
     for k in range(int((T + 0.02) / P.dt)):
         t = k * P.dt
-        d.ctrl[:3] = ctrl.torque(d, ref, t)
+        d.ctrl[:3] = ctrl.torque(d, t)
         plant_friction(m, d, P, ctrl.vadr)
         mujoco.mj_step(m, d)
         mujoco.mj_forward(m, d)

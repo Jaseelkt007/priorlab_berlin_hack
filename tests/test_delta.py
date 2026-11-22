@@ -95,13 +95,12 @@ def run_move(Pt: DeltaParams, exact_ff: bool = False):
     mujoco.mj_forward(m, d)
     ctrl = DeltaController(Pt, m, P0)
     ref, T = x_move(P0)
-    if exact_ff:
-        ctrl.use_table(FeedforwardA(Pt, P0, extra_platform_xml=tool_xml(Pt)).precompute(ref, T + 0.05, Pt.dt))
+    ctrl.prepare(ref, T + 0.05, exact=FeedforwardA(Pt, P0, extra_platform_xml=tool_xml(Pt)) if exact_ff else None)
     tcp, plat = m.site("tcp").id, m.body("plat").id
     e_tcp = viol = tilt = tau_pk = fb_pk = 0.0
     for k in range(int((T + 0.05) / Pt.dt)):
         t = k * Pt.dt
-        d.ctrl[:3] = ctrl.torque(d, ref, t)
+        d.ctrl[:3] = ctrl.torque(d, t)
         plant_friction(m, d, Pt, ctrl.vadr)
         mujoco.mj_step(m, d)
         pw, _, _ = ref(t)   # after mj_step, site_xpos still describes the pre-integration state at time t

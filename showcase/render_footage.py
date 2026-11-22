@@ -41,7 +41,7 @@ MS = 1e-3
 RELEASE_T = 0.30                      # s recorded after arrival (vacuum off at +40 ms, product settles)
 ALPHAS = np.round(np.arange(0.2, 1.01, 0.1), 2)
 V_OUT = 0.45                          # m/s outfeed belt (display only): ~0.28 m between placed bars
-SKU_RGBA = {"bar 45 g": [0.86, 0.36, 0.12, 1], "protein bar 60 g": [0.10, 0.48, 0.62, 1]}   # plain one-colour wraps
+SKU_RGBA = {"bar 45 g": [0.9098, 0.4627, 0.1686, 1.0], "protein bar 60 g": [0.1216, 0.6392, 0.6039, 1.0]}   # plain one-colour wraps
 
 
 # ================================================================================================ tasks
@@ -138,17 +138,24 @@ def style_model(m, W: int, H: int, fovy: float, ortho: bool):
     m.vis.quality.shadowsize = 8192
     m.vis.map.shadowclip = 3.0
     m.vis.map.znear, m.vis.map.zfar = 0.01, 50.0
+    m.vis.quality.numslices = 64                      # smooth cylinders/ellipsoids at 4K
+    m.vis.quality.numstacks = 48
     m.vis.headlight.active = 1
-    m.vis.headlight.ambient[:] = [0.28, 0.28, 0.29]
-    m.vis.headlight.diffuse[:] = [0.10, 0.10, 0.10]
+    m.vis.headlight.ambient[:] = [0.17, 0.17, 0.18]
+    m.vis.headlight.diffuse[:] = [0.05, 0.05, 0.05]
     m.vis.headlight.specular[:] = [0.0, 0.0, 0.0]
 
 
-ALU = dict(rgba=[0.80, 0.81, 0.83, 1], specular=0.9, shininess=0.75)
-CARBON = dict(rgba=[0.11, 0.11, 0.12, 1], specular=0.45, shininess=0.55)
-SILICONE = dict(rgba=[0.08, 0.08, 0.08, 1], specular=0.15, shininess=0.2)
-BELT = dict(rgba=[0.12, 0.12, 0.13, 1], specular=0.04, shininess=0.05)
-STUDIO = dict(rgba=[0.84, 0.84, 0.85, 1], specular=0.0, shininess=0.0)
+# look (clip-studio): dark studio, satin light-grey robot, carbon rods, charcoal belts, product colour the only colour
+ALU = dict(rgba=[0.851, 0.8627, 0.8784, 1.0], specular=0.4, shininess=0.5)          # housing, upper arms, platform: satin grey
+CARBON = dict(rgba=[0.1059, 0.1137, 0.1255, 1.0], specular=0.25, shininess=0.4)      # parallel rods
+SILICONE = dict(rgba=[0.0784, 0.0824, 0.0863, 1.0], specular=0.08, shininess=0.15)   # cup rubber (matte)
+BELT = dict(rgba=[0.1647, 0.1765, 0.1922, 1.0], specular=0.05, shininess=0.05)       # matte charcoal, lighter than the floor
+RAIL = dict(rgba=[0.2902, 0.3059, 0.3294, 1.0], specular=0.3, shininess=0.4)         # belt side rails: thin edge highlight
+FLOOR = dict(rgba=[0.0392, 0.0431, 0.051, 1.0], specular=0.35, shininess=0.6)       # near-black glossy floor (reflectance below)
+FLOOR_REFLECTANCE = 0.3
+BG_TOP, BG_BOTTOM = np.array([0.0863, 0.098, 0.1176]), np.array([0.0431, 0.051, 0.0627])   # background gradient (sRGB)
+WHITE_CAP = 240.0                                                        # no clipped highlights
 
 
 def _style(g, s, rgba=None):
@@ -167,9 +174,11 @@ def restyle_scene(m, scn, sku_rgba):
         if name in ("belt", "pad"):
             _style(g, BELT)
         elif name == "floor":
-            _style(g, STUDIO)
+            _style(g, FLOOR)
+            g.reflectance = FLOOR_REFLECTANCE
+            g.size[0] = g.size[1] = 40.0          # no visible floor edge (the fog takes the far floor)
         elif name == "prod":
-            _style(g, dict(specular=0.55, shininess=0.7, rgba=sku_rgba), sku_rgba)
+            _style(g, dict(WRAP, rgba=sku_rgba), sku_rgba)
         elif body.startswith("arm") or name == "base" or body == "plat":
             _style(g, ALU)
         elif body.startswith("s") and body[1:].isdigit():
@@ -182,10 +191,10 @@ def restyle_scene(m, scn, sku_rgba):
             _style(g, SILICONE)
 
 
-HOUSING = dict(rgba=[0.88, 0.88, 0.89, 1], specular=0.5, shininess=0.5)
-WRAP = dict(specular=0.55, shininess=0.7)
+HOUSING = ALU
+WRAP = dict(specular=0.3, shininess=0.6)                                 # satin foil-wrap sheen
 METAL = dict(rgba=[0.55, 0.56, 0.58, 1], specular=0.8, shininess=0.7)
-KINDS = ["studio", "frame", "housing", "belt", "cup", "queue", "outfeed", "wrap_seal"]
+KINDS = ["housing", "belt", "cup", "queue", "outfeed", "wrap_seal"]
 
 
 def _item(kind, gtype, size, pos, mat, style, rgba=None):
@@ -201,7 +210,7 @@ def _bar_items(kind, gtype, size, pos, mat, rgba):
     size = np.asarray(size, float)
     if gtype == mujoco.mjtGeom.mjGEOM_BOX and size[0] > 2.5 * size[1]:
         R = np.asarray(mat, float).reshape(3, 3)
-        fin_rgba = np.array(rgba, float) * [0.85, 0.85, 0.85, 1]
+        fin_rgba = np.minimum(np.array(rgba, float) * [1.12, 1.12, 1.12, 1], 1.0)
         for sgn in (-1, 1):
             out.append(_item("wrap_seal", mujoco.mjtGeom.mjGEOM_BOX, [0.005, size[1] * 1.02, 0.0010],
                              np.asarray(pos) + R @ [sgn * (size[0] + 0.005), 0, 0], R, WRAP, fin_rgba))
@@ -210,24 +219,17 @@ def _bar_items(kind, gtype, size, pos, mat, rgba):
 
 def display_items(m, d, p, picks, k, t, tl, pitch, camd):
     """Everything drawn that is not a body of the simulated model (all display only), in world coordinates:
-    studio, support frame, base housing, outfeed belt, the drawn suction cup, the bar's seal fins, the queue of
+    base housing, belt rails, outfeed belt, the drawn suction cup, the bar's seal fins, the queue of
     upcoming items, placed items riding the outfeed, dropped items where they came to rest."""
     import mujoco
     from sim.line import X_PICK, X_PLACE, Z_BELT
     B, C, E = mujoco.mjtGeom.mjGEOM_BOX, mujoco.mjtGeom.mjGEOM_CYLINDER, mujoco.mjtGeom.mjGEOM_ELLIPSOID
     eye = np.eye(3)
     it = []
-    for pos, size in (([-4, 0, 0], [0.02, 4, 3]), ([4, 0, 0], [0.02, 4, 3]), ([0, 4, 0], [4, 0.02, 3]),
-                      ([0, -4, 0], [4, 0.02, 3]), ([0, 0, 2.6], [4, 4, 0.02])):
-        it.append(_item("studio", B, size, pos, eye, STUDIO))
-    if camd.get("frame", True):     # support frame outside the belts: 4 posts, top rails, the beam carrying the base
-        for x, y in ((0.55, 0.75), (-0.55, 0.75), (0.55, -0.75), (-0.55, -0.75)):
-            it.append(_item("frame", C, [0.022, 0.665], [x, y, -0.635], eye, ALU))
-        for x in (0.55, -0.55):
-            it.append(_item("frame", B, [0.022, 0.75, 0.022], [x, 0.0, 0.03], eye, ALU))
-        for y in (0.75, -0.75):
-            it.append(_item("frame", B, [0.55, 0.022, 0.022], [0.0, y, 0.03], eye, ALU))
-        it.append(_item("frame", B, [0.55, 0.06, 0.022], [0.0, 0.0, 0.03], eye, ALU))
+    # belt side rails (infeed belt half-width 80 mm, outfeed 70 mm): a thin lighter edge so the line reads
+    for xb, hw, top in ((X_PICK, 0.08, Z_BELT), (X_PLACE, 0.07, Z_BELT - 0.0025)):
+        for sgn in (-1, 1):
+            it.append(_item("belt", B, [0.004, 0.6, 0.008], [xb + sgn * (hw + 0.004), 0.0, top - 0.004], eye, RAIL))
     # base housing over the three motors (the real robot's wide top housing), rounded lid
     it.append(_item("housing", C, [0.30, 0.055], [0.0, 0.0, 0.035], eye, HOUSING))
     it.append(_item("housing", E, [0.30, 0.30, 0.05], [0.0, 0.0, 0.09], eye, HOUSING))
@@ -267,33 +269,49 @@ def draw_items(scn, items):
         scn.ngeom += 1
 
 
+LIGHT_AZ = 150.0            # the rig is placed relative to the hero (A) camera's heading, the same for every angle
+
+
 def add_lights(scn):
-    """Soft key (shadows), rim and fill; replaces the model's single light."""
+    """One rig for all angles. Key: soft spot from upper front-left (as seen from the hero camera), neutral-warm,
+    the only shadow caster. Rim: behind/above, cool white, no shadows. Fill: low, from the hero camera's side."""
     import mujoco
-    spec = [  # pos, target, diffuse, specular, castshadow, cutoff
-        ([1.6, -1.4, 1.2], [0.0, 0.0, -0.9], 0.75, 0.35, 1, 40.0),
-        ([-1.4, 1.7, 0.6], [0.0, 0.0, -0.8], 0.45, 0.45, 0, 45.0),
-        ([0.4, -2.2, -0.4], [0.0, 0.0, -0.9], 0.22, 0.0, 0, 60.0),
+    phi = np.radians(LIGHT_AZ)
+    fwd = np.array([np.cos(phi), np.sin(phi), 0.0])     # hero camera's horizontal viewing direction
+    right = np.array([np.sin(phi), -np.cos(phi), 0.0])
+    z = np.array([0.0, 0.0, 1.0])
+    tgt = np.array([0.0, 0.0, -0.85])
+    spec = [  # pos, colour, specular, castshadow, cutoff
+        (tgt - 2.0 * fwd - 1.5 * right + 1.7 * z, [0.95, 0.90, 0.83], 0.30, 1, 38.0),   # key
+        (tgt + 2.2 * fwd + 0.4 * right + 1.4 * z, [0.62, 0.68, 0.78], 0.45, 0, 40.0),   # rim
+        (tgt - 2.6 * fwd + 0.8 * right - 0.1 * z, [0.16, 0.16, 0.17], 0.0, 0, 70.0),    # fill
     ]
     scn.nlight = 0
-    for pos, tgt, dif, spc, sh, cut in spec:
+    for pos, col, spc, sh, cut in spec:
         L = scn.lights[scn.nlight]
         L.type = mujoco.mjtLightType.mjLIGHT_SPOT
         L.pos[:] = pos
-        dvec = np.array(tgt) - np.array(pos)
+        dvec = tgt - np.asarray(pos)
         L.dir[:] = dvec / np.linalg.norm(dvec)
         L.ambient[:] = [0.0, 0.0, 0.0]
-        L.diffuse[:] = [dif] * 3
+        L.diffuse[:] = col
         L.specular[:] = [spc] * 3
         L.castshadow = sh
-        L.cutoff, L.exponent = cut, 2.0
+        L.cutoff, L.exponent = cut, 4.0
         L.attenuation[:] = [1.0, 0.0, 0.0]
         L.headlight = 0
-        try:
-            L.softness = 0.35
-        except Exception:
-            pass
+        L.softness = 0.6 if sh else 0.0
         scn.nlight += 1
+
+
+def composite(img: np.ndarray, depth: np.ndarray, fog_start: float, fog_end: float) -> np.ndarray:
+    """Haze toward the background gradient by distance, background where nothing was drawn, highlight cap.
+    sRGB in, sRGB out (the blend is done in sRGB: simple and matches a display-referred grade)."""
+    H, W = depth.shape
+    bg = (BG_TOP[None, :] + (BG_BOTTOM - BG_TOP)[None, :] * np.linspace(0, 1, H)[:, None]) * 255.0  # (H, 3)
+    f = np.clip((depth - fog_start) / max(fog_end - fog_start, 1e-6), 0.0, 1.0)[:, :, None]
+    out = img.astype(np.float32) * (1 - f) + bg[:, None, :] * f
+    return np.clip(out * (WHITE_CAP / 255.0), 0, 255).astype(np.uint8)
 
 
 # ================================================================================================ cameras
@@ -304,8 +322,8 @@ def ease(u):
 
 CAMERAS = {  # lookat (None: tracked), distance, azimuth, elevation, fovy (deg; view height in m if ortho)
     # A: low, close, long lens; robot + belts fill ~60 % of the frame; no support frame (its legs would sit in front)
-    "A-wide": dict(lookat=[0.0, 0.0, -0.50], dist=3.0, az=150, el=-4, fovy=22, orbit=0.0, frame=False, depth=True),
-    "A-wide-orbit": dict(lookat=[0.0, 0.0, -0.50], dist=3.0, az=143, el=-4, fovy=22, orbit=14.0, frame=False, depth=True),
+    "A-wide": dict(lookat=[0.0, 0.0, -0.50], dist=3.0, az=150, el=-4, fovy=22, orbit=0.0, depth=True),
+    "A-wide-orbit": dict(lookat=[0.0, 0.0, -0.50], dist=3.0, az=143, el=-4, fovy=22, orbit=14.0, depth=True),
     "B-top": dict(lookat=[0.0, 0.0, -1.0], dist=0.95, az=0.0, el=-89.9, fovy=55, orbit=0.0),
     # C: follows the cup (Gaussian-smoothed, sigma 40 ms): cup in the upper third, the bar in the lower third
     "C-close": dict(lookat=None, track="cup", offset=[0.0, 0.0, -0.016], sigma=0.04, dist=0.30, az=158, el=-3,
@@ -381,37 +399,51 @@ def render_clip(job: dict) -> dict:
     depth_dir = path[:-4] + ".depth"
     if camd.get("depth") and job.get("depth", True):
         Path(depth_dir).mkdir(exist_ok=True)
+    nsub = {60: 8, 250: 2}.get(int(fps_sim), 1)     # motion blur: 180° shutter on the 1 ms grid (none at 1000)
+    lut = ((np.arange(256) / 255.0) ** 2.2).astype(np.float32)   # sRGB-ish -> linear for the average
+    fog_start = camd.get("fog", (camd["dist"] + 0.6, camd["dist"] + 3.5))[0]
+    fog_end = camd.get("fog", (camd["dist"] + 0.6, camd["dist"] + 3.5))[1]
     for f in range(n_frames):
         t = t0 + f / fps_sim
-        k, i = state(t)
-        p = picks[k]
-        m = p["model"]
-        if k not in renderers:
-            style_model(m, W, H, camd["fovy"], camd.get("ortho", False))
-            renderers[k] = mujoco.Renderer(m, H, W)
-            datas.setdefault(k, mujoco.MjData(m))
-        r, d = renderers[k], datas[k]
-        d.qpos[:] = p["qpos"][i]
-        mujoco.mj_forward(m, d)
-        cam = mujoco.MjvCamera()
-        cam.type = mujoco.mjtCamera.mjCAMERA_FREE
         u = ease(f / max(n_frames - 1, 1))
-        cam.lookat[:] = track[f] if track is not None else camd["lookat"]
-        cam.distance, cam.azimuth, cam.elevation = camd["dist"], camd["az"] + camd["orbit"] * u, camd["el"]
-        cam.orthographic = int(camd.get("ortho", False))     # camera-level switch: fovy is then the view height (m)
-        r.update_scene(d, cam)
-        scn = r.scene
-        restyle_scene(m, scn, p["rgba"])
-        tl = i * MS
-        items = display_items(m, d, p, picks, k, t, tl, job["pitch"], camd)
-        draw_items(scn, items)
-        add_lights(scn)
-        img = r.render()
+        acc = None
+        for jsub in reversed(range(nsub)):           # sub-states t-(nsub-1) ms ... t; the frame-time state is last
+            k, i = state(max(t - jsub * MS, 0.0))
+            p = picks[k]
+            m = p["model"]
+            if k not in renderers:
+                # one GL context per pick model; at 4K with 8x MSAA each holds ~0.5 GB of GPU memory, so keep only
+                # the current pick and the previous one (motion-blur sub-states can straddle a pick boundary)
+                for kk in [kk for kk in renderers if kk < k - 1]:
+                    renderers.pop(kk).close()
+                style_model(m, W, H, camd["fovy"], camd.get("ortho", False))
+                renderers[k] = mujoco.Renderer(m, H, W)
+                datas.setdefault(k, mujoco.MjData(m))
+            r, d = renderers[k], datas[k]
+            d.qpos[:] = p["qpos"][i]
+            mujoco.mj_forward(m, d)
+            cam = mujoco.MjvCamera()                 # the camera is held at the output frame's pose
+            cam.type = mujoco.mjtCamera.mjCAMERA_FREE
+            cam.lookat[:] = track[f] if track is not None else camd["lookat"]
+            cam.distance, cam.azimuth, cam.elevation = camd["dist"], camd["az"] + camd["orbit"] * u, camd["el"]
+            cam.orthographic = int(camd.get("ortho", False))   # camera-level switch: fovy is the view height (m)
+            r.update_scene(d, cam)
+            scn = r.scene
+            restyle_scene(m, scn, p["rgba"])
+            tl = i * MS
+            items = display_items(m, d, p, picks, k, t - jsub * MS, tl, job["pitch"], camd)
+            draw_items(scn, items)
+            add_lights(scn)
+            img = r.render()
+            acc = lut[img] if acc is None else acc + lut[img]
+        img = img if nsub == 1 else np.clip(((acc / nsub) ** (1 / 2.2)) * 255.0 + 0.5, 0, 255).astype(np.uint8)
+        # depth of the frame-time state: haze + background, and the depth pass for A and C
+        r.enable_depth_rendering()
+        dep = r.render()
+        r.disable_depth_rendering()
+        img = composite(img, dep, fog_start, fog_end)
         ff.stdin.write(img.tobytes())
-        if camd.get("depth") and job.get("depth", True):     # depth pass (metres -> 16-bit PNG in mm, half resolution)
-            r.enable_depth_rendering()
-            dep = r.render()
-            r.disable_depth_rendering()
+        if camd.get("depth") and job.get("depth", True):     # 16-bit PNG in mm, half resolution
             mm = np.clip(dep[::2, ::2] * 1000.0, 0, 65535).astype(np.uint16)
             from PIL import Image
             Image.fromarray(mm).save(f"{depth_dir}/{f:05d}.png")
@@ -523,6 +555,9 @@ def write_poses(path, m0, poses, cams, fps_sim, t0):
                        "size: MuJoCo half-sizes (cylinder: radius, half-height); item_mat: 3x3 world rotation row-major; "
                        "the model geom 'prod' size varies per pick: use prod_size; the tool cylinder is hidden in "
                        "the render (replaced by the 'cup' items)."))
+
+
+POLICY_LABEL = {"tabpfn_jax": "tabpfn", "fixed": "fixed30", "fixed50": "fixed50"}   # decisions key -> file label
 
 
 # ================================================================================================ plan
@@ -655,8 +690,9 @@ def main():
     for c in plan["clips"]:
         t0, t1 = clip_window(picks, c)
         pol = plan["policy"]
-        name = f"{c['scene']}_{c['label']}_{c['camera']}_{pol}_{c['sim_fps']}.mp4"
-        jobs.append(dict(picks=picks, pitch=pitch, policy=pol, story=story, path=str(out / name),
+        label = POLICY_LABEL.get(pol, pol)
+        name = f"{c['scene']}_{c['label']}_{c['camera']}_{label}_{c['sim_fps']}.mp4"
+        jobs.append(dict(picks=picks, pitch=pitch, policy=label, story=story, path=str(out / name),
                          clip=dict(camera=c["camera"], t0=t0, t1=t1, sim_fps=c["sim_fps"], W=a.W, H=a.H)))
     with ProcessPoolExecutor(min(a.workers, len(jobs)), mp_context=mp.get_context("spawn")) as ex:
         results = list(ex.map(render_clip, jobs))
@@ -665,7 +701,7 @@ def main():
     commit = git_commit()
     for c, rres, j in zip(plan["clips"], results, jobs):
         man = [e for e in man if e["file"] != rres["file"]]
-        man.append(dict(file=rres["file"], scene=c["scene"], camera=c["camera"], policy=plan["policy"],
+        man.append(dict(file=rres["file"], scene=c["scene"], camera=c["camera"], policy=POLICY_LABEL.get(plan["policy"], plan["policy"]),
                         sim_fps=c["sim_fps"], video_fps=60, resolution=f"{a.W}x{a.H}", frames=rres["frames"],
                         sim_t0=rres["sim_t0"], sim_t1=rres["sim_t1"], stream=plan["stream"],
                         pick_ids=[p["idx"] for p in picks if p["t_start_g"] + p["dur"] >= rres["sim_t0"] and p["t_start_g"] <= rres["sim_t1"]],

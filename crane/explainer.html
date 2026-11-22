@@ -153,7 +153,7 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
     <div class="fact"><span class="v">22–64 ms</span><span class="k">one batched TabPFN-3.5 query on our RTX 4050 laptop GPU</span><a href="#m-tabpfn">team benchmark</a></div>
   </div>
   <nav class="toc" aria-label="Sections">
-    <a href="#live">1 · Live crane</a><a href="#physics">2 · Why loads swing</a><a href="#table">3 · The table</a><a href="#decide">4 · Each move</a><a href="#calib">5 · Calibration</a><a href="#realdata">6 · Real data</a><a href="#mujoco">6b · MuJoCo</a><a href="#playground">6c · Playground</a><a href="#closedloop">6d · Closed loop</a><a href="#influence">6e · Inputs &amp; outputs</a><a href="#setdown">6f · Set-down timing</a><a href="#method">7 · Problem &amp; training</a><a href="#today">8 · Today</a><a href="#business">9 · Business</a><a href="#sources">Sources</a>
+    <a href="#live">1 · Live crane</a><a href="#physics">2 · Why loads swing</a><a href="#table">3 · The table</a><a href="#decide">4 · Each move</a><a href="#calib">5 · Calibration</a><a href="#realdata">6 · Real data</a><a href="#mujoco">6b · MuJoCo</a><a href="#playground">6c · Playground</a><a href="#closedloop">6d · Closed loop</a><a href="#influence">6e · Inputs &amp; outputs</a><a href="#setdown">6f · Set-down timing</a><a href="#benefits">6g · Benefits &amp; run it</a><a href="#method">7 · Problem &amp; training</a><a href="#today">8 · Today</a><a href="#business">9 · Business</a><a href="#sources">Sources</a>
   </nav>
 </header>
 
@@ -488,6 +488,54 @@ ECE: |observed − predicted| rate, averaged over bins of p̂</div>
     <li><b>Where timing does win: release jobs.</b> Magnet and grab cranes drop scrap or bulk material into a hopper mid-swing, so only the landing point matters: position at release + sideways speed × fall time. TabPFN's accurate position prediction is exactly what that needs. It's our next demo, not built yet.</li>
     <li>Script: <span class="mono">crane/setdown_advisor.py</span>; results <span class="mono">crane/results/setdown_advisor.json</span>. Simulation, 12 moves, one seed.</li>
   </ul>
+</section>
+
+<!-- 6g BENEFITS + RUN -->
+<section id="benefits">
+  <div class="eyebrow">6g · Benefits, measured impact, and how to run it</div>
+  <h2>Better swing prediction → the right anti-sway setting → shorter waits → more moves per hour</h2>
+  <p>The chain is the same everywhere. TabPFN predicts where the load will be from the crane's own recent motion, with a calibrated range. That prediction lets the crane (or the operator) choose the speed and anti-sway setting that suits <i>this</i> load. The swing then dies out quickly, the settle wait shrinks, and every cycle gets shorter. Nothing is retrained along the way; new rows are the adaptation.</p>
+  <div class="box"><table class="ptab"><thead><tr><th>What changes</th><th>Without TabPFN</th><th>With TabPFN</th><th>Where measured</th></tr></thead><tbody>
+    <tr><td>Swing prediction on a <b>new payload</b>, 1 s ahead</td><td class="v">0.54 cm (fitted physics)</td><td class="v"><b>0.10 cm</b> after 5 s of its rows (from 0.30)</td><td>real lab crane (6)</td></tr>
+    <tr><td>Trust in the range (90% range holds)</td><td class="v">–</td><td class="v">32% → <b>91%</b> after 5 s</td><td>real lab crane (6)</td></tr>
+    <tr><td>Swing prediction with a <b>hidden long sling</b></td><td class="v">4.7 cm</td><td class="v"><b>0.7 cm</b></td><td>MuJoCo, 27 runs (6e)</td></tr>
+    <tr><td>Swing prediction, all 81 playground settings</td><td class="v">2.2 cm</td><td class="v"><b>0.8 cm</b></td><td>MuJoCo (6c)</td></tr>
+    <tr><td>12 new loads: total time</td><td class="v">403 s (107 moves/h)</td><td class="v"><b>261 s (166 moves/h), −35%</b></td><td>MuJoCo closed loop (6d)</td></tr>
+    <tr><td>Settle wait per move</td><td class="v">19.9 s</td><td class="v"><b>7.4 s</b></td><td>MuJoCo closed loop (6d)</td></tr>
+    <tr><td>Pick-and-place cycle, 2.0 m sling</td><td class="v">69.5 s (settle 23.7 s), anti-sway set for 0.5 m</td><td class="v"><b>47 s (settle 1.0–1.6 s)</b> with the anti-sway set for the real sling, the setting TabPFN's closed loop learns to pick</td><td>live MuJoCo pick and place</td></tr>
+    <tr><td>Placement in the bay</td><td class="v">+6 cm</td><td class="v">−3 / +5 cm</td><td>live MuJoCo pick and place</td></tr>
+    <tr><td>Collisions</td><td class="v">0</td><td class="v">0</td><td>no safety gain shown yet</td></tr>
+  </tbody></table></div>
+  <ul class="note">
+    <li><b>Where the gain comes from:</b> killing the swing with the right anti-sway setting, chosen from predictions. Timing the set-down alone does not work (6f): TabPFN predicts the position correctly, but the load is still moving.</li>
+    <li><b>Why it's deployable:</b> no training loop; a new load is handled by adding rows. Predictions take about 130 ms on a laptop GPU. It can start in <b>manual mode</b> as advice to the operator (one cycle at a time), then move to <b>auto</b>.</li>
+    <li><b>What is not yet shown:</b> the live pick-and-place app takes the anti-sway setting from the operator (← / →). Choosing it automatically per load is shown in the closed loop (6d), not yet inside the live app. All results are simulation or a lab-scale crane; one run or seed each.</li>
+  </ul>
+
+  <h3>Run it live on your machine</h3>
+  <div class="formula"><span class="c"># once: environment, data, key (see crane/README.md)</span>
+uv venv --python 3.12 crane/.venv &amp;&amp; uv pip install --python crane/.venv/bin/python -r crane/requirements.txt
+<span class="c"># TABPFN_TOKEN in ./.env, TabPFN-3.5 licence accepted on platform.priorlabs.ai</span>
+
+<span class="c"># live pick and place (auto mode, anti-sway set for the entered 0.5 m sling)</span>
+set -a; . ./.env; set +a; TABPFN_NO_BROWSER=1 MUJOCO_GL=glfw crane/.venv/bin/python crane/live_pick_place.py
+<span class="c"># other start options</span>
+... live_pick_place.py --manual                 <span class="c"># one cycle per Enter</span>
+... live_pick_place.py --stopped --tune 2.0     <span class="c"># start idle, anti-sway set for 2.0 m</span>
+... live_pick_place.py --rope 6 --sling 3 --payload 0.5 --speed 0.8
+<span class="c"># live prediction only (no picking): crane shuttles between bays</span>
+... live_crane.py</div>
+  <div class="box"><table class="ptab"><thead><tr><th>Key (in the 3D window)</th><th>Or type in the terminal</th><th>Does</th></tr></thead><tbody>
+    <tr><td>Enter</td><td><span class="mono">start</span> / <span class="mono">stop</span></td><td>AUTO: start or stop cycling (a stop finishes the current cycle and sets the beam down). MANUAL: run one pick-and-place cycle</td></tr>
+    <tr><td>1 / 2</td><td><span class="mono">auto</span> / <span class="mono">manual</span></td><td>switch mode</td></tr>
+    <tr><td>← / →</td><td><span class="mono">tune 2.0</span> / <span class="mono">tune off</span></td><td>sling length the anti-sway assumes (off, 0.5 … 3.0 m)</td></tr>
+    <tr><td>↑ / ↓</td><td><span class="mono">speed 0.8</span></td><td>speed and acceleration ±10%</td></tr>
+    <tr><td>Page Up / Page Down</td><td><span class="mono">sling 2.5</span></td><td>real sling length ±0.5 m (hidden from TabPFN)</td></tr>
+    <tr><td>Home / End</td><td><span class="mono">rope 5</span></td><td>rope length ±0.5 m</td></tr>
+    <tr><td>Insert / Delete</td><td><span class="mono">payload 0.5</span></td><td>payload ±0.5 t</td></tr>
+    <tr><td>close window</td><td><span class="mono">quit</span></td><td>exit</td></tr>
+  </tbody></table></div>
+  <p class="note">Changes to rope, sling, payload and speed apply at the next pick. The window shows the mode, the phase, TabPFN's and the physics model's prediction 1 s ahead, their recent error, and each cycle's time, settle wait and placement.</p>
 </section>
 
 <!-- 7 METHOD -->

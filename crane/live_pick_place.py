@@ -8,6 +8,8 @@ The beam is a separate body resting in a bay. Each cycle: LOWER the hook on the 
 travel height -> TRAVEL to the other bay -> SETTLE (|swing| < 5 cm for 1 s, the crane's own rule) -> LOWER into the bay
 -> RELEASE (weld off) -> RAISE empty -> pick the same beam again and carry it back.
 TabPFN (teal ghost + 90% floor band) and the physics model (orange) predict the load 1 s ahead during TRAVEL and SETTLE.
+Start / stop: Enter (or type start / stop). Modes: 1 = AUTO (cycles until stopped; a stop finishes the current cycle and
+sets the beam down), 2 = MANUAL (one pick-and-place cycle per Enter). Flags: --manual, --stopped (start idle).
 Anti-sway: ZV shaper, by default tuned for the operator-entered 0.5 m sling (--tune; 0 = off). Left/Right arrow (or
 'tune 2.0' / 'tune off') changes the sling it assumes: match the real sling and the swing dies out quickly.
 Keys / terminal commands as in live_crane.py (Up/Down speed, PgUp/PgDn sling, Home/End rope, Ins/Del payload;
@@ -124,6 +126,8 @@ def main():
     ap.add_argument('--payload', type=float, default=0.5); ap.add_argument('--speed', type=float, default=1.0)
     ap.add_argument('--headless', type=float, default=0)
     ap.add_argument('--tune', type=float, default=0.5, help='anti-sway assumed sling (m); 0 = off')
+    ap.add_argument('--manual', action='store_true', help='manual mode: one cycle per Enter / "start"')
+    ap.add_argument('--stopped', action='store_true', help='start idle; press Enter or type start')
     a = ap.parse_args()
     P = dict(rope=a.rope, sling=a.sling, payload=a.payload, speed=a.speed); pending = dict(P); lock = threading.Lock()
     T = {'i': TUNES.index(a.tune) if a.tune in TUNES else 1}
@@ -151,7 +155,7 @@ def main():
     tid, gid, lid = m.body('trolley').id, m.body('grip').id, m.body('load').id
     jtx, jh = m.joint('tx').qposadr[0], m.joint('hoist').qposadr[0]; eq = m.equality('grab').id; hid = m.actuator('hoist_m').id
     d.qpos[jtx] = mc.BAYS[0]; d.qpos[jh] = P['rope']; d.ctrl[hid] = P['rope']; mujoco.mj_forward(m, d)
-    S = dict(phase='LOWER', t0=0.0, hoist_from=P['rope'], hoist_to=None, attached=False, inTol=0.0, cycle0=0.0, cycles=[], last_row=-1.0, quit=False, phys=None)
+    S = dict(mode='manual' if a.manual else 'auto', run=not a.stopped and not a.manual, phase='IDLE' if (a.stopped or a.manual) else 'LOWER', t0=0.0, hoist_from=P['rope'], hoist_to=None, attached=False, inTol=0.0, cycle0=0.0, cycles=[], last_row=-1.0, quit=False, phys=None)
     mover = ShapedMover(mc.BAYS[0]); hist = collections.deque(maxlen=40); preds, phys_at, errs = {}, {}, collections.deque(maxlen=100)
     cond = lambda: dict(L1=P['rope'], L2=P['sling'], m_hook=M_HOOK, m_load=P['payload'] * 1000, beam=BEAM)
     pick_len = lambda: PIVOT_Z - HOOK_DROP - P['sling'] - LOAD_H - 0.01 - 0.15   # rope length that puts the grip on the beam top
@@ -189,11 +193,15 @@ def main():
             S['inTol'] = S['inTol'] + mc.DT if abs(offset()) < TOL else 0.0
             if S['inTol'] >= HOLD or el >= CAP: S['settle_s'] = el; S['hoist_from'] = d.qpos[jh]; set_phase('LOWER')
         elif ph == 'RELEASE' and el > 0.6: S['hoist_from'] = d.qpos[jh]; set_phase('RAISE')
-        elif ph == 'NEXT':                                                    # cycle done; apply changes, pick the beam again
-            S['cycles'].append(dict(cycle_s=round(t - S['cycle0'], 1), settle_s=round(S.get('settle_s', 0), 1), placed_cm=S.get('place_cm'), antisway=TUNES[T['i']], **P)); S['cycle0'] = t
+        elif ph == 'NEXT':                                                    # cycle done
+            S['cycles'].append(dict(cycle_s=round(t - S['cycle0'], 1), settle_s=round(S.get('settle_s', 0), 1), placed_cm=S.get('place_cm'), antisway=TUNES[T['i']], mode=S['mode'], **P))
+            mover.x0 = mover.ref(t); mover.t0 = None
+            if S['mode'] == 'manual': S['run'] = False                        # manual: one cycle per start
+            set_phase('IDLE')
+        elif ph == 'IDLE' and S['run']:                                      # start (auto: keeps going; manual: one cycle)
             with lock: new = dict(pending)
             if new != P: P.update(new); rebuild()
-            mover.x0 = mover.ref(t); mover.t0 = None; S['hoist_from'] = d.qpos[jh]; set_phase('LOWER')
+            S['cycle0'] = t; S['hoist_from'] = d.qpos[jh]; set_phase('LOWER')
         M = float(m.body_subtreemass[tid]) + (P['payload'] * 1000 if S['attached'] else 0.0)
         xr, vr, ar = mover.state(t)                                          # holds at the end bay after the move
         d.ctrl[m.actuator('drive').id] = M * ar + M * 25 * (xr - d.qpos[jtx]) + M * 10 * (vr - d.qvel[m.joint('tx').dofadr[0]])
@@ -211,7 +219,17 @@ def main():
                 if r: preds[round(r[0], 1)] = (r[2], phys_at.get(round(r[0], 1)))
         elif S['phase'] not in ('TRAVEL', 'SETTLE'): S['phys'] = None
 
+    def control(cmd):
+        if cmd == 'start': S['run'] = True
+        elif cmd == 'stop': S['run'] = False
+        elif cmd == 'toggle': S['run'] = not S['run']
+        elif cmd in ('auto', 'manual'): S['mode'] = cmd; S['run'] = False if cmd == 'manual' else S['run']
+        print(f"mode {S['mode']}, {'running' if S['run'] else ('stopping after this cycle' if S['phase'] != 'IDLE' else 'stopped')}", flush=True)
+
     def on_key(k):
+        if k in (257, 335): control('toggle'); return                       # Enter / keypad Enter: start / stop
+        if k == 49: control('auto'); return                                  # '1'
+        if k == 50: control('manual'); return                                # '2'
         if k in (262, 263):                                                   # Right / Left: anti-sway assumed sling
             T['i'] = (T['i'] + (1 if k == 262 else -1)) % len(TUNES); print('anti-sway for next move:', TUNES[T['i']], flush=True); return
         if k in KEYS:
@@ -224,6 +242,7 @@ def main():
             w = line.split()
             if not w: continue
             if w[0] == 'quit': S['quit'] = True; return
+            if w[0] in ('start', 'stop', 'auto', 'manual'): control(w[0]); continue
             if len(w) == 2 and w[0] == 'tune':
                 v = None if w[1] in ('off', '0') else float(w[1]); T['i'] = TUNES.index(v) if v in TUNES else T['i']; print('anti-sway for next move:', TUNES[T['i']], flush=True); continue
             if len(w) == 2 and w[0] in LIMITS:
@@ -246,17 +265,18 @@ def main():
         if show and S['phys']:
             ghost(scn, [BEAM / 2, 0.3, 0.02], [mover.ref(S['phys'][0] + H) + S['phys'][1], 0, 0.08], (0.77, 0.35, 0.09, 0.9))
         e = list(errs); ep = np.mean([x[0] for x in e]) * 100 if e else float('nan'); ef = [x[1] for x in e if x[1] is not None]; ef = np.mean(ef) * 100 if ef else float('nan')
-        label = dict(LOWER='lowering the hook' if not S['attached'] else 'lowering into the bay', GRAB='grabbing the beam', RAISE='lifting' if S['attached'] else 'raising the empty hook',
+        label = dict(IDLE='stopped: press Enter (or type start)' if S['mode'] == 'auto' else 'manual: press Enter for one cycle', LOWER='lowering the hook' if not S['attached'] else 'lowering into the bay', GRAB='grabbing the beam', RAISE='lifting' if S['attached'] else 'raising the empty hook',
                      TRAVEL='travelling', SETTLE=f"waiting for the swing to settle ({d.time - S['t0']:.1f} s)", RELEASE='releasing', NEXT='next pick')[S['phase']]
         last = S['cycles'][-1] if S['cycles'] else None
         with lock: nxt = dict(pending)
-        left = (f"Pick and place · {label}\nrope {P['rope']} m  sling {P['sling']} m (hidden)  payload {P['payload']} t  speed {int(P['speed'] * 100)}%\n"
+        runst = 'running' if S['run'] else ('stopping after this cycle' if S['phase'] != 'IDLE' else 'stopped')
+        left = (f"Pick and place · {S['mode'].upper()} · {runst} · {label}\nrope {P['rope']} m  sling {P['sling']} m (hidden)  payload {P['payload']} t  speed {int(P['speed'] * 100)}%\n"
                 f"TabPFN (teal) in 1 s: {('%+.2f m  90%%: %+.2f..%+.2f' % (r[2], r[1], r[3])) if (r and show) else '-'}\nphysics (orange): {('%+.2f m' % S['phys'][1]) if S['phys'] else '-'}\n"
                 f"mean error last 10 s: TabPFN {ep:.1f} cm  physics {ef:.1f} cm\n"
                 f"anti-sway: " + (f"ZV tuned for a {TUNES[T['i']]} m sling" if TUNES[T['i']] else 'off') + "\n"
                 f"cycles {len(S['cycles'])}" + (f"  last: {last['cycle_s']} s, settle {last['settle_s']} s, placed {last['placed_cm']:+d} cm from bay centre" if last else ''))
         keys = (f"next pick: rope {nxt['rope']}  sling {nxt['sling']}  payload {nxt['payload']}  speed {int(nxt['speed'] * 100)}%\n"
-                "Up/Down speed  PgUp/PgDn sling  Home/End rope  Ins/Del payload  Left/Right anti-sway tuning")
+                "Enter start/stop  1 auto  2 manual  |  Up/Down speed  PgUp/PgDn sling  Home/End rope  Ins/Del payload  Left/Right anti-sway")
         return [(mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_TOPLEFT, left, None), (mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_BOTTOMLEFT, keys, None)]
 
     if a.headless:
@@ -264,9 +284,10 @@ def main():
         while d.time < a.headless:
             step_once()
             if d.time > time.time() - t0: time.sleep(max(0.0, d.time - (time.time() - t0)))
+            if a.manual and S['phase'] == 'IDLE' and not S['run'] and len(S['cycles']) < 2 and d.time > 2: control('start')   # test: press start
             if d.time - last_print >= 5:
                 last_print = d.time; e = list(errs); ef = [x[1] for x in e if x[1] is not None]
-                print(f"t={d.time:5.1f} {S['phase']:8s} attached={S['attached']} trolley x={d.qpos[jtx]:5.2f} load x={d.xpos[lid][0]:5.2f} z={d.xpos[lid][2]:4.2f}  "
+                print(f"t={d.time:5.1f} {S['mode']:6s} run={S['run']!s:5s} {S['phase']:8s} attached={S['attached']} trolley x={d.qpos[jtx]:5.2f} load x={d.xpos[lid][0]:5.2f} z={d.xpos[lid][2]:4.2f}  "
                       f"TabPFN {np.mean([x[0] for x in e]) * 100 if e else float('nan'):.1f} cm  physics {np.mean(ef) * 100 if ef else float('nan'):.1f} cm  cycles {len(S['cycles'])}", flush=True)
         print('cycles:', S['cycles'], flush=True); req.put(None); time.sleep(0.3); os._exit(0)
 

@@ -21,8 +21,10 @@ Context: the full commissioning log (results/logs/commission_lap.csv + commissio
 
 Stages:
   bank    simulate all 120 x 9 picks          -> results/shift/bank.csv
-  decide  replay both policies on the bank    -> results/shift/decisions.csv (+ risk vectors, events)
-Usage: .venv/bin/python showcase/line_shift.py bank|decide [--workers 10]
+  decide      replay both policies on the bank    -> results/shift/decisions.csv (+ risk vectors, events)
+  decide_jax  the same with TabPFN-3.5-Fast answered in JAX (rolling 2,700-row context), plus the fixed 50 % recipe
+              ("fastest speed with <= 5 % commissioning drops")  -> results/shift/decisions_jax.csv
+Usage: .venv/bin/python showcase/line_shift.py bank|decide|decide_jax [--workers 10]
 """
 from __future__ import annotations
 
@@ -86,7 +88,58 @@ def stage_bank(workers: int):
         print(f"  {k:8s}", t.loc[ids].mean().round(2).to_dict())
 
 
-def stage_decide():
+def jax_policy_class():
+    """TabPFN-3.5-Fast with the JAX query path (jax_tabpfn, PR #1/#2): the context is fitted by PyTorch in fp32 and
+    exported (export.bundle_from_classifier); every pick's 9-speed query runs in JAX fp32, which the verification
+    measured identical in decisions to PyTorch fp32 (0 of 3,825 differ). The context is an exactly fixed-size
+    rolling window (the commissioning log's 2,700 rows: each new pick in, the oldest held pick out, every drop kept),
+    so JAX compiles once. jax is imported before torch (shared GPU)."""
+    from jax_tabpfn.export import bundle_from_classifier
+    from jax_tabpfn.runtime import JaxTabPFN
+    import torch
+    from policy.policies import TabPFNPolicy
+    from tabpfn import TabPFNClassifier
+    from tabpfn.constants import ModelVersion
+
+    class JaxTabPFNPolicy(TabPFNPolicy):
+        def __init__(self, **kw):
+            super().__init__(version="3.5-fast", **kw)
+            self.clf = TabPFNClassifier.create_default_for_version(
+                ModelVersion.V3_5_FAST, n_estimators=1, device="cuda", fit_mode="fit_with_cache", random_state=0,
+                inference_precision=torch.float32, kv_cache_precision="auto")
+            self.jm = None
+            self.name = self.name.replace("tabpfn-3.5-fast(", "tabpfn-3.5-fast-jax(")
+
+        def start(self, log):
+            self.n_fixed = len(log)            # the context stays exactly this size: JAX compiles once
+            super().start(log)
+
+        def _refit(self):
+            """Exactly fixed-size rolling window: after the new picks are appended, the same number of the oldest
+            held rows leave (drops are never evicted)."""
+            excess = len(self.log) - self.n_fixed
+            if excess > 0:
+                held = np.where(~self.log["dropped"].astype(bool).to_numpy())[0][:excess]
+                self.log = self.log.drop(self.log.index[held]).reset_index(drop=True)
+            super()._refit()
+
+        def _fit(self, X, y):
+            self.clf.fit(X, y)
+            b = bundle_from_classifier(self.clf)
+            if self.jm is None:
+                self.jm = JaxTabPFN(b, fast=False)
+                self.jm.warmup(9)                  # compile (once, then the persistent cache) before the first pick
+            else:
+                self.jm.update_context(b)
+
+        def _proba(self, X):
+            return self.jm.predict_proba(X)[:, 1]
+    return JaxTabPFNPolicy
+
+
+def stage_decide(jax: bool = False):
+    if jax:
+        import jax_tabpfn.runtime  # noqa: F401  (jax before torch)
     from dotenv import load_dotenv
     load_dotenv(ROOT / ".env")
     from policy.policies import X_COLS, FixedRecipe, TabPFNPolicy, replay
@@ -94,17 +147,24 @@ def stage_decide():
     assert (bank.groupby("idx")["alpha"].nunique() == 9).all() and bank["idx"].nunique() == N, "incomplete bank"
     log = pd.concat([pd.read_csv(ROOT / "results/logs/commission_lap.csv"),
                      pd.read_csv(ROOT / "results/logs/commission_srv.csv")], ignore_index=True)
+    if jax:
+        pols = (("fixed", FixedRecipe(cost=10)), ("fixed50", FixedRecipe(target=0.05)),
+                ("tabpfn_jax", jax_policy_class()(cost=10, safe_step=True, refit_every=2)))
+        out_csv = OUT / "decisions_jax.csv"
+    else:
+        pols = (("fixed", FixedRecipe(cost=10)), ("tabpfn", TabPFNPolicy(cost=10, safe_step=True, refit_every=2)))
+        out_csv = OUT / "decisions.csv"
     out = []
-    for name, pol in (("fixed", FixedRecipe(cost=10)), ("tabpfn", TabPFNPolicy(cost=10, safe_step=True, refit_every=2))):
+    for name, pol in pols:
         risk: dict[int, list] = {}
         nctx: dict[int, int] = {}
         lat: dict[int, float] = {}
-        if name == "tabpfn":
+        if name.startswith("tabpfn"):
             orig = pol.choose
 
             def choose(cand, pol=pol, orig=orig):
                 i = int(cand["idx"].iloc[0])
-                t0 = time.perf_counter()     # measured query time of this run (torch on the shared H100)
+                t0 = time.perf_counter()     # measured per-pick query time of this run
                 p = pol._proba(cand[X_COLS].to_numpy(float)) if pol.const is None else np.full(len(cand), pol.const)
                 lat[i] = (time.perf_counter() - t0) * 1e3
                 risk[i], nctx[i] = [float(x) for x in p], len(pol.log)
@@ -117,8 +177,10 @@ def stage_decide():
         runs["tabpfn_ms"] = runs["idx"].map(lambda i: lat.get(int(i), np.nan))
         out.append(runs)
         good = (~runs["dropped"].astype(bool)).sum()
-        print(f"{name:7s}: drops {int(runs['dropped'].sum())}/{len(runs)}, good picks/min "
-              f"{60 * good / runs['cycle_s'].sum():.1f}, mean speed {runs['alpha'].mean():.2f}")
+        ms = runs["tabpfn_ms"].dropna()
+        print(f"{name:10s}: drops {int(runs['dropped'].sum())}/{len(runs)}, good picks/min "
+              f"{60 * good / runs['cycle_s'].sum():.1f}, mean speed {runs['alpha'].mean():.2f}"
+              + (f", query ms median {ms.median():.2f} p95 {ms.quantile(0.95):.2f} max {ms.max():.2f}" if len(ms) else ""))
         for a, b, lab in EVENTS:
             seg = runs[(runs["idx"] >= a) & (runs["idx"] <= b)]
             print(f"    {lab:42s} speed {seg['alpha'].mean():.2f}  drops {int(seg['dropped'].sum())}")
@@ -126,14 +188,14 @@ def stage_decide():
     keep = ["policy_key", "policy", "idx", "sku", "film", "cup_cycles", "weight_g", "belt_mps", "alpha", "seed",
             "seal_kpa", "evac_ms", "dropped", "place_offset_mm", "cycle_s", "a_peak", "risk", "n_ctx", "tabpfn_ms",
             "prod_t", "room_rh"]
-    dec[keep].to_csv(OUT / "decisions.csv", index=False)
+    dec[keep].to_csv(out_csv, index=False)
     (OUT / "events.json").write_text(json.dumps([dict(first=a, last=b, label=l) for a, b, l in EVENTS], indent=1))
-    print("wrote", OUT / "decisions.csv")
+    print("wrote", out_csv)
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("stage", choices=["bank", "decide"])
+    ap.add_argument("stage", choices=["bank", "decide", "decide_jax"])
     ap.add_argument("--workers", type=int, default=10)
     a = ap.parse_args()
-    stage_bank(a.workers) if a.stage == "bank" else stage_decide()
+    stage_bank(a.workers) if a.stage == "bank" else stage_decide(jax=a.stage == "decide_jax")

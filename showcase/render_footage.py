@@ -40,7 +40,7 @@ import pandas as pd
 MS = 1e-3
 RELEASE_T = 0.30                      # s recorded after arrival (vacuum off at +40 ms, product settles)
 ALPHAS = np.round(np.arange(0.2, 1.01, 0.1), 2)
-V_OUT = 0.30                          # m/s outfeed belt (display only)
+V_OUT = 0.45                          # m/s outfeed belt (display only): ~0.28 m between placed bars
 SKU_RGBA = {"bar 45 g": [0.86, 0.36, 0.12, 1], "protein bar 60 g": [0.10, 0.48, 0.62, 1]}   # plain one-colour wraps
 
 
@@ -174,40 +174,97 @@ def restyle_scene(m, scn, sku_rgba):
             _style(g, ALU)
         elif body.startswith("s") and body[1:].isdigit():
             _style(g, CARBON)
-        elif body == "tool" or body.startswith("lip"):
+        elif body == "tool" and m.geom_type[g.objid] == mujoco.mjtGeom.mjGEOM_CYLINDER:
+            g.rgba[3] = 0.0                       # the fitting stand-in: replaced by the drawn suction cup
+        elif body.startswith("lip"):
+            g.rgba[3] = 0.0                       # contact points of the lip ring: the drawn cup skirt is the visual
+        elif body == "tool":
             _style(g, SILICONE)
 
 
-def add_geom(scn, gtype, size, pos, mat, s, rgba=None):
-    import mujoco
-    if scn.ngeom >= scn.maxgeom:
-        return
-    g = scn.geoms[scn.ngeom]
-    size = np.r_[np.asarray(size, float), np.zeros(3)][:3]          # mjv_initGeom wants 3 size values
-    mujoco.mjv_initGeom(g, int(gtype), size, np.asarray(pos, float), np.asarray(mat, float).ravel(),
-                        np.asarray(rgba if rgba is not None else s["rgba"], np.float32))
-    g.specular, g.shininess = s["specular"], s["shininess"]
-    scn.ngeom += 1
+HOUSING = dict(rgba=[0.88, 0.88, 0.89, 1], specular=0.5, shininess=0.5)
+WRAP = dict(specular=0.55, shininess=0.7)
+METAL = dict(rgba=[0.55, 0.56, 0.58, 1], specular=0.8, shininess=0.7)
+KINDS = ["studio", "frame", "housing", "belt", "cup", "queue", "outfeed", "wrap_seal"]
 
 
-def add_studio(scn):
-    """Display only: studio enclosure (floor is the model's), the robot's support frame, the outfeed belt."""
+def _item(kind, gtype, size, pos, mat, style, rgba=None):
+    return dict(kind=kind, type=int(gtype), size=np.r_[np.asarray(size, float), np.zeros(3)][:3],
+                pos=np.asarray(pos, float), mat=np.asarray(mat, float).reshape(9), rgba=np.asarray(rgba if rgba is not None else style["rgba"], float),
+                specular=style["specular"], shininess=style["shininess"])
+
+
+def _bar_items(kind, gtype, size, pos, mat, rgba):
+    """A product, plus (for flow-wrapped bars) the crimped seal fins at both ends (display only: thin film)."""
     import mujoco
-    from sim.line import X_PLACE, Z_BELT
-    B, S = mujoco.mjtGeom.mjGEOM_BOX, mujoco.mjtGeom.mjGEOM_CYLINDER
+    out = [_item(kind, gtype, size, pos, mat, WRAP, rgba)]
+    size = np.asarray(size, float)
+    if gtype == mujoco.mjtGeom.mjGEOM_BOX and size[0] > 2.5 * size[1]:
+        R = np.asarray(mat, float).reshape(3, 3)
+        fin_rgba = np.array(rgba, float) * [0.85, 0.85, 0.85, 1]
+        for sgn in (-1, 1):
+            out.append(_item("wrap_seal", mujoco.mjtGeom.mjGEOM_BOX, [0.005, size[1] * 1.02, 0.0010],
+                             np.asarray(pos) + R @ [sgn * (size[0] + 0.005), 0, 0], R, WRAP, fin_rgba))
+    return out
+
+
+def display_items(m, d, p, picks, k, t, tl, pitch, camd):
+    """Everything drawn that is not a body of the simulated model (all display only), in world coordinates:
+    studio, support frame, base housing, outfeed belt, the drawn suction cup, the bar's seal fins, the queue of
+    upcoming items, placed items riding the outfeed, dropped items where they came to rest."""
+    import mujoco
+    from sim.line import X_PICK, X_PLACE, Z_BELT
+    B, C, E = mujoco.mjtGeom.mjGEOM_BOX, mujoco.mjtGeom.mjGEOM_CYLINDER, mujoco.mjtGeom.mjGEOM_ELLIPSOID
     eye = np.eye(3)
+    it = []
     for pos, size in (([-4, 0, 0], [0.02, 4, 3]), ([4, 0, 0], [0.02, 4, 3]), ([0, 4, 0], [4, 0.02, 3]),
                       ([0, -4, 0], [4, 0.02, 3]), ([0, 0, 2.6], [4, 4, 0.02])):
-        add_geom(scn, B, size, pos, eye, STUDIO)
-    # support frame outside the belts: 4 posts (floor to z = 0.03), top rails, and the cross beam carrying the base
-    for x, y in ((0.55, 0.75), (-0.55, 0.75), (0.55, -0.75), (-0.55, -0.75)):
-        add_geom(scn, S, [0.022, 0.665], [x, y, -0.635], eye, ALU)
-    for x in (0.55, -0.55):
-        add_geom(scn, B, [0.022, 0.75, 0.022], [x, 0.0, 0.03], eye, ALU)
-    for y in (0.75, -0.75):
-        add_geom(scn, B, [0.55, 0.022, 0.022], [0.0, y, 0.03], eye, ALU)
-    add_geom(scn, B, [0.55, 0.06, 0.022], [0.0, 0.0, 0.03], eye, ALU)
-    add_geom(scn, B, [0.07, 0.6, 0.004], [X_PLACE, 0.0, Z_BELT - 0.0065], eye, BELT)
+        it.append(_item("studio", B, size, pos, eye, STUDIO))
+    if camd.get("frame", True):     # support frame outside the belts: 4 posts, top rails, the beam carrying the base
+        for x, y in ((0.55, 0.75), (-0.55, 0.75), (0.55, -0.75), (-0.55, -0.75)):
+            it.append(_item("frame", C, [0.022, 0.665], [x, y, -0.635], eye, ALU))
+        for x in (0.55, -0.55):
+            it.append(_item("frame", B, [0.022, 0.75, 0.022], [x, 0.0, 0.03], eye, ALU))
+        for y in (0.75, -0.75):
+            it.append(_item("frame", B, [0.55, 0.022, 0.022], [0.0, y, 0.03], eye, ALU))
+        it.append(_item("frame", B, [0.55, 0.06, 0.022], [0.0, 0.0, 0.03], eye, ALU))
+    # base housing over the three motors (the real robot's wide top housing), rounded lid
+    it.append(_item("housing", C, [0.30, 0.055], [0.0, 0.0, 0.035], eye, HOUSING))
+    it.append(_item("housing", E, [0.30, 0.30, 0.05], [0.0, 0.0, 0.09], eye, HOUSING))
+    it.append(_item("belt", B, [0.07, 0.6, 0.004], [X_PLACE, 0.0, Z_BELT - 0.0065], eye, BELT))
+    # the suction cup on the tool flange: flat cup (the bar line's Ø25 flat cup), skirt + body + fitting
+    c = d.site_xpos[m.site("cupc").id]
+    r_lip = float(p["setup"].cup.r_lip)
+    it.append(_item("cup", E, [r_lip + 0.0008, r_lip + 0.0008, 0.0045], c + [0, 0, 0.0030], eye, SILICONE))
+    it.append(_item("cup", C, [0.62 * r_lip, 0.004], c + [0, 0, 0.0085], eye, SILICONE))
+    it.append(_item("cup", C, [0.0055, 0.010], c + [0, 0, 0.022], eye, METAL))
+    # seal fins on the simulated product
+    g = m.geom("prod").id
+    it += _bar_items("wrap_seal", m.geom_type[g], m.geom_size[g], d.geom_xpos[g], d.geom_xmat[g], p["rgba"])[1:]
+    if camd.get("ghosts", True):    # not in the side view: it looks along the belts and would see them end-on
+        for j, q in enumerate(picks[k + 1:k + 6], start=1):
+            yq = p["y0"] + p["vb"] * tl - j * pitch[k]
+            if yq > -0.6:
+                it += _bar_items("queue", q["gtype"], q["gsize"], [X_PICK, yq, q["z0"]], eye, q["rgba"])
+        for q in picks[:k]:
+            pos = np.array(q["final_pos"])
+            if not q["out"]["dropped"]:
+                pos[1] += V_OUT * max(t - q["t_release_g"], 0.0)
+                if pos[1] > 0.6:
+                    continue
+            it += _bar_items("outfeed", q["gtype"], q["gsize"], pos, q["final_mat"], q["rgba"])
+    return it
+
+
+def draw_items(scn, items):
+    import mujoco
+    for x in items:
+        if scn.ngeom >= scn.maxgeom:
+            return
+        g = scn.geoms[scn.ngeom]
+        mujoco.mjv_initGeom(g, x["type"], x["size"], x["pos"], x["mat"], x["rgba"].astype(np.float32))
+        g.specular, g.shininess = x["specular"], x["shininess"]
+        scn.ngeom += 1
 
 
 def add_lights(scn):
@@ -245,12 +302,16 @@ def ease(u):
     return u * u * (3 - 2 * u)
 
 
-CAMERAS = {  # lookat, distance, azimuth, elevation, fovy (deg; metres of view height if ortho)
-    "A-wide": dict(lookat=[0.0, 0.0, -0.72], dist=2.75, az=150, el=-8, fovy=30, orbit=0.0),
-    "A-wide-orbit": dict(lookat=[0.0, 0.0, -0.72], dist=2.75, az=142, el=-8, fovy=30, orbit=14.0),
+CAMERAS = {  # lookat (None: tracked), distance, azimuth, elevation, fovy (deg; view height in m if ortho)
+    # A: low, close, long lens; robot + belts fill ~60 % of the frame; no support frame (its legs would sit in front)
+    "A-wide": dict(lookat=[0.0, 0.0, -0.50], dist=3.0, az=150, el=-4, fovy=22, orbit=0.0, frame=False, depth=True),
+    "A-wide-orbit": dict(lookat=[0.0, 0.0, -0.50], dist=3.0, az=143, el=-4, fovy=22, orbit=14.0, frame=False, depth=True),
     "B-top": dict(lookat=[0.0, 0.0, -1.0], dist=0.95, az=0.0, el=-89.9, fovy=55, orbit=0.0),
-    "C-close": dict(lookat=[-0.1525, 0.0, -0.985], dist=0.42, az=158, el=-4, fovy=17, orbit=0.0),
-    "D-track": dict(lookat=None, dist=0.75, az=150, el=-12, fovy=24, orbit=0.0),
+    # C: follows the cup (Gaussian-smoothed, sigma 40 ms): cup in the upper third, the bar in the lower third
+    "C-close": dict(lookat=None, track="cup", offset=[0.0, 0.0, -0.016], sigma=0.04, dist=0.30, az=158, el=-3,
+                    fovy=18, orbit=0.0, depth=True),
+    "D-track": dict(lookat=None, track="tool", offset=[0.0, 0.0, 0.0], sigma=0.12, dist=0.75, az=150, el=-12, fovy=24,
+                    orbit=0.0),
     "E-side": dict(lookat=[0.0, 0.0, -0.965], dist=3.0, az=90, el=-1.0, fovy=0.52, orbit=0.0, ortho=True, ghosts=False),
 }
 
@@ -291,8 +352,8 @@ def render_clip(job: dict) -> dict:
         k = min(max(k, 0), len(picks) - 1)
         i = min(int(round((t - starts[k]) / MS)), len(picks[k]["qpos"]) - 1)
         return k, max(i, 0)
-    tool_track = None
-    if camd["lookat"] is None:
+    track = None
+    if camd["lookat"] is None:          # tracked camera: target on the frame grid, smoothed zero-phase (Gaussian)
         pts = []
         for f in range(n_frames):
             k, i = state(t0 + f / fps_sim)
@@ -300,13 +361,13 @@ def render_clip(job: dict) -> dict:
             d = datas.setdefault(k, mujoco.MjData(m))
             d.qpos[:] = picks[k]["qpos"][i]
             mujoco.mj_kinematics(m, d)
-            pts.append(d.xpos[m.body("tool").id].copy())
-        pts = np.array(pts)
-        sig = 0.12 * fps_sim
+            pts.append(d.site_xpos[m.site("cupc").id].copy() if camd["track"] == "cup" else d.xpos[m.body("tool").id].copy())
+        pts = np.array(pts) + np.array(camd.get("offset", [0, 0, 0]))
+        sig = max(camd.get("sigma", 0.12) * fps_sim, 1.0)
         ker = np.exp(-0.5 * (np.arange(-int(3 * sig), int(3 * sig) + 1) / sig) ** 2)
         ker /= ker.sum()
         pad = np.pad(pts, ((len(ker) // 2, len(ker) // 2), (0, 0)), mode="edge")
-        tool_track = np.stack([np.convolve(pad[:, j], ker, mode="valid") for j in range(3)], axis=1)
+        track = np.stack([np.convolve(pad[:, j], ker, mode="valid") for j in range(3)], axis=1)
     path = job["path"]
     ff = subprocess.Popen(
         ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", "60",
@@ -316,6 +377,10 @@ def render_clip(job: dict) -> dict:
          "-x264-params", "colorprim=bt709:transfer=bt709:colormatrix=bt709:range=tv",
          "-movflags", "+faststart", "-an", path], stdin=subprocess.PIPE)
     rows, cams = [], []
+    poses = dict(xpos=[], xquat=[], prod_size=[], items=[])
+    depth_dir = path[:-4] + ".depth"
+    if camd.get("depth") and job.get("depth", True):
+        Path(depth_dir).mkdir(exist_ok=True)
     for f in range(n_frames):
         t = t0 + f / fps_sim
         k, i = state(t)
@@ -331,33 +396,30 @@ def render_clip(job: dict) -> dict:
         cam = mujoco.MjvCamera()
         cam.type = mujoco.mjtCamera.mjCAMERA_FREE
         u = ease(f / max(n_frames - 1, 1))
-        cam.lookat[:] = tool_track[f] if tool_track is not None else camd["lookat"]
+        cam.lookat[:] = track[f] if track is not None else camd["lookat"]
         cam.distance, cam.azimuth, cam.elevation = camd["dist"], camd["az"] + camd["orbit"] * u, camd["el"]
         cam.orthographic = int(camd.get("ortho", False))     # camera-level switch: fovy is then the view height (m)
         r.update_scene(d, cam)
         scn = r.scene
         restyle_scene(m, scn, p["rgba"])
-        add_studio(scn)
-        add_lights(scn)
-        # queue: the next items of the stream on the infeed belt (display only; not in the side view, which looks
-        # along the belts and would see them end-on in front of the move)
         tl = i * MS
-        ghosts = camd.get("ghosts", True)
-        for j, q in enumerate(picks[k + 1:k + 6] if ghosts else [], start=1):
-            yq = p["y0"] + p["vb"] * tl - j * job["pitch"][k]
-            if yq > -0.6:
-                add_geom(scn, q["gtype"], q["gsize"], [X_PICK, yq, q["z0"]], np.eye(3),
-                         dict(specular=0.55, shininess=0.7), q["rgba"])
-        # placed items ride the outfeed away; dropped items stay where they came to rest (display only)
-        for q in (picks[:k] if ghosts else []):
-            pos = np.array(q["final_pos"])
-            if not q["out"]["dropped"]:
-                pos[1] += V_OUT * max(t - q["t_release_g"], 0.0)
-                if pos[1] > 0.6:
-                    continue
-            add_geom(scn, q["gtype"], q["gsize"], pos, q["final_mat"], dict(specular=0.55, shininess=0.7), q["rgba"])
+        items = display_items(m, d, p, picks, k, t, tl, job["pitch"], camd)
+        draw_items(scn, items)
+        add_lights(scn)
         img = r.render()
         ff.stdin.write(img.tobytes())
+        if camd.get("depth") and job.get("depth", True):     # depth pass (metres -> 16-bit PNG in mm, half resolution)
+            r.enable_depth_rendering()
+            dep = r.render()
+            r.disable_depth_rendering()
+            mm = np.clip(dep[::2, ::2] * 1000.0, 0, 65535).astype(np.uint16)
+            from PIL import Image
+            Image.fromarray(mm).save(f"{depth_dir}/{f:05d}.png")
+        # pose export (same state and items as this frame)
+        poses["xpos"].append(d.xpos.copy())
+        poses["xquat"].append(d.xquat.copy())
+        poses["prod_size"].append(m.geom_size[m.geom("prod").id].copy())
+        poses["items"].append(items)
         # sidecar row
         gl = scn.camera[0]
         g = m.geom("prod").id
@@ -386,11 +448,11 @@ def render_clip(job: dict) -> dict:
                    vac_kpa_live=round(p["dp"][i] / 1e3, 2), evac_ms=p["out"]["evac_ms"] if tg >= ev["seal_measured"] else np.nan,
                    cup_cycles=int(p["logged"]["cup_cycles"]), mass_g=round(p["logged"]["weight_g"], 1),
                    temp_c=round(p["logged"]["prod_t"], 1), rh_pct=round(p["logged"]["room_rh"], 1),
-                   context_rows=dec.get("n_ctx", np.nan) if job["policy"] == "tabpfn" else np.nan)
+                   context_rows=dec.get("n_ctx", np.nan) if job["policy"].startswith("tabpfn") else np.nan)
         for a, rk in zip(ALPHAS, dec.get("risk") or [np.nan] * 9):
-            row[f"risk_{int(round(a * 100))}"] = round(rk, 4) if (known and job["policy"] == "tabpfn") else np.nan
+            row[f"risk_{int(round(a * 100))}"] = round(rk, 4) if (known and job["policy"].startswith("tabpfn")) else np.nan
         row.update(chosen_speed=p["alpha"] if known else np.nan, policy=job["policy"],
-                   tabpfn_ms=round(dec.get("tabpfn_ms", np.nan), 2) if (known and job["policy"] == "tabpfn") else np.nan,
+                   tabpfn_ms=round(dec.get("tabpfn_ms", np.nan), 2) if (known and job["policy"].startswith("tabpfn")) else np.nan,
                    outcome=outcome,
                    placement_err_mm=round(p["out"]["place_offset_mm"], 2) if outcome == "placed" else np.nan,
                    picks=cnt["picks"], placed=cnt["placed"], dropped=cnt["dropped"], good_per_min=round(cnt["gpm"], 1),
@@ -398,13 +460,14 @@ def render_clip(job: dict) -> dict:
                    bbox_x0=round(np.nanmin(uv[:, 0]), 1), bbox_y0=round(np.nanmin(uv[:, 1]), 1),
                    bbox_x1=round(np.nanmax(uv[:, 0]), 1), bbox_y1=round(np.nanmax(uv[:, 1]), 1), visible=int(vis))
         rows.append(row)
-        cams.append(dict(frame=f, pos=[round(x, 5) for x in gl.pos], forward=[round(x, 5) for x in gl.forward],
-                         lookat=[round(float(x), 5) for x in cam.lookat],
+        cams.append(dict(frame=f, pos=[round(float(x), 5) for x in gl.pos], forward=[round(float(x), 5) for x in gl.forward],
+                         up=[round(float(x), 5) for x in gl.up], lookat=[round(float(x), 5) for x in cam.lookat],
                          fovy=camd["fovy"], orthographic=bool(camd.get("ortho", False))))
     ff.stdin.close()
     ff.wait()
     base = path[:-4]
     pd.DataFrame(rows).to_csv(base + ".frames.csv", index=False)
+    write_poses(base + ".poses.npz", picks[0]["model"], poses, cams, fps_sim, t0)
     # events: every per-pick event inside the clip, frame-exact (nearest frame on this clip's sim_fps grid)
     events = []
     for k, p in enumerate(picks):
@@ -414,7 +477,7 @@ def render_clip(job: dict) -> dict:
             e = dict(event=name, pick_id=p["idx"], sim_time=round(tg, 6), frame=int(round((tg - t0) * fps_sim)))
             if name == "decision":
                 e.update(speed=p["alpha"], policy=job["policy"])
-                if job["policy"] == "tabpfn":
+                if job["policy"].startswith("tabpfn"):
                     e.update(risk=p["decision"].get("risk"), latency_ms=p["decision"].get("tabpfn_ms"),
                              context_rows=p["decision"].get("n_ctx"))
             events.append(e)
@@ -425,6 +488,41 @@ def render_clip(job: dict) -> dict:
     Path(base + ".events.json").write_text(json.dumps(dict(clip=Path(path).name, sim_fps=fps_sim, video_fps=60,
                                                             sim_t0=t0, sim_t1=t1, events=events, camera=cams), indent=1, default=_num))
     return dict(file=Path(path).name, frames=n_frames, sim_t0=t0, sim_t1=t1)
+
+
+def write_poses(path, m0, poses, cams, fps_sim, t0):
+    """Everything a re-render (e.g. Blender) needs, per frame: world pose of every body, the geom table (static,
+    body-local), the display-only items (world), and the camera. Units: metres, quaternions w-x-y-z (MuJoCo)."""
+    import mujoco
+    F = len(poses["xpos"])
+    nmax = max(len(x) for x in poses["items"])
+    it_type = np.full((F, nmax), -1, np.int16)
+    it_kind = np.full((F, nmax), -1, np.int8)
+    it_size, it_pos = np.zeros((F, nmax, 3), np.float32), np.zeros((F, nmax, 3), np.float32)
+    it_mat, it_rgba = np.zeros((F, nmax, 9), np.float32), np.zeros((F, nmax, 4), np.float32)
+    for f, items in enumerate(poses["items"]):
+        for j, x in enumerate(items):
+            it_type[f, j], it_kind[f, j] = x["type"], KINDS.index(x["kind"])
+            it_size[f, j], it_pos[f, j], it_mat[f, j], it_rgba[f, j] = x["size"], x["pos"], x["mat"], x["rgba"]
+    body_names = [mujoco.mj_id2name(m0, mujoco.mjtObj.mjOBJ_BODY, b) or f"body{b}" for b in range(m0.nbody)]
+    geom_names = [mujoco.mj_id2name(m0, mujoco.mjtObj.mjOBJ_GEOM, g) or f"geom{g}" for g in range(m0.ngeom)]
+    np.savez_compressed(
+        path, frame=np.arange(F), sim_time_s=t0 + np.arange(F) / fps_sim, sim_fps=fps_sim,
+        body_names=np.array(body_names), xpos=np.array(poses["xpos"], np.float32), xquat=np.array(poses["xquat"], np.float32),
+        geom_names=np.array(geom_names), geom_type=m0.geom_type.copy(), geom_size=m0.geom_size.copy(),
+        geom_body=m0.geom_bodyid.copy(), geom_pos=m0.geom_pos.copy(), geom_quat=m0.geom_quat.copy(),
+        geom_rgba=m0.geom_rgba.copy(), geom_mesh=np.array([""] * m0.ngeom),
+        prod_size=np.array(poses["prod_size"], np.float32),
+        item_kinds=np.array(KINDS), item_kind=it_kind, item_type=it_type, item_size=it_size, item_pos=it_pos,
+        item_mat=it_mat, item_rgba=it_rgba,
+        cam_pos=np.array([c["pos"] for c in cams], np.float32), cam_forward=np.array([c["forward"] for c in cams], np.float32),
+        cam_up=np.array([c["up"] for c in cams], np.float32), cam_lookat=np.array([c["lookat"] for c in cams], np.float32),
+        cam_fovy=np.array([c["fovy"] for c in cams], np.float32), cam_orthographic=np.array([c["orthographic"] for c in cams]),
+        geom_type_names=np.array([mujoco.mjtGeom(i).name for i in range(8)]),
+        notes=np.array("geom_type/item_type: MuJoCo mjtGeom (2 sphere, 3 capsule, 4 ellipsoid, 5 cylinder, 6 box); "
+                       "size: MuJoCo half-sizes (cylinder: radius, half-height); item_mat: 3x3 world rotation row-major; "
+                       "the model geom 'prod' size varies per pick: use prod_size; the tool cylinder is hidden in "
+                       "the render (replaced by the 'cup' items)."))
 
 
 # ================================================================================================ plan
@@ -494,7 +592,7 @@ def git_commit():
 def make_plan_test():
     """Test pack: shift picks 0–8 under TabPFN; ~5 s per angle A–E around the middle picks."""
     return dict(
-        name="test", out="/home/nebius/delta_line/footage", stream="shift:bar", policy="tabpfn", idxs=list(range(0, 9)),
+        name="test", out="/home/nebius/delta_line/footage", stream="shift:bar", policy="tabpfn_jax", idxs=list(range(0, 9)),
         clips=[
             dict(scene="T00", label="cell", camera="A-wide", picks=[2, 7], sim_fps=60),
             dict(scene="T00", label="cell", camera="A-wide-orbit", picks=[2, 7], sim_fps=60),
@@ -512,8 +610,19 @@ def clip_window(picks, c):
         return max(a["t_start_g"] - 1.0, 0.0), min(b["t_start_g"] + b["dur"] + 1.0, picks[-1]["t_start_g"] + picks[-1]["dur"] - MS)
     p = by[c["pick"]]
     e = p["events_g"]
-    if c["window"] == "touch":
-        return e["touch"] - 1.0 if e["touch"] - 1.0 > 0 else 0.0, e["move_start"] + 0.15 + 1.0
+    if c["window"] == "touch":      # from 1 s before touch until the cup has carried the bar ~20 cm, + 1 s
+        import mujoco
+        m, d = p["model"], mujoco.MjData(p["model"])
+        tool = []
+        for q in p["qpos"]:
+            d.qpos[:] = q
+            mujoco.mj_kinematics(m, d)
+            tool.append(d.site_xpos[m.site("cupc").id].copy())
+        tool = np.array(tool)
+        i_t = int(round((e["touch"] - p["t_start_g"]) / MS))
+        far = np.where(np.linalg.norm(tool[i_t:] - tool[i_t], axis=1) > 0.20)[0]
+        t_far = p["t_start_g"] + (i_t + (far[0] if len(far) else len(tool) - 1 - i_t)) * MS
+        return max(e["touch"] - 1.0, 0.0), t_far + 1.0
     end = e["drop_impact"] or e["placed"] or e["release"]
     return e["move_start"] - 1.0, end + 1.0
 
@@ -532,7 +641,8 @@ def main():
         plan["clips"] = [c for c in plan["clips"] if c["camera"] in a.only.split(",")]
     out = Path(a.out or plan["out"])
     out.mkdir(parents=True, exist_ok=True)
-    decisions = pd.read_csv(ROOT / "results/shift/decisions.csv") if plan["stream"] == "shift:bar" else None
+    # shift decisions: TabPFN answered in JAX (policy key tabpfn_jax), fixed recipes fixed (30 %) and fixed50 (50 %)
+    decisions = pd.read_csv(ROOT / "results/shift/decisions_jax.csv") if plan["stream"] == "shift:bar" else None
     picks = build_stream(plan["stream"], plan["idxs"], plan["policy"], decisions, plan.get("alpha"), a.workers)
     pitch = queue_pitch(picks)
     story = []

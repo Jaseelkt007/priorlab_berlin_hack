@@ -27,7 +27,15 @@ FRAME_DT = 1e-3       # recorded state every 1 ms of simulated time
 
 def simulate(product: str, alpha: float, seed: int, v_belt: float):
     cfg, logged, hidden = sample(product, np.random.default_rng(seed), LineState())
-    cell = PickCell(PickSetup(cup=cfg, alpha=alpha, v_belt=v_belt, seed=seed))
+    cell, frames, out = record(PickCell(PickSetup(cup=cfg, alpha=alpha, v_belt=v_belt, seed=seed)))
+    verdict = "DROPPED" if out["dropped"] else f"placed, error {out['place_offset_mm']:.1f} mm"
+    print(f"{product} {logged['weight_g']:.1f} g, speed setting {alpha:.0%}: seal {out['seal_kpa']:.1f} kPa at touch, "
+          f"loaded move {out['move_ms']:.0f} ms (peak {out['a_peak']:.0f} m/s²) -> {verdict}")
+    return cell, frames, out
+
+
+def record(cell: PickCell):
+    """Run the pick, recording qpos every FRAME_DT, then release it onto the pad. Returns (cell, frames, outcome)."""
     frames = []
     every = int(round(FRAME_DT / cell.P.dt))
 
@@ -49,9 +57,6 @@ def simulate(product: str, alpha: float, seed: int, v_belt: float):
         cup.update(t, P.dt)
         if k % every == 0:
             frames.append(d.qpos.copy())
-    verdict = "DROPPED" if out["dropped"] else f"placed, error {out['place_offset_mm']:.1f} mm"
-    print(f"{product} {logged['weight_g']:.1f} g, speed setting {alpha:.0%}: seal {out['seal_kpa']:.1f} kPa at touch, "
-          f"loaded move {out['move_ms']:.0f} ms (peak {out['a_peak']:.0f} m/s²) -> {verdict}")
     return cell, frames, out
 
 

@@ -732,6 +732,18 @@ def make_plan_full():
         dict(name="fixed50_events", out=out, stream="shift:bar", policy="fixed50", idxs=shift, clips=ev_clips),
         dict(name="tabpfn_long", out=out, stream="shift:bar", policy="tabpfn_jax", idxs=shift, clips=long_clips),
         dict(name="fixed50_long", out=out, stream="shift:bar", policy="fixed50", idxs=shift, clips=long_clips),
+        # S05: a product never logged (results/new_bar, showcase/new_product.py). TabPFN climbs one setting at a time
+        # (20 -> 50 %), probes 60 % once at pick 27 (dropped), then holds 30-40 %; the recipe runs it at 20 %.
+        dict(name="s05_tabpfn", out=out, stream="new:bar", policy="tabpfn_jax", decisions="results/new_bar/decisions_jax.csv",
+             idxs=list(range(80)), clips=[
+                 dict(scene="S05", label="newproduct", camera=c, picks=[0, 79], sim_fps=15.625, fps_label="tl4", nsub=8,
+                      sub_ms=4) for c in ("A-wide", "A2-mid-lock", "B-top")] + [
+                 dict(scene="S05", label=lab, camera="D-track", picks=w, sim_fps=250)
+                 for lab, w in (("first", [0, 2]), ("climb", [21, 24]), ("probe", [26, 29]))]),
+        dict(name="s05_fixed", out=out, stream="new:bar", policy="fixed", label="fixedunknown",
+             decisions="results/new_bar/decisions_jax.csv", idxs=list(range(80)), clips=[
+                 dict(scene="S05", label="newproduct", camera="A2-mid-lock", picks=[0, 79], sim_fps=15.625,
+                      fps_label="tl4", nsub=8, sub_ms=4)]),
     ]
 
 
@@ -786,7 +798,9 @@ def run_plan(plan, a):
     out = Path(a.out or plan["out"])
     out.mkdir(parents=True, exist_ok=True)
     decisions = None
-    if plan["stream"] == "shift:bar" and "alpha" not in plan:
+    if "decisions" in plan:
+        decisions = pd.read_csv(ROOT / plan["decisions"])
+    elif plan["stream"] == "shift:bar" and "alpha" not in plan:
         # shift decisions: TabPFN answered in JAX (policy key tabpfn_jax), fixed recipes fixed (30 %) and fixed50 (50 %)
         decisions = pd.read_csv(ROOT / "results/shift/decisions_jax.csv")
     picks = build_stream(plan["stream"], plan["idxs"], plan["policy"], decisions, plan.get("alpha"), a.workers)
@@ -798,7 +812,7 @@ def run_plan(plan, a):
                 if p["idx"] == i:
                     story.append(dict(event=name, pick_id=i, sim_time=round(p["t_start_g"], 6)))
     jobs = []
-    label = POLICY_LABEL.get(plan["policy"], plan["policy"])
+    label = plan.get("label") or POLICY_LABEL.get(plan["policy"], plan["policy"])
     for c in plan["clips"]:
         t0, t1 = clip_window(picks, c)
         name = f"{c['scene']}_{c['label']}_{c['camera']}_{label}_{c.get('fps_label', c['sim_fps'])}.mp4"

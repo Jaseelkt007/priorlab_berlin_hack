@@ -139,10 +139,22 @@ video { display: block; background: #0b0f14; }
 .band div:first-child { border-left: 0; }
 .band b { font-size: 72px; font-weight: 800; line-height: 1; letter-spacing: -0.04em; }
 .band span { font-size: 22px; line-height: 1.35; color: rgba(255, 255, 255, 0.9); }
-.links { position: absolute; left: 120px; right: 120px; bottom: 118px; display: flex; align-items: center; gap: 36px; }
-.links img { width: 140px; height: 140px; }
-.links .t { font-size: 24px; line-height: 1.45; color: var(--tab); font-weight: 500; }
-.links .t b { display: block; font-size: 30px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
+.links { position: absolute; left: 120px; right: 120px; bottom: 112px; display: flex; align-items: center; gap: 56px; }
+.links .lk { display: flex; align-items: center; gap: 26px; text-decoration: none; }
+.links img { width: 130px; height: 130px; flex: none; }
+.links .t { font-size: 22px; line-height: 1.45; color: var(--tab); font-weight: 500; }
+.links .t b { display: flex; align-items: center; gap: 10px; font-size: 28px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
+.links .t b svg { width: 28px; height: 28px; }
+.links .lk:hover .t { text-decoration: underline; }
+.cover .watch {
+  position: absolute; top: 76px; right: 120px; z-index: 2;
+  display: inline-flex; align-items: center; gap: 14px; padding: 14px 24px 14px 16px;
+  border-radius: 16px; background: #fff; border: 1px solid var(--line);
+  box-shadow: 0 16px 40px -24px rgba(15, 23, 42, 0.5);
+  font-size: 24px; font-weight: 600; color: var(--ink); text-decoration: none;
+}
+.cover .watch svg { width: 40px; height: 40px; }
+.cover .watch:hover { border-color: #e11d48; }
 .links .right { margin-left: auto; text-align: right; font-size: 20px; line-height: 1.6; color: var(--ink-3); }
 
 /* ---------- on-screen controls (outside the slide; hidden while the mouse rests and in print) ---------- */

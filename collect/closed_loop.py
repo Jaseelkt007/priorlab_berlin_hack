@@ -36,40 +36,22 @@ OBS_KEYS = ["walker/accelerometer", "walker/actuator_activation", "walker/gyro",
 CONTEXT_PASSES = ("pass1_clean", "pass2_noise_a", "pass3_noise_b", "pass6_noise_strong")
 
 
-def recorded_steps(prev_action=False, passes=CONTEXT_PASSES):
-    """All training-pair steps of passes 1-3 and 6 (clean, noisy, strong noise): obs (n, 104), policy action (n, 12).
-
-    prev_action: append the action actually applied at the previous step (12 more columns, as
-    DuckPFN's `last_action`), and drop each flight's step 0, which has no previous action.
-    """
+def recorded_steps(passes=CONTEXT_PASSES):
+    """All training-pair steps of the given passes: obs (n, 104), policy action (n, 12), held-out pairs."""
     obs, act = [], []
     for name in passes:
-        d, _ = load(name, wingbeat=False, keys=["ids", "obs", "action_mean", "action_applied"])
+        d, _ = load(name, wingbeat=False, keys=["ids", "obs", "action_mean"])
         test, test_pairs = split_pairs(d["ids"])
-        o, keep = d["obs"], ~test
-        if prev_action:
-            # Rows are in step order within each flight, and every flight starts at step 0.
-            o = np.column_stack([o, np.roll(d["action_applied"], 1, axis=0)])
-            keep &= d["ids"][:, 4] > 0
-        obs.append(o[keep])
-        act.append(d["action_mean"][keep])
+        obs.append(d["obs"][~test])
+        act.append(d["action_mean"][~test])
     return np.concatenate(obs), np.concatenate(act), test_pairs
 
 
 class TabPFNController:
-    def __init__(self, n_steps, device, seed=0, context=None, prev_action=False, delta=False, bounds=None,
-                 passes=CONTEXT_PASSES):
-        """Context: `n_steps` random recorded steps, or explicit `context=(obs, act)` arrays.
-
-        prev_action: also feed the previous applied action (call reset() at every episode start;
-        the first step uses the context's mean action). bounds: (low, high) to clip outputs to,
-        so the remembered previous action is the one the env really applied. delta (needs
-        prev_action): predict the change from the previous action instead of the action
-        (DuckPFN's target_mode="delta"), so "copy the last action" is no longer a free answer.
-        """
-        if delta and not prev_action:
-            raise ValueError("delta needs prev_action")
-        self.prev_action, self.delta, self.bounds = prev_action, delta, bounds
+    def __init__(self, n_steps, device, seed=0, context=None, bounds=None, passes=CONTEXT_PASSES):
+        """Context: `n_steps` random recorded steps of `passes`, or explicit `context=(obs, act)` arrays.
+        bounds: (low, high) to clip the predicted actions to."""
+        self.bounds = bounds
         from dotenv import load_dotenv
         load_dotenv(ROOT / ".env")
         os.environ.setdefault("TABPFN_NO_BROWSER", "1")
@@ -77,18 +59,14 @@ class TabPFNController:
         from tabpfn.constants import ModelVersion
 
         if context is None:
-            obs, act, self.test_pairs = recorded_steps(prev_action, passes)
+            obs, act, self.test_pairs = recorded_steps(passes)
             pick = np.random.default_rng(seed).choice(len(obs), n_steps, replace=False)
             obs, act = obs[pick], act[pick]
         else:
             obs, act = context
             n_steps = len(obs)
-        if delta:
-            act = act - obs[:, -act.shape[1]:]  # the previous applied action is the last 12 columns
         self.mu, self.sd = act.mean(0), np.maximum(act.std(0), 1e-6)
         self.n_act = act.shape[1]
-        # First step of an episode: no previous action yet, use the context's mean action.
-        self.first_prev = ((act + obs[:, -self.n_act:]) if delta else act).mean(0).astype(np.float32)
         X = np.column_stack([np.repeat(obs, self.n_act, 0), np.tile(np.arange(self.n_act), len(obs))]).astype(np.float32)
         y = ((act - self.mu) / self.sd).reshape(-1)
         self.model = TabPFNRegressor.create_default_for_version(
@@ -98,10 +76,6 @@ class TabPFNController:
         self.model.fit(X, y)
         print(f"fitted context: {n_steps} steps = {len(X)} rows x {X.shape[1]} columns "
               f"in {time.time() - t0:.1f} s", flush=True)
-        self.reset()
-
-    def reset(self):
-        self.prev = self.first_prev.copy()
 
     def __call__(self, observation):
         return self.act_flat(np.concatenate([np.ravel(observation[k]) for k in OBS_KEYS]))
@@ -109,16 +83,9 @@ class TabPFNController:
     def act_flat(self, o):
         """Same as calling the controller, from the 104 sensor values already flattened in OBS_KEYS order."""
         o = np.asarray(o, np.float32)
-        if self.prev_action:
-            o = np.concatenate([o, self.prev])
         X = np.column_stack([np.repeat(o[None], self.n_act, 0), np.arange(self.n_act)]).astype(np.float32)
         a = np.asarray(self.model.predict(X)) * self.sd + self.mu
-        if self.delta:
-            a = self.prev + a
-        if self.bounds is not None:
-            a = np.clip(a, *self.bounds)
-        self.prev = a.astype(np.float32)
-        return a
+        return a if self.bounds is None else np.clip(a, *self.bounds)
 
 
 def main():

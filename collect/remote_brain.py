@@ -7,8 +7,7 @@ On the laptop, tunnel the port and point the live viewer at it:
     python collect/view_flight.py --controller remote --path saccade_then_smooth
 
 Protocol, per message: a 4-byte little-endian length, then that many bytes of float32. The client
-sends the 104 flattened sensor values and gets the 12 actions back; an empty message resets the
-controller's per-episode state. One client at a time.
+sends the 104 flattened sensor values and gets the 12 actions back. One client at a time.
 """
 
 import argparse
@@ -46,16 +45,12 @@ def _recv_exact(sock, n):
 
 
 class RemoteController:
-    """Client side: behaves like TabPFNController (call with the observation dict, reset per episode)."""
+    """Client side: behaves like TabPFNController (call it with the observation dict)."""
 
     def __init__(self, address="localhost:7777"):
         host, port = address.rsplit(":", 1)
         self.sock = socket.create_connection((host, int(port)))
         self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-
-    def reset(self):
-        self.sock.sendall(struct.pack("<I", 0))
-        _recv(self.sock)
 
     def __call__(self, observation):
         _send(self.sock, np.concatenate([np.ravel(observation[k]) for k in OBS_KEYS]))
@@ -83,10 +78,6 @@ def serve(args):
         try:
             while True:
                 o = _recv(conn)
-                if o is None:
-                    ctrl.reset()
-                    _send(conn, [])
-                    continue
                 _send(conn, ctrl.act_flat(o))
                 n += 1
                 if n % 500 == 0:

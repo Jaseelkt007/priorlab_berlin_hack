@@ -1,5 +1,0 @@
-# JAX runtime env (.venv-jax). Create with:
-#   uv venv -p 3.12 .venv-jax && VIRTUAL_ENV=.venv-jax uv pip install -r jax_tabpfn/requirements.txt
-jax[cuda13]==0.12.1
-safetensors==0.8.0
-numpy==2.5.5

@@ -106,8 +106,6 @@ def main():
         loader.set_next_trajectory(np.vstack([qpos, np.repeat(qpos[-1:], pad, 0)]),
                                    np.vstack([qvel, np.repeat(qvel[-1:], pad, 0)]))
         timestep = env.reset()
-        if ctrl is not None:
-            ctrl.reset()
         drift, n, why, ts = [], 0, "path end", time.time()
         while timestep.step_type != 2:
             obs = timestep.observation

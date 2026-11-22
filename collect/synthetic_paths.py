@@ -100,8 +100,6 @@ def main():
     parser.add_argument("--controller", choices=["policy", "tabpfn"], required=True)
     parser.add_argument("--context-steps", type=int, default=512)
     parser.add_argument("--paths", nargs="+", default=list(PATHS), choices=list(PATHS))
-    parser.add_argument("--prev-action", action="store_true", help="TabPFN also sees the previous action")
-    parser.add_argument("--delta", action="store_true", help="predict the change from the previous action")
     parser.add_argument("--context-passes", nargs="+", help="recorded passes for TabPFN's context (default: all)")
     parser.add_argument("--diagnose", action="store_true",
                         help="also save the fly's offset from the ghost (ahead/left/up) and, per step, "
@@ -116,11 +114,9 @@ def main():
     if args.controller == "tabpfn":
         from closed_loop import TabPFNController
         spec = env.action_spec()
-        act = ctrl = TabPFNController(args.context_steps, "cuda", prev_action=args.prev_action or args.delta,
-                                      delta=args.delta,
-                                      bounds=(spec.minimum, spec.maximum),
+        act = ctrl = TabPFNController(args.context_steps, "cuda", bounds=(spec.minimum, spec.maximum),
                                       **({"passes": args.context_passes} if args.context_passes else {}))
-        tag = f"tabpfn_ctx{args.context_steps}" + ("_delta" if args.delta else "_prev" if args.prev_action else "")
+        tag = f"tabpfn_ctx{args.context_steps}"
         if args.context_passes:
             tag += "_" + "-".join(p.split("_")[0] for p in args.context_passes)
     else:
@@ -140,8 +136,6 @@ def main():
         qpos, qvel, yaw_rate = make_path(PATHS[name], n_steps)
         loader.set_next_trajectory(qpos, qvel)
         timestep = env.reset()
-        if args.controller == "tabpfn":
-            ctrl.reset()
         drift, frames, n, t0 = [], [], 0, time.time()
         diag = {"offset_mm": [], "act": [], "act_policy": []}
         while timestep.step_type != 2:
@@ -152,8 +146,6 @@ def main():
                 label = expert(timestep.observation)
                 a = np.array(a, np.float32)  # copy: env.step edits the wing actions in place
                 a[handed] = label[handed]
-                if handed and args.prev_action:
-                    ctrl.prev = a.copy()  # TabPFN remembers what was really applied
                 diag["act"].append(a.copy())
                 diag["act_policy"].append(label)
             timestep = env.step(a)

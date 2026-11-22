@@ -2,12 +2,12 @@
 
     conda run -n flybody python collect/view_flight.py --flights 14 106 68
     conda run -n flybody python collect/view_flight.py --controller tabpfn --context-steps 512 --flights 14 106 68
-    conda run -n flybody python collect/view_flight.py --controller tabpfn --context-steps 256 --prev-action --path smooth
+    conda run -n flybody python collect/view_flight.py --controller tabpfn --context-steps 256 --path tour
 
 Plays the given reference flights in a loop (each from its first step). The ghost fly and
 the cyan dots are the real fly's recorded flight; the orange fly is the controller.
 Flights 14, 106 and 68 are held out from TabPFN's context. --path flies one of experiment E's
-synthetic 1 s paths instead (looped). --prev-action feeds TabPFN the previous action too.
+synthetic paths instead (looped).
 --slowmo 20 means 1 s of simulated flight takes 20 s on screen (a wingbeat is 4.6 ms,
 so real time is just a blur). Close the window to stop.
 """
@@ -36,7 +36,6 @@ def main():
     parser.add_argument("--context-steps", type=int, default=512, help="TabPFN context size (512 fits 4 GB)")
     parser.add_argument("--context-passes", nargs="+", help="recorded passes TabPFN's context is drawn from "
                         "(default: closed_loop.CONTEXT_PASSES), e.g. pass1_clean")
-    parser.add_argument("--prev-action", action="store_true", help="TabPFN also sees the previous action")
     parser.add_argument("--path", choices=[*PATHS, "tour"],
                         help="fly this synthetic path instead of --flights (tour: 4 s, every kind of turn)")
     parser.add_argument("--duration", type=float, default=DURATION, help="length of a --path flight in seconds")
@@ -65,8 +64,7 @@ def main():
     elif args.controller == "tabpfn":
         from closed_loop import TabPFNController
         spec = env.action_spec()
-        tabpfn = TabPFNController(args.context_steps, "cuda", prev_action=args.prev_action,
-                                  bounds=(spec.minimum, spec.maximum),
+        tabpfn = TabPFNController(args.context_steps, "cuda", bounds=(spec.minimum, spec.maximum),
                                   **({"passes": args.context_passes} if args.context_passes else {}))
         policy = tabpfn
     else:
@@ -93,8 +91,6 @@ def main():
                 traj = args.flights[i % len(args.flights)]
                 env.task.set_next_trajectory_index(traj)
             timestep = env.reset()
-            if tabpfn is not None:
-                tabpfn.reset()
             with viewer.lock():
                 # This flight's trajectory dots: positions and which are visible (the viewer's
                 # copy was made before the first path was loaded, so it only showed 40 ms of dots).

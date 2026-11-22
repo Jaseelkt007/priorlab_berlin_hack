@@ -77,7 +77,7 @@ Every estimated value is tagged and listed in `DEBT.md`.
 ## Reproduce
 
 ```sh
-./scripts/fetch_assets.sh && uv venv --python 3.12 && uv pip install -r pyproject.toml
+uv venv --python 3.12 && uv pip install -r pyproject.toml
 echo "TABPFN_TOKEN=<key from platform.priorlabs.ai>" > .env       # TabPFN weights licence (non-commercial)
 .venv/bin/python -m pytest tests/ -q                                  # gates 1-5
 .venv/bin/python scripts/sweep_picks.py 25 data/commission_lap.csv --s0 0     # commissioning log, half 1

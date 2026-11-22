@@ -243,10 +243,10 @@ def record(flight, frames, log, meas, pred, view, out, fps=30, size=(1280, 720),
     print(f"{count} frames ({count / fps:.0f} s) -> {out}")
 
 
-def fly(seed):
+def fly(seed, pilot="a"):
     """Fly the whole flight first (exactly as when the dataset was made), keeping frames to play back.
     Playing back, rather than simulating inside the viewer, keeps the viewer from touching the physics."""
-    flight = Flight(seed, "cf2")
+    flight = Flight(seed, "cf2", pilot=pilot)
     frames, next_frame = [], 0.0
     while flight.step():
         if flight.data.time >= next_frame:

@@ -1,0 +1,5 @@
+setup,median_error_m,p90_error_m
+IMM alone (every 0.1 s),1.802,3.246
+"IMM + TabPFN, slow setting, answer at every reading (not live: 5.2 s each)",1.621,3.119
+"IMM + TabPFN, fast setting, answer at every reading (not live: 252 ms each)",1.557,2.995
+Live: IMM every 0.1 s + fast TabPFN correction every 0.3 s,1.725,3.062

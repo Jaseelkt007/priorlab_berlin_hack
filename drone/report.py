@@ -15,7 +15,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from compare import Z90, auc, caught_at, change_ahead, drone_frame, imm_breach_probability  # noqa: E402
+from compare import (  # noqa: E402
+    Z90, auc, caught_at, change_ahead, drone_frame, imm_breach_probability, realtime_predictions)
 from features import DATA  # noqa: E402
 
 OUT = Path(__file__).resolve().parent.parent / "results"
@@ -327,6 +328,41 @@ def main():
             f"{ccover:.0%} of the time; alarm catches {caught_at(cb['B_x2_plus_cf2_p_breach'], cl):.0%} of breaches "
             f"(TabPFN B {caught_at(pb['B_x2_plus_cf2_p_breach'], cl):.0%}).\n\n{md(combo)}")
 
+    # real time: IMM every 0.1 s, the fast IMM + TabPFN every 0.3 s (its answer arriving 0.3 s later)
+    rt_text = "Not run yet."
+    if (DATA / "tabpfn_cf2_pilotb_combo_fast.npz").exists():
+        pt = dict(np.load(DATA / "table_cf2_pilotb.npz"))
+        fast = np.load(DATA / "tabpfn_cf2_pilotb_combo_fast.npz")
+        im = np.load(DATA / "imm_cf2_pilotb.npz")
+        r = fast["test_rows"]
+        t = pt["Y_world"][r, :3]
+        imm_w = im["mean"][:, hi].astype(float)
+        fast_w = np.full_like(imm_w, np.nan)
+        fast_w[r] = fast["B_x2_plus_cf2_world"][:, 0]
+        rt_w, used, _ = realtime_predictions(pt, imm_w, fast_w, every=3)
+        full = np.load(DATA / "tabpfn_cf2_pilotb_combo.npz")
+        re = {"IMM alone (every 0.1 s)": np.linalg.norm(imm_w[r] - t, axis=1),
+              "IMM + TabPFN, slow setting, answer at every reading (not live: 5.2 s each)":
+                  np.linalg.norm(full["B_x2_plus_cf2_world"][:, 0] - t, axis=1),
+              "IMM + TabPFN, fast setting, answer at every reading (not live: 252 ms each)":
+                  np.linalg.norm(fast_w[r] - t, axis=1),
+              "**Live: IMM every 0.1 s + fast TabPFN correction every 0.3 s**": np.linalg.norm(rt_w[r] - t, axis=1)}
+        live = list(re)[-1]
+        g = gain_range(re[live], re["IMM alone (every 0.1 s)"], pt["flight"][r])
+        pd.DataFrame({"setup": [k.replace("*", "") for k in re], "median_error_m": [np.median(e) for e in re.values()],
+                      "p90_error_m": [np.percentile(e, 90) for e in re.values()]}).round(3).to_csv(
+            OUT / "realtime.csv", index=False)
+        rt_text = ("A live system cannot wait 252 ms at every 100 ms radar reading. So: the IMM answers at every reading; "
+                   "every 0.3 s the fast IMM + TabPFN (example cache, 1 pass, 2,000 examples) starts on the newest "
+                   "reading, and its answer arrives 0.3 s later. Until the next one, its correction (TabPFN's 1 s "
+                   "prediction minus the IMM's, for the reading it started from) is added to the IMM's fresh "
+                   f"prediction. Pilot b, {len(r):,} moments; a correction was in use at {used[r].mean():.0%} of them "
+                   "(the IMM alone at the start of each flight).\n\n| Setup | Error 1 s ahead | 90% of errors below |\n"
+                   "|---|---|---|\n" + "\n".join(f"| {k} | {np.median(e):.2f} m | {np.percentile(e, 90):.2f} m |"
+                                                    for k, e in re.items())
+                   + f"\n\n**Live, it is {g[0]:.0f}% better than the IMM** (95% range {g[1]:.1f}-{g[2]:.1f}%, better on "
+                   f"{g[3]} of {g[4]} flights).")
+
     # speed: drone/latency.py
     speed_text = "Not measured yet (`python drone/latency.py`)."
     if (OUT / "latency.csv").exists():
@@ -417,6 +453,10 @@ The radar is noisier far away (1% of range), so everything gets harder with dist
 
 {speed_text}
 
+### Live replay: the IMM every 0.1 s, TabPFN every 0.3 s
+
+{rt_text}
+
 ## How many examples of the new drone does TabPFN need?
 
 {sweep_text}
@@ -433,9 +473,26 @@ The radar is noisier far away (1% of range), so everything gets harder with dist
 
 ## Videos
 
-In `videos/` (not in git, too large): `scene_54.mp4` (the world: building, intruder, defender),
-`imm_vs_tabpfn_chase_54.mp4` (behind the drone, both predictions, close-up inset) and `imm_vs_tabpfn_54.mp4` (the same
-from the radar on the roof).
+![IMM, TabPFN B and IMM + TabPFN on the same flight](compare.gif)
+
+`compare.gif` above: new pilot b, flight 78, the three best models together (from video 7 below).
+Green = the real path; each colour = one model's predicted path, its ball = its guess for now, made 1 s ago.
+
+The videos are in `videos/` (not in git, too large; rebuild them all with `drone/make_videos.sh`, about 5 minutes on a
+GPU). Half speed, the drone drawn 4x bigger; the error on each video is **that one flight only**: for the overall
+numbers use the tables above.
+
+| Folder / file | What it shows |
+|---|---|
+| `1_world/world_scene.mp4` | the world: building, red zone, intruder, the X2 defender hovering; no predictions (its first 14 s: `world.gif`) |
+| `2_pilotA_flight54/1_IMM.mp4` ... `4_TabPFN-B.mp4` | pilot a, test flight 54: IMM, IMM re-tuned, TabPFN A, TabPFN B, one per video |
+| `3_newpilotB_flight78/1_IMM.mp4` ... `4_TabPFN-B.mp4` | pilot b (never seen), flight 78: the same four models |
+| `3_newpilotB_flight78/5_IMM-plus-TabPFN.mp4` | IMM + TabPFN, the best model |
+| `3_newpilotB_flight78/6_LIVE-IMM-plus-TabPFN-every-0.3s.mp4` | the live replay: IMM every 0.1 s, TabPFN correction every 0.3 s |
+| `3_newpilotB_flight78/7_COMPARE-IMM-TabPFN-IMMplusTabPFN.mp4` | IMM, TabPFN B and IMM + TabPFN together (the GIF) |
+
+On flight 78: IMM 1.54 m, TabPFN B 1.36 m, IMM + TabPFN 1.17 m, live 1.29 m (over all 250 pilot-b flights: 1.80,
+1.67, 1.62 and 1.72 m).
 """
     (OUT / "README.md").write_text(report)
     print(summary.to_string(index=False))

@@ -17,7 +17,6 @@ It is given the true radar noise model (0.3 m + 1% of range), which is generous 
 """
 
 import argparse
-import itertools
 from dataclasses import asdict, dataclass
 
 import numpy as np

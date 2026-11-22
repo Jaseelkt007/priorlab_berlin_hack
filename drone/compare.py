@@ -66,6 +66,28 @@ def imm_breach_probability(mean, cov, rng, samples=200):
     return inside_any.mean(1)
 
 
+def realtime_predictions(table, imm_world, tab_world, every=3):
+    """Replay a live system: the IMM answers at every radar reading (0.1 s); TabPFN starts a new answer every
+    `every` readings and, taking up to that long (252 ms < 0.3 s, experiment 16), its answer arrives `every`
+    readings later. Until the next one arrives, its correction (TabPFN's 1 s prediction minus the IMM's, for the
+    reading it started from) is added to the IMM's fresh prediction. Before the first answer: the IMM alone.
+
+    table: dict with flight, t; imm_world, tab_world: (n, 3) 1 s predictions per table row (NaN = none).
+    Returns (predictions (n, 3), whether a TabPFN correction was used (n,), the row each correction came from (n,))."""
+    k = np.rint(table["t"] / 0.1).astype(np.int64)
+    flight = table["flight"].astype(np.int64)
+    key = flight * 100_000 + k
+    order = np.argsort(key)
+    start = (k // every) * every - every  # the last answer that has arrived started at this reading
+    want = flight * 100_000 + start
+    pos = np.clip(np.searchsorted(key[order], want), 0, len(key) - 1)
+    src = order[pos]
+    found = (key[src] == want) & (start >= 0)
+    corr = np.where(found[:, None], tab_world[src] - imm_world[src], np.nan)
+    used = ~np.isnan(corr).any(1)
+    return imm_world + np.where(used[:, None], corr, 0.0), used, src
+
+
 def main():
     table = dict(np.load(DATA / "table_cf2.npz"))
     imm = np.load(DATA / "imm_cf2.npz")

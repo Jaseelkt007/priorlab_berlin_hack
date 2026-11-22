@@ -129,6 +129,19 @@ The radar gives a reading every **100 ms**, so all 4 TabPFN models (forward, lef
 | + cache, 1 pass | 5000 | 1.62 | 255.60 | 272.20 | False |
 | + cache, 1 pass, 1,000 X2 rows | 2000 | 1.56 | 252.10 | 258.40 | False |
 
+### Live replay: the IMM every 0.1 s, TabPFN every 0.3 s
+
+A live system cannot wait 252 ms at every 100 ms radar reading. So: the IMM answers at every reading; every 0.3 s the fast IMM + TabPFN (example cache, 1 pass, 2,000 examples) starts on the newest reading, and its answer arrives 0.3 s later. Until the next one, its correction (TabPFN's 1 s prediction minus the IMM's, for the reading it started from) is added to the IMM's fresh prediction. Pilot b, 116,914 moments; a correction was in use at 97% of them (the IMM alone at the start of each flight).
+
+| Setup | Error 1 s ahead | 90% of errors below |
+|---|---|---|
+| IMM alone (every 0.1 s) | 1.80 m | 3.25 m |
+| IMM + TabPFN, slow setting, answer at every reading (not live: 5.2 s each) | 1.62 m | 3.12 m |
+| IMM + TabPFN, fast setting, answer at every reading (not live: 252 ms each) | 1.56 m | 3.00 m |
+| **Live: IMM every 0.1 s + fast TabPFN correction every 0.3 s** | 1.72 m | 3.06 m |
+
+**Live, it is 4% better than the IMM** (95% range 3.6-5.0%, better on 201 of 250 flights).
+
 ## How many examples of the new drone does TabPFN need?
 
 Same test moments for every point (every 5th reading, 22,501 moments). TabPFN beats both IMMs from **250 Crazyflie rows** (about 25 s of radar on the new drone).
@@ -156,6 +169,23 @@ Same test moments for every point (every 5th reading, 22,501 moments). TabPFN be
 
 ## Videos
 
-In `videos/` (not in git, too large): `scene_54.mp4` (the world: building, intruder, defender),
-`imm_vs_tabpfn_chase_54.mp4` (behind the drone, both predictions, close-up inset) and `imm_vs_tabpfn_54.mp4` (the same
-from the radar on the roof).
+![IMM, TabPFN B and IMM + TabPFN on the same flight](compare.gif)
+
+`compare.gif` above: new pilot b, flight 78, the three best models together (from video 7 below).
+Green = the real path; each colour = one model's predicted path, its ball = its guess for now, made 1 s ago.
+
+The videos are in `videos/` (not in git, too large; rebuild them all with `drone/make_videos.sh`, about 5 minutes on a
+GPU). Half speed, the drone drawn 4x bigger; the error on each video is **that one flight only**: for the overall
+numbers use the tables above.
+
+| Folder / file | What it shows |
+|---|---|
+| `1_world/world_scene.mp4` | the world: building, red zone, intruder, the X2 defender hovering; no predictions (its first 14 s: `world.gif`) |
+| `2_pilotA_flight54/1_IMM.mp4` ... `4_TabPFN-B.mp4` | pilot a, test flight 54: IMM, IMM re-tuned, TabPFN A, TabPFN B, one per video |
+| `3_newpilotB_flight78/1_IMM.mp4` ... `4_TabPFN-B.mp4` | pilot b (never seen), flight 78: the same four models |
+| `3_newpilotB_flight78/5_IMM-plus-TabPFN.mp4` | IMM + TabPFN, the best model |
+| `3_newpilotB_flight78/6_LIVE-IMM-plus-TabPFN-every-0.3s.mp4` | the live replay: IMM every 0.1 s, TabPFN correction every 0.3 s |
+| `3_newpilotB_flight78/7_COMPARE-IMM-TabPFN-IMMplusTabPFN.mp4` | IMM, TabPFN B and IMM + TabPFN together (the GIF) |
+
+On flight 78: IMM 1.54 m, TabPFN B 1.36 m, IMM + TabPFN 1.17 m, live 1.29 m (over all 250 pilot-b flights: 1.80,
+1.67, 1.62 and 1.72 m).

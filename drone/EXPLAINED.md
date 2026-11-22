@@ -8,7 +8,7 @@
 
 ## 1. The problem
 
-![the scene](../results/charts/scene.jpg)
+![the world: building, red zone, an intruder flying in, the X2 defender hovering](../results/world.gif)
 
 ```mermaid
 flowchart LR
@@ -184,18 +184,40 @@ flowchart LR
 
 ---
 
+### Live: does it still work in real time?
+
+TabPFN needs 252 ms per answer, the radar reads every 100 ms. So the IMM tracks every 0.1 s and TabPFN sends a new correction every 0.3 s.
+
+```mermaid
+flowchart LR
+    R["📡 radar, every 0.1 s"] --> I["IMM<br/>fresh guess every 0.1 s"]
+    R -->|"every 0.3 s"| T["TabPFN (252 ms)<br/>'the IMM is off by this much'"]
+    T -->|"correction, 0.3 s later"| P["IMM guess + latest correction"]
+    I --> P
+```
+
+| On pilot b | Error 1 s ahead |
+|---|---|
+| IMM alone | 1.80 m |
+| IMM + TabPFN, an answer at every reading (not live) | 1.56 m: 13% better |
+| **Live: correction every 0.3 s** | **1.72 m: 4% better**, on 201 of 250 flights |
+
+**The gap is speed, not accuracy:** a faster TabPFN gets back toward 13%.
+
+---
+
 ## 9. See it
 
-![IMM vs TabPFN](../results/charts/imm_vs_tabpfn.jpg)
+![IMM, TabPFN B and IMM + TabPFN on the same flight](../results/compare.gif)
 
 | Colour | Meaning |
 |---|---|
-| ⚪ white dots | radar readings |
-| 🟢 green dots | the real path |
-| 🔵 blue ball / 🟡 yellow ball | IMM: in 1 s / its guess for *now*, made 1 s ago |
-| 🩷 pink ball / pink cube | TabPFN: in 1 s / its guess for *now*, made 1 s ago |
+| 🟢 green line | the real path |
+| 🔵 blue | IMM's predicted path; its ball = its guess for *now*, made 1 s ago |
+| 🟠 orange | TabPFN B |
+| 🟣 purple | IMM + TabPFN |
 
-Videos (shared separately, not in git): `scene_54.mp4`, `imm_vs_tabpfn_chase_54.mp4`, `imm_vs_tabpfn_54.mp4`.
+All videos (not in git; `drone/make_videos.sh` makes them): list in `results/README.md`, "Videos".
 
 ---
 
@@ -221,7 +243,7 @@ In our video the X2 defender only hovers; using the predictions to intercept is 
 | Scripted pilots | two styles tested (TabPFN wins on both); human pilots are next |
 | Example rows are scattered | "25 s of radar" means rows from 50 flights, not one continuous track |
 | Perfect example answers | in real use "where it really went" comes from smoothed radar tracks of past flights, slightly noisier; the live drone's future is never shown |
-| Speed | measured: 5.2 s → **252 ms per reading** with TabPFN's example cache and 1 pass, no accuracy lost; not yet under the radar's 100 ms, so the IMM tracks live and TabPFN corrects 4 times a second |
+| Speed | measured: 5.2 s → **252 ms per reading** with TabPFN's example cache and 1 pass, no accuracy lost; not yet under the radar's 100 ms, so live the IMM tracks and TabPFN corrects every 0.3 s: 4% better than the IMM instead of 13% |
 
 ---
 

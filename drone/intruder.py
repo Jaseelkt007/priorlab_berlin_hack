@@ -296,7 +296,7 @@ def view(index, drone):
         viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
         viewer.cam.trackbodyid = flight.pilot.body
         viewer.cam.distance, viewer.cam.elevation = (25.0 if drone == "x2" else 2.5), -12
-        viewer.opt.geomgroup[POLE_GROUP] = 1  # the zone poles: MuJoCo hides group 3 unless asked
+        viewer.opt.geomgroup[POLE_GROUP] = 1  # the zone poles: MuJoCo hides groups 3+ unless asked
         start = time.time()
         last = None
         while viewer.is_running():
@@ -330,7 +330,7 @@ def record_view(index, drone, out, fps=30, size=(1280, 720)):
     cam.type, cam.trackbodyid = mujoco.mjtCamera.mjCAMERA_TRACKING, flight.pilot.body
     cam.distance, cam.elevation = (25.0 if drone == "x2" else 2.5), -12
     options = mujoco.MjvOption()
-    options.geomgroup[POLE_GROUP] = 1  # the zone poles: MuJoCo hides group 3 unless asked
+    options.geomgroup[POLE_GROUP] = 1  # the zone poles: MuJoCo hides groups 3+ unless asked
     writer = imageio_ffmpeg.write_frames(str(out), size, fps=fps, quality=8, macro_block_size=8)
     writer.send(None)
     frames, held = 0, 0

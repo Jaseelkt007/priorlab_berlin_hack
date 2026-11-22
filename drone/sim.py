@@ -57,7 +57,7 @@ WORLD_XML = """
 """
 
 
-POLE_GROUP = 3  # geom group of the zone's marker poles: the zoomed radar view hides them (they block the drone)
+POLE_GROUP = 4  # geom group of the zone's marker poles (3 holds the drones' collision meshes); hidden unless asked
 
 
 def _scenery():
@@ -109,8 +109,9 @@ ZONE_XML = _scenery()
 RADAR_TOP = (0.0, 0.0, 15.4)  # m: just above the radar dish (its rim reaches 14.9 m) on the roof
 
 
-def build(names, zone=False, timestep=0.002):
+def build(names, zone=False, timestep=0.002, scale=1.0):
     """One world with sky and floor (and the zone if asked), each drone attached with its own name prefix.
+    scale > 1 draws the drones bigger: only for playing back a flight already flown, never for physics.
 
     The Crazyflie needs timestep 0.002; the X2 alone runs fine at 0.005.
     """
@@ -120,6 +121,8 @@ def build(names, zone=False, timestep=0.002):
     for name in names:
         xml, pos, _ = DRONES[name]
         child = mujoco.MjSpec.from_file(str(MENAGERIE / xml))
+        for mesh in child.meshes:  # display only (pitch_video.py): a bigger drone is easier to see
+            mesh.scale = [scale * v for v in mesh.scale]
         world.worldbody.add_frame(pos=list(pos)).attach_body(child.worldbody.first_body(), f"{name}_", "")
     with warnings.catch_warnings():  # the drones' own timestep is replaced by ours on purpose
         warnings.simplefilter("ignore")

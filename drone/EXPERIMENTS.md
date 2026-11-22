@@ -223,7 +223,24 @@ Each experiment in four lines: what happened, why, what we changed, and the resu
 | + 1 pass, 1,000 X2 + 1,000 Crazyflie examples | **252 ms** | **1.56 m** |
 
 - **So:** 20x faster with no accuracy lost. Fewer X2 examples even helped (the Crazyflie rows are then half of the examples); that was measured on pilot b only. Still **not under 100 ms**: what is left is about 60 ms of fixed cost per model call, 4 calls per reading, and 10 drones cost the same as 1.
-- **Live design that fits today:** the IMM tracks every 100 ms (microseconds), and TabPFN updates its correction about 4 times a second (every 250 ms). Untested ways to reach 100 ms: run the 4 models in parallel (separate GPU streams or GPUs), or one model for all 3 directions.
+- **Live design that fits today:** the IMM tracks every 100 ms (microseconds), and TabPFN updates its correction every 0.3 s (it needs 252 ms). Measured in experiment 17. Untested ways to reach 100 ms: run the 4 models in parallel (separate GPU streams or GPUs), or one model for all 3 directions.
+
+### 17. Live replay: the IMM every 0.1 s, TabPFN every 0.3 s
+- **Question:** experiment 15 had a TabPFN answer at every reading, which takes 252 ms at best. What is left when the system runs live?
+- **How:** the fast setting from experiment 16 (example cache, 1 pass, 1,000 X2 + 1,000 Crazyflie examples) for every pilot-b reading: `tabpfn_model.py --versions B --imm-features --fast --context 1000 --adapt-rows 1000 --test cf2_pilotb --every 1 --out data/tabpfn_cf2_pilotb_combo_fast.npz` (H100, about 1 minute). Then `compare.realtime_predictions` replays it as a live system: the IMM answers at every reading; every 0.3 s TabPFN starts on the newest reading and its answer arrives 0.3 s later; until the next one arrives, its correction (TabPFN's 1 s prediction minus the IMM's, for the reading it started from) is added to the IMM's fresh prediction. Scored by `report.py` (`results/realtime.csv`).
+- **Result (pilot b, 116,914 moments):**
+
+| Setup | Error 1 s ahead |
+|---|---|
+| IMM alone | 1.80 m |
+| IMM + TabPFN at every reading, slow (5.2 s each, not live) | 1.62 m |
+| IMM + TabPFN at every reading, fast (252 ms each, not live) | 1.56 m |
+| **Live: IMM every 0.1 s + TabPFN correction every 0.3 s** | **1.72 m: 4% better than the IMM** (3.6-5.0%, better on 201 of 250 flights) |
+
+- **So:** it works live, but the 0.3-0.6 s old correction keeps only about a third of the gain (13% instant, 4% live). The limit is speed, not accuracy. Tried and not kept: fewer examples (200) were no faster (about 250 ms is a fixed cost per call) and less accurate.
+
+### 18. Pitch videos
+- `pitch_video.py` replays a flight with the saved predictions (the same files the results come from): the real path (green), one model's predicted path, its guess for now made 1 s ago, its guess for 1 s ahead, the numbers and the alarm; or several models in one video, one colour each. `make_videos.sh` makes every video in `results/videos/` and `results/compare.gif`; the list is in `results/README.md`.
 
 ## 5. Known limits
 
@@ -232,5 +249,6 @@ Each experiment in four lines: what happened, why, what we changed, and the resu
 - Close range: intruders start 60 m out; a real counter-drone radar sees 1-5 km.
 - The examples' answers are perfect: "where the drone really was 1 s later" comes from the simulator. In real use it would come from radar tracks of past flights smoothed afterwards (readings before and after each point), which is noisier, so real accuracy would be somewhat lower. The live drone's future is never shown to any model.
 - The radar gives x, y, z with simple noise; a real radar measures distance and angles.
+- Live, TabPFN answers in 252 ms on an H100, so its correction is 0.3-0.6 s old when used (experiment 17).
 - The Crazyflie is limited to 3 m/s by its weak turning motors (model as menagerie ships it).
 - At 3 m/s, Crazyflie flybys rarely leave the arena in 60 s, so they end as timeouts.

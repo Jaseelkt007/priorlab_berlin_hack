@@ -2,6 +2,25 @@
 
 HackLab #2 Berlin, Prior Labs track: **TabPFN for spatial awareness**. The brief is in [`docs/HACKATHON.md`](docs/HACKATHON.md).
 
+## Drone track (this branch): where will the intruder drone be in 1 second?
+
+![IMM, TabPFN B and IMM + TabPFN on the same flight](results/compare.gif)
+
+A radar tracks a small intruder drone. **TabPFN predicts where it will be in 1 s and raises the alarm before it enters
+the protected zone, with no training**: only example radar rows. We compare it with the IMM, the tracker real radars use.
+
+| On a pilot no model has seen (250 flights) | Error 1 s ahead |
+|---|---|
+| IMM (radar standard) | 1.80 m |
+| TabPFN B (no training) | 1.67 m |
+| **IMM + TabPFN (TabPFN corrects the IMM)** | **1.62 m: 10% better than the IMM** |
+| IMM + TabPFN live (correction every 0.3 s) | 1.72 m: 4% better |
+
+- The idea in diagrams: [`drone/EXPLAINED.md`](drone/EXPLAINED.md)
+- How to run and reproduce everything: [`drone/README.md`](drone/README.md)
+- All results, charts and caveats: [`results/README.md`](results/README.md)
+- Every experiment in detail: [`drone/EXPERIMENTS.md`](drone/EXPERIMENTS.md)
+
 ## Team setup
 
 1. Clone the repo and add your TabPFN key:

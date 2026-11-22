@@ -3,8 +3,8 @@
     python drone/demo_imm.py                 # test flight 54 (an attack that breaches the zone)
     python drone/demo_imm.py --flight 61 --speed 0.5
     python drone/demo_imm.py --view radar    # from the protected site, looking at the incoming drone
-    python drone/demo_imm.py --view radar --record data/demo_radar_54.mp4   # save a video instead of showing it
-    python drone/demo_imm.py --view radar --tabpfn     # also TabPFN B (pink), from data/tabpfn_cf2.npz
+    python drone/demo_imm.py --view radar --record drone/data/demo_radar_54.mp4   # save a video instead of showing it
+    python drone/demo_imm.py --view radar --tabpfn     # also TabPFN B (pink), from drone/data/tabpfn_cf2.npz
 
 What you see:
   the drone + green trail          the real Crazyflie model (MuJoCo physics, intruder pilot) and where it flew
@@ -269,7 +269,7 @@ def main():
     seed = SETUP["cf2"][2] + args.flight
     meas = flight_radar(seed)
     if len(meas) == 0:
-        raise SystemExit(f"flight {args.flight} not in data/intruder_cf2.npz (run intruder.py --drone cf2 first)")
+        raise SystemExit(f"flight {args.flight} not in drone/data/intruder_cf2.npz (run intruder.py --drone cf2 first)")
     pred = predictions(meas)
     tab_world = tabpfn_track(seed, len(meas)) if args.tabpfn else None
 

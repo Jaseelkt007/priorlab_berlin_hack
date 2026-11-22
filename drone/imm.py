@@ -1,7 +1,7 @@
 """IMM tracker: the real-world baseline TabPFN has to beat.
 
     python drone/imm.py --tune           # pick the noise settings on 200 X2 (training) flights
-    python drone/imm.py --drone cf2      # run on the Crazyflie test flights -> data/imm_cf2.npz
+    python drone/imm.py --drone cf2      # run on the Crazyflie test flights -> drone/data/imm_cf2.npz
 
 IMM (Interacting Multiple Model) is what radar trackers use for manoeuvring targets. It runs three
 filters at once and blends them by how well each explains the latest radar readings:

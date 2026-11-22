@@ -90,7 +90,7 @@ We predict **one thing: where the drone will be 1 s from now (x, y, z)**, plus t
 | TabPFN A (learned from X2 only) | 1.70 m | 93% | 0.989 | 95% |
 | **TabPFN B (X2 + rows from 50 other Crazyflie flights)** | **1.37 m** | 93% | 0.993 | 98% |
 
-TabPFN B against the re-tuned IMM: **8% better** (95% range over flights: 7.1-9.5%), better on 208 of 250 flights. On a new pilot (experiment 14): 1.67 vs 1.80 m, still 8% better. Full analysis: `results/README.md`.
+TabPFN B against the re-tuned IMM: **8% better** (95% range over flights: 7.1-9.5%), better on 208 of 250 flights. On a new pilot (experiment 14): 1.67 vs 1.80 m, still 8% better. Full analysis: `drone/results/README.md`.
 
 **Error** = distance between the predicted and the real position. **Range:** how often the real position is inside the 5%-95% range, per direction (should be 90%): the IMM's range is honest.
 
@@ -205,7 +205,7 @@ Each experiment in four lines: what happened, why, what we changed, and the resu
 ### 15. IMM + TabPFN: TabPFN corrects the radar's tracker
 - **Idea:** keep the IMM a radar already runs, and let TabPFN correct it. The IMM's answer at each reading goes into the row as 6 extra inputs: its predicted move in 1 s (forward, left, up, in the drone frame) and its 3 model probabilities (straight / accelerating / turning). TabPFN learns from the examples when the IMM is right and how it is usually wrong. Still no training.
 - **Not cheating:** the IMM only uses readings up to now, and its settings were tuned on other flights (X2). It is the same information TabPFN already has, worked through physics first.
-- **How:** `imm.py --drone <x2|cf2|cf2_pilotb>` (now also saves the model probabilities), then `tabpfn_model.py --versions B --imm-features --test cf2_pilotb --every 1 --out data/tabpfn_cf2_pilotb_combo.npz`. Same examples as TabPFN B; tested only on **pilot b**, the pilot no model has seen.
+- **How:** `imm.py --drone <x2|cf2|cf2_pilotb>` (now also saves the model probabilities), then `tabpfn_model.py --versions B --imm-features --test cf2_pilotb --every 1 --out drone/data/tabpfn_cf2_pilotb_combo.npz`. Same examples as TabPFN B; tested only on **pilot b**, the pilot no model has seen.
 - **Result:** IMM 1.80 m, TabPFN B 1.67 m, **IMM + TabPFN 1.62 m**: **10% better than the IMM** (9.2-10.9% over flight resamples, better on 232 of 250 flights), **2.7% better than TabPFN B** (2.2-3.1%). Better or equal on every manoeuvre except climb (2.06 vs the IMM's 1.96 m); on dive it now ties the IMM. 90% range holds the truth 89% of the time; alarm 97% of breaches caught.
 - **So:** the gain over TabPFN alone is small but real; the strongest claim is against the IMM: "TabPFN upgrades the tracker you already run by 10%, on a pilot it never saw".
 
@@ -227,7 +227,7 @@ Each experiment in four lines: what happened, why, what we changed, and the resu
 
 ### 17. Live replay: the IMM every 0.1 s, TabPFN every 0.3 s
 - **Question:** experiment 15 had a TabPFN answer at every reading, which takes 252 ms at best. What is left when the system runs live?
-- **How:** the fast setting from experiment 16 (example cache, 1 pass, 1,000 X2 + 1,000 Crazyflie examples) for every pilot-b reading: `tabpfn_model.py --versions B --imm-features --fast --context 1000 --adapt-rows 1000 --test cf2_pilotb --every 1 --out data/tabpfn_cf2_pilotb_combo_fast.npz` (H100, about 1 minute). Then `compare.realtime_predictions` replays it as a live system: the IMM answers at every reading; every 0.3 s TabPFN starts on the newest reading and its answer arrives 0.3 s later; until the next one arrives, its correction (TabPFN's 1 s prediction minus the IMM's, for the reading it started from) is added to the IMM's fresh prediction. Scored by `report.py` (`results/realtime.csv`).
+- **How:** the fast setting from experiment 16 (example cache, 1 pass, 1,000 X2 + 1,000 Crazyflie examples) for every pilot-b reading: `tabpfn_model.py --versions B --imm-features --fast --context 1000 --adapt-rows 1000 --test cf2_pilotb --every 1 --out drone/data/tabpfn_cf2_pilotb_combo_fast.npz` (H100, about 1 minute). Then `compare.realtime_predictions` replays it as a live system: the IMM answers at every reading; every 0.3 s TabPFN starts on the newest reading and its answer arrives 0.3 s later; until the next one arrives, its correction (TabPFN's 1 s prediction minus the IMM's, for the reading it started from) is added to the IMM's fresh prediction. Scored by `report.py` (`results/realtime.csv`).
 - **Result (pilot b, 116,914 moments):**
 
 | Setup | Error 1 s ahead |
@@ -240,7 +240,7 @@ Each experiment in four lines: what happened, why, what we changed, and the resu
 - **So:** it works live, but the 0.3-0.6 s old correction keeps only about a third of the gain (13% instant, 4% live). The limit is speed, not accuracy. Tried and not kept: fewer examples (200) were no faster (about 250 ms is a fixed cost per call) and less accurate.
 
 ### 18. Pitch videos
-- `pitch_video.py` replays a flight with the saved predictions (the same files the results come from): the real path (green), one model's predicted path, its guess for now made 1 s ago, its guess for 1 s ahead, the numbers and the alarm; or several models in one video, one colour each. `make_videos.sh` makes every video in `results/videos/` and `results/compare.gif`; the list is in `results/README.md`.
+- `pitch_video.py` replays a flight with the saved predictions (the same files the results come from): the real path (green), one model's predicted path, its guess for now made 1 s ago, its guess for 1 s ahead, the numbers and the alarm; or several models in one video, one colour each. `make_videos.sh` makes every video in `results/videos/` and `results/compare.gif`; the list is in `drone/results/README.md`.
 
 ## 5. Known limits
 

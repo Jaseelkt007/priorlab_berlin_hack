@@ -1,12 +1,12 @@
 """Clean slow-motion videos for the pitch: the real path against one or more models' predicted paths.
 
-    python drone/pitch_video.py --pilot b --flight 78 --model combo --out results/videos/combo.mp4
-    python drone/pitch_video.py --pilot b --flight 78 --model imm,tabpfn,combo --out results/videos/compare.mp4 \
-        --gif results/compare.gif     # also a short GIF of the busiest part, for the README
-    drone/make_videos.sh              # every video in results/videos/, as listed in results/README.md
+    python drone/pitch_video.py --pilot b --flight 78 --model combo --out drone/results/videos/combo.mp4
+    python drone/pitch_video.py --pilot b --flight 78 --model imm,tabpfn,combo --out drone/results/videos/compare.mp4 \
+        --gif drone/results/compare.gif     # also a short GIF of the busiest part, for the README
+    drone/make_videos.sh              # every video in drone/results/videos/, as listed in drone/results/README.md
 
 Models: imm, imm_retuned, tabpfn_a, tabpfn (= TabPFN B), combo (IMM + TabPFN), live (the real-time replay).
-combo and live exist only for pilot b. Needs data/ with the saved predictions (drone/README.md, "Reproduce every result").
+combo and live exist only for pilot b. Needs drone/data/ with the saved predictions (drone/README.md, "Reproduce every result").
 
 Renders offscreen (MUJOCO_GL=egl), so it runs on a server GPU. The flight is flown first exactly as recorded,
 then played back with the drone drawn SCALE times bigger (display only). On screen:

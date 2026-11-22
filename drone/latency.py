@@ -1,11 +1,11 @@
 """How fast is TabPFN per radar reading, and what does speeding it up cost in accuracy? (EXPERIMENTS.md 16)
 
-    python drone/latency.py        # needs a GPU, .env with TABPFN_TOKEN, data/ tables and IMM files
+    python drone/latency.py        # needs a GPU, .env with TABPFN_TOKEN, drone/data/ tables and IMM files
 
 The live budget: the radar gives a new reading every 100 ms, so all 4 models (forward, left, up, alarm)
 must answer within that. Setup: IMM + TabPFN (experiment 15), examples from X2 + 1,000 Crazyflie rows, tested on
 pilot b. For each setting: delay for one reading (1 drone, and 10 drones at once) and the error on pilot b
-(every 10th reading). Writes results/latency.csv.
+(every 10th reading). Writes drone/results/latency.csv.
 """
 
 import os
@@ -84,7 +84,7 @@ def main():
 
     df = pd.DataFrame(out)
     df["fits_100ms"] = df["ms_1_drone"] < 100
-    df.to_csv(ROOT / "results" / "latency.csv", index=False)
+    df.to_csv(ROOT / "drone" / "results" / "latency.csv", index=False)
     print(df.to_string(index=False))
     print(f"GPU: {torch.cuda.get_device_name()}; every 10th pilot-b reading ({len(test):,}) for the error")
 

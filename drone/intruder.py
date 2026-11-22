@@ -1,9 +1,9 @@
 """Random intruder flights toward the protected zone, recorded like a radar would see them.
 
     python drone/intruder.py --view 7                          # watch X2 flight 7 live in the viewer
-    python drone/intruder.py --flights 2000                    # X2 training set -> data/intruder_x2.npz
+    python drone/intruder.py --flights 2000                    # X2 training set -> drone/data/intruder_x2.npz
     python drone/intruder.py --drone cf2 --view 7              # watch a Crazyflie intruder
-    python drone/intruder.py --drone cf2 --flights 300         # Crazyflie test set -> data/intruder_cf2.npz
+    python drone/intruder.py --drone cf2 --flights 300         # Crazyflie test set -> drone/data/intruder_cf2.npz
 
 Every flight is a different random intruder (the "policy"):
 - an intent: attack (heads into the zone), flyby (passes near it) or loiter (circles around it),
@@ -362,10 +362,10 @@ def main():
     parser.add_argument("--view", type=int, metavar="N", help="watch flight N of the dataset live")
     parser.add_argument("--record", type=Path, help="with --view: save it as an MP4 instead (no window needed)")
     parser.add_argument("--flights", type=int, default=2000)
-    parser.add_argument("--out", type=Path, help="default: data/intruder_<drone>.npz")
+    parser.add_argument("--out", type=Path, help="default: drone/data/intruder_<drone>.npz")
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--pilot", choices=list(PILOTS), default="a",
-                        help="b: a different, more evasive pilot (writes data/intruder_<drone>_pilotb.npz)")
+                        help="b: a different, more evasive pilot (writes drone/data/intruder_<drone>_pilotb.npz)")
     args = parser.parse_args()
     if args.view is not None and args.record:
         record_view(args.view, args.drone, args.record)
@@ -373,7 +373,7 @@ def main():
         view(args.view, args.drone)
     else:
         name = args.drone + ("" if args.pilot == "a" else f"_pilot{args.pilot}")
-        out = args.out or Path(__file__).resolve().parent.parent / "data" / f"intruder_{name}.npz"
+        out = args.out or Path(__file__).resolve().parent / "data" / f"intruder_{name}.npz"
         make_dataset(args.flights, args.drone, out, args.workers, args.pilot)
 
 

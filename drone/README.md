@@ -2,7 +2,7 @@
 
 **New to the project? Start with [`EXPLAINED.md`](EXPLAINED.md): the whole idea in diagrams.**
 
-![IMM, TabPFN B and IMM + TabPFN on the same flight](../results/compare.gif)
+![IMM, TabPFN B and IMM + TabPFN on the same flight](results/compare.gif)
 
 *Green: where the drone really went. Blue: the IMM (what radars use). Orange: TabPFN. Purple: IMM + TabPFN, our best.
 Each line is where the model said the drone would be, 1 s earlier.*
@@ -76,7 +76,7 @@ enough to beat both IMMs. **IMM + TabPFN**, where TabPFN corrects the IMM, is **
 Live (TabPFN needs 252 ms, so it corrects every 0.3 s) it keeps **4%**: the gap is speed, not accuracy.
 **It knows when it is unsure:** TabPFN B's 90% range holds the real position 93% of the time on pilot a and 90% on pilot b, as promised; the IMM re-tuned on the small drone only 82% (pilot a).
 The alarm is about a tie. Full analysis, charts and caveats:
-[`../results/README.md`](../results/README.md).
+[`results/README.md`](results/README.md).
 
 ## Try it
 
@@ -87,7 +87,7 @@ the drone models: see `models/README.md`. TabPFN needs `TABPFN_TOKEN` in `.env` 
 python drone/view_drones.py                      # fly the two drones with the keyboard
 python drone/intruder.py --drone cf2 --view 54   # building, red zone, an intruder, the X2 defender hovering
 python drone/demo_imm.py --view radar --tabpfn   # a test flight live: real vs IMM and TabPFN predictions
-python drone/pitch_video.py --pilot b --flight 78 --model imm,tabpfn,combo --out results/videos/compare.mp4
+python drone/pitch_video.py --pilot b --flight 78 --model imm,tabpfn,combo --out drone/results/videos/compare.mp4
 ```
 
 Videos render offscreen, so a GPU server works: prefix `MUJOCO_GL=egl`. `drone/make_videos.sh` makes every video.
@@ -95,7 +95,7 @@ Videos render offscreen, so a GPU server works: prefix `MUJOCO_GL=egl`. `drone/m
 ## Reproduce every result
 
 The data is not in git (402 MB). Run these in order from the repo root; times are for a laptop CPU (simulation) and
-an H100 (TabPFN). Every number in `results/` then comes from the last command.
+an H100 (TabPFN). Every number in `drone/results/` then comes from the last command.
 
 ```sh
 # 1. flights (MuJoCo) and tables
@@ -116,18 +116,18 @@ python drone/imm.py --drone cf2_pilotb --settings cf2
 
 # 3. TabPFN (needs TABPFN_TOKEN; GPU)
 python drone/tabpfn_model.py --every 1                                                    # A and B, pilot a
-python drone/tabpfn_model.py --versions A,B --test cf2_pilotb --every 1 --out data/tabpfn_cf2_pilotb.npz
-python drone/tabpfn_model.py --versions B --imm-features --test cf2_pilotb --every 1 --out data/tabpfn_cf2_pilotb_combo.npz
+python drone/tabpfn_model.py --versions A,B --test cf2_pilotb --every 1 --out drone/data/tabpfn_cf2_pilotb.npz
+python drone/tabpfn_model.py --versions B --imm-features --test cf2_pilotb --every 1 --out drone/data/tabpfn_cf2_pilotb_combo.npz
 python drone/tabpfn_model.py --versions B --imm-features --fast --context 1000 --adapt-rows 1000 \
-    --test cf2_pilotb --every 1 --batch 10000 --out data/tabpfn_cf2_pilotb_combo_fast.npz  # live replay
+    --test cf2_pilotb --every 1 --batch 10000 --out drone/data/tabpfn_cf2_pilotb_combo_fast.npz  # live replay
 for n in 0 100 250 500 1000 2000; do                                                      # example sweep
-    python drone/tabpfn_model.py --versions B --adapt-rows $n --out data/sweep/B_$n.npz
+    python drone/tabpfn_model.py --versions B --adapt-rows $n --out drone/data/sweep/B_$n.npz
 done
-python drone/latency.py                                          # speed per radar reading -> results/latency.csv
+python drone/latency.py                                          # speed per radar reading -> drone/results/latency.csv
 
 # 4. results and videos
-python drone/report.py                                           # results/README.md, CSVs, charts
-MUJOCO_GL=egl drone/make_videos.sh                               # results/videos/, world.gif and compare.gif
+python drone/report.py                                           # drone/results/README.md, CSVs, charts
+MUJOCO_GL=egl drone/make_videos.sh                               # drone/results/videos/, world.gif and compare.gif
 ```
 
 ## Project tree
@@ -155,14 +155,14 @@ priorlab_berlin_hack/
 │   ├── pitch_video.py        the pitch videos and GIFs
 │   ├── make_videos.sh        rebuilds every video and GIF
 │   ├── view_drones.py        fly the drones with the keyboard
-│   └── models/README.md      how to get the drone models (MuJoCo Menagerie)
-├── results/                  every number we quote
-│   ├── README.md             all results, analysis and caveats
-│   ├── *.csv                 the tables behind every number
-│   ├── charts/               the charts
-│   ├── world.gif, compare.gif
-│   └── videos/               the videos (not in git: drone/make_videos.sh)
-└── data/                     flights, tables, saved predictions (not in git: drone/README.md)
+│   ├── models/README.md      how to get the drone models (MuJoCo Menagerie)
+│   ├── results/              every number we quote
+│   │   ├── README.md         all results, analysis and caveats
+│   │   ├── *.csv             the tables behind every number
+│   │   ├── charts/           the charts
+│   │   ├── world.gif, compare.gif
+│   │   └── videos/           the videos (not in git: drone/make_videos.sh)
+│   └── data/                 flights, tables, saved predictions (not in git: drone/README.md)
 ```
 
 ## References

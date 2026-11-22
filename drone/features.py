@@ -1,8 +1,8 @@
 """Turn recorded radar tracks into model tables: one row per radar reading.
 
-    python drone/features.py                 # data/intruder_x2.npz  -> data/table_x2.npz
-    python drone/features.py --drone cf2     # data/intruder_cf2.npz -> data/table_cf2.npz
-    python drone/features.py --preview 2000  # first 2000 rows of data/table_x2.npz -> data/table_x2_preview.csv
+    python drone/features.py                 # drone/data/intruder_x2.npz  -> drone/data/table_x2.npz
+    python drone/features.py --drone cf2     # drone/data/intruder_cf2.npz -> drone/data/table_cf2.npz
+    python drone/features.py --preview 2000  # first 2000 rows of drone/data/table_x2.npz -> drone/data/table_x2_preview.csv
 
 Inputs use only the radar measurements a real system would have (never the true state, never
 the flight clock). Targets use the true future position. Spec: drone/README.md, "Inputs and outputs".
@@ -45,7 +45,7 @@ TARGETS = [f"d{h:g}s_{axis}" for h in HORIZONS for axis in ("fwd", "left", "up")
 # the demo use these; models may learn in the drone frame and convert with `to_world`.
 WORLD_TARGETS = [f"{axis}_{h:g}s" for h in HORIZONS for axis in ("x", "y", "z")]
 
-DATA = Path(__file__).resolve().parent.parent / "data"
+DATA = Path(__file__).resolve().parent / "data"
 ADAPT_FLIGHTS = 50  # the first Crazyflie flights: TabPFN B's examples and the IMM's fairness tuning; never tested on
 
 

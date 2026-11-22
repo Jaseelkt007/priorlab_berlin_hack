@@ -1,0 +1,5 @@
+# Drone track: local-only files
+data/
+*.mp4
+models/mujoco_menagerie/
+MUJOCO_LOG.TXT

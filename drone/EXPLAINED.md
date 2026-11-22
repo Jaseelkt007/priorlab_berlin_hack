@@ -10,7 +10,7 @@
 
 A radar knows where a drone **is**. To stop it, you need where it **will be**, and a small drone can change course within a second. This matters wherever small drones are a threat: airports, stadiums, power plants, prisons.
 
-![the world: building, red zone, an intruder flying in, the X2 defender hovering](../results/world.gif)
+![the world: building, red zone, an intruder flying in, the X2 defender hovering](results/world.gif)
 
 ```mermaid
 flowchart LR
@@ -139,7 +139,7 @@ This is what real radar trackers use. It is physics with 5 hand-set knobs, which
 | TabPFN A (big drone examples only) | 1.70 m | 2.25 m | 95% |
 | **TabPFN B (+ 1,000 small drone examples)** | **1.37 m** ✅ | **1.67 m** ✅ | 98% |
 
-![error by model](../results/charts/error_by_model.png)
+![error by model](results/charts/error_by_model.png)
 
 ```mermaid
 flowchart LR
@@ -156,14 +156,14 @@ flowchart TB
     Q3["❓ Did it just learn the pilot's habits?"] --> A3["new pilot, nothing re-tuned<br/><b>still 8% better</b>"]
 ```
 
-![example sweep](../results/charts/example_sweep.png)
+![example sweep](results/charts/example_sweep.png)
 
 - **Better on:** straight, zigzag, orbit, hover, dash. **Slightly worse on:** dive, climb.
 - **Alarm:** all models are near perfect at 2 s (AUC 0.99).
 - **In the 250 test flights 108 drones breached**; TabPFN B warned for 98% of them, about 4 s before.
 - **The gain is solid:** resampling the 250 flights 1,000 times keeps it between 7% and 10%.
 
-![error by manoeuvre](../results/charts/error_by_manoeuvre.png)
+![error by manoeuvre](results/charts/error_by_manoeuvre.png)
 
 ---
 
@@ -210,7 +210,7 @@ flowchart LR
 
 ## 9. See it
 
-![IMM, TabPFN B and IMM + TabPFN on the same flight](../results/compare.gif)
+![IMM, TabPFN B and IMM + TabPFN on the same flight](results/compare.gif)
 
 | Colour | Meaning |
 |---|---|
@@ -219,7 +219,7 @@ flowchart LR
 | 🟠 orange | TabPFN B |
 | 🟣 purple | IMM + TabPFN |
 
-All videos (not in git; `drone/make_videos.sh` makes them): list in `results/README.md`, "Videos".
+All videos (not in git; `drone/make_videos.sh` makes them): list in `drone/results/README.md`, "Videos".
 
 ---
 
@@ -249,4 +249,4 @@ In our video the X2 defender only hovers. Flying it to where the intruder **will
 
 ---
 
-**Run it:** `drone/README.md` · **all numbers:** `results/README.md` · **every experiment:** `drone/EXPERIMENTS.md`
+**Run it:** `drone/README.md` · **all numbers:** `drone/results/README.md` · **every experiment:** `drone/EXPERIMENTS.md`

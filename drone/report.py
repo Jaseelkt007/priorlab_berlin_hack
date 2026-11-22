@@ -1,8 +1,8 @@
 """Build the results folder: tables, analysis and charts for IMM vs TabPFN on the Crazyflie test flights.
 
-    python drone/report.py        # needs data/imm_cf2.npz and data/tabpfn_cf2.npz
+    python drone/report.py        # needs drone/data/imm_cf2.npz and drone/data/tabpfn_cf2.npz
 
-Writes results/README.md (the write-up), results/*.csv (every number in it) and results/charts/*.png.
+Writes drone/results/README.md (the write-up), drone/results/*.csv (every number in it) and drone/results/charts/*.png.
 Scoring is compare.py's: the same test rows for every model.
 """
 
@@ -19,7 +19,7 @@ from compare import (  # noqa: E402
     Z90, auc, caught_at, change_ahead, drone_frame, imm_breach_probability, realtime_predictions)
 from features import DATA  # noqa: E402
 
-OUT = Path(__file__).resolve().parent.parent / "results"
+OUT = Path(__file__).resolve().parent / "results"
 IMM_FILES = {"IMM": "imm_cf2.npz", "IMM re-tuned": "imm_cf2_cf2tuned.npz"}  # the second only if the fairness check ran
 MODELS = ["IMM", "TabPFN A", "TabPFN B"]  # + "IMM re-tuned" when its file exists (set in main)
 LONG = {"IMM": "IMM (radar standard, tuned on X2)", "TabPFN A": "TabPFN A (X2 context only)",
@@ -212,7 +212,7 @@ def main():
         lines = ["| " + " | ".join(df.columns) + " |", "|" + "---|" * len(df.columns)]
         return "\n".join(lines + ["| " + " | ".join(cell(v) for v in r) + " |" for r in df.itertuples(index=False)])
 
-    # example sweep: TabPFN B with 0, 100, ... Crazyflie rows in its context (tabpfn_model.py --out data/sweep/B_<n>.npz)
+    # example sweep: TabPFN B with 0, 100, ... Crazyflie rows in its context (tabpfn_model.py --out drone/data/sweep/B_<n>.npz)
     sweep_text = "Not run yet."
     sweep_files = sorted((DATA / "sweep").glob("B_*.npz"), key=lambda f: int(f.stem[2:]))
     if sweep_files:

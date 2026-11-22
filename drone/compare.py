@@ -2,7 +2,7 @@
 
     python drone/compare.py
 
-Uses data/imm_cf2.npz (python drone/imm.py --drone cf2) and, if present, data/tabpfn_cf2.npz
+Uses drone/data/imm_cf2.npz (python drone/imm.py --drone cf2) and, if present, drone/data/tabpfn_cf2.npz
 (python drone/tabpfn_model.py). The test rows are the ones tabpfn_model.py chose; without that file,
 the same rule is applied here (tabpfn_model.test_rows). The alarm is scored on all test rows, including
 the last seconds before a breach, whose 2 s-later position does not exist.

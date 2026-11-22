@@ -38,7 +38,7 @@ def load(drone):
 def imm_columns(name, table):
     """The IMM's own answer as 6 extra inputs (experiment 15, "IMM + TabPFN"): its predicted move in 1 s in the
     drone's frame (forward, left, up) and how sure it is the drone goes straight / accelerates / turns.
-    Needs data/imm_<name>.npz from `imm.py --drone <name>` (X2 tuning). NaN where the IMM has no answer yet;
+    Needs drone/data/imm_<name>.npz from `imm.py --drone <name>` (X2 tuning). NaN where the IMM has no answer yet;
     TabPFN handles missing values."""
     imm = np.load(DATA / f"imm_{name}.npz")
     hi = int(np.argmin(np.abs(imm["horizons"] - 1.0)))

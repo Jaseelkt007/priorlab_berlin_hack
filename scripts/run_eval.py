@@ -4,7 +4,8 @@ Context (the line's log before each stream): the commissioning speed tests (scri
 speed settings under random line states); for the "new" scenario the stream's product is removed from it.
 Suites: main (oracle, fixed recipe with and without a one-step margin, logistic, GBDT, TabPFN), frozen (TabPFN with a
 growing vs a frozen log), explore (TabPFN without and with bounded exploration), tabpfn (TabPFN only, e.g. with
---version 3.5-fast), cost (every policy maximizes expected value per second, a drop costing --costs picks).
+--version 3.5-fast), cost (every policy maximizes expected value per second, a drop costing --costs picks), margin
+(the cost recipe one and two settings slower).
 Usage: .venv/bin/python scripts/run_eval.py BANK.csv[,..] LOG.csv[,..] OUT_DIR [--suite main] [--targets 0.02,0.05,0.1]
 """
 import argparse
@@ -24,7 +25,8 @@ ap = argparse.ArgumentParser()
 ap.add_argument("bank", help="bank CSV(s), comma-separated")
 ap.add_argument("log", help="commissioning log CSV(s), comma-separated")
 ap.add_argument("out")
-ap.add_argument("--suite", default="main", choices=["main", "frozen", "explore", "tabpfn", "cost"])
+ap.add_argument("--suite", default="main", choices=["main", "frozen", "explore", "tabpfn", "cost", "margin"])
+ap.add_argument("--safe-step", action="store_true", help="safe-set expansion for every learned policy")
 ap.add_argument("--costs", default="1,3,10,30", help="cost suite: a drop costs this many picks' worth")
 ap.add_argument("--targets", default="0.02,0.05,0.1")
 ap.add_argument("--refit", type=int, default=5)
@@ -38,14 +40,16 @@ targets = [float(x) for x in a.targets.split(",")]
 out = Path(a.out)
 out.mkdir(parents=True, exist_ok=True)
 streams = a.streams.split(",") if a.streams else sorted(bank["stream"].unique())
-tag = a.suite if a.version == "3.5" else f"{a.suite}_{a.version}"
+tag = (a.suite if a.version == "3.5" else f"{a.suite}_{a.version}") + ("_safe" if a.safe_step else "")
 
 
 def suite(tg):
+    if a.suite == "margin":    # hand-set safety margins on top of the drop-cost recipe (one and two settings slower)
+        return [FixedRecipe(cost=tg, margin=1), FixedRecipe(cost=tg, margin=2)]
+    kw = dict(refit_every=a.refit, safe_step=a.safe_step)
     if a.suite == "cost":      # tg is the drop cost here: every policy maximizes the same expected value per second
-        return [FixedRecipe(cost=tg), LogisticPolicy(cost=tg, refit_every=a.refit),
-                GBDTPolicy(cost=tg, refit_every=a.refit),
-                TabPFNPolicy(cost=tg, version=a.version, refit_every=a.refit)]
+        return [FixedRecipe(cost=tg), LogisticPolicy(cost=tg, **kw), GBDTPolicy(cost=tg, **kw),
+                TabPFNPolicy(cost=tg, version=a.version, **kw)]
     tab = lambda **kw: TabPFNPolicy(tg, version=a.version, refit_every=a.refit, **kw)
     if a.suite == "main":
         return [FixedRecipe(tg), FixedRecipe(tg, margin=1), LogisticPolicy(tg, refit_every=a.refit),
@@ -63,7 +67,7 @@ for st in streams:
     b = b[b.groupby("idx")["alpha"].transform("nunique") == 9]          # unfinished instances are skipped
     prod, scen = b["product"].iloc[0], b["scenario"].iloc[0]
     ctx = log[log["product"] != prod] if scen == "new" else log
-    levels = [float(x) for x in a.costs.split(",")] if a.suite == "cost" else targets
+    levels = [float(x) for x in a.costs.split(",")] if a.suite in ("cost", "margin") else targets
     pols = ([Oracle()] if a.suite in ("main", "cost") else []) + [p for tg in levels for p in suite(tg)]
     for pol in pols:
         t0 = time.time()

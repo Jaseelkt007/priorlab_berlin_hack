@@ -198,7 +198,7 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
   <section id="line" aria-labelledby="line-h">
     <div class="eyebrow">1 · The line, live</div>
     <h2 id="line-h">Four ways to run the same line, on the same products</h2>
-    <p>All four strategies run in parallel on identical products and conditions. The view shows one of them. The scenario walks through what really happens in a shift: dry morning, humidity rising, a product changeover, a suction cup wearing out, a second changeover.</p>
+    <p>All four strategies run in parallel on identical products and conditions. The view shows one of them. The scenario walks through what really happens in a shift: a dry morning, a changeover to chilled cheese, a humid afternoon that fogs the cold cheese, a second changeover, a suction cup wearing out.</p>
     <div class="line-shell">
       <div class="bar">
         <div class="grp" role="group" aria-label="Show strategy"><span class="lbl">Show</span>
@@ -296,7 +296,7 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
       <div class="step"><span class="n">Step 1 · cup touches (≈10 ms)</span><h3>Read the seal</h3><p>The vacuum sensor shows how well this particular product sealed. A leaky biscuit or a wrinkled film shows up here, before any acceleration.</p></div>
       <div class="step"><span class="n">Step 2 · one batched call</span><h3>Ask TabPFN 15 questions</h3><p>One row per candidate speed, 30% to 100%, with the outcome left blank. TabPFN reads the recent log of this product and returns a drop probability for each.</p></div>
       <div class="step"><span class="n">Step 3 · decide</span><h3>Fastest speed under 0.5% risk</h3><p>The risk limit is a business setting, changeable at any time without retraining. If no speed is safe, the product goes to a reject or manual lane.</p></div>
-      <div class="step"><span class="n">Step 4 · after the place</span><h3>Log the outcome</h3><p>Dropped or not, plus the lowest vacuum during the move. A deep dip that still held is a near-miss: it teaches the limit without losing a product.</p></div>
+      <div class="step"><span class="n">Step 4 · after the place</span><h3>Log the outcome</h3><p>Dropped or not, plus where it landed. A product that slipped on the cup and landed off target is a near-miss: it teaches the limit without losing a product. A product that peels off gives no such warning: the cup lets go at once, so for tall items only drops teach the limit.</p></div>
     </div>
     <div class="two">
       <div class="panel">
@@ -307,7 +307,7 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
       <div class="panel">
         <h3>Speed chosen per pick, over the shift</h3>
         <canvas id="cv-trace" aria-label="Chosen speed per pick over time"></canvas>
-        <p class="note">Teal: TabPFN's chosen speed for each pick. Orange: the commissioning recipe. Red marks: drops. After a changeover TabPFN starts careful and speeds up as rows arrive. Under humidity or cup wear it slows down only the picks that need it.</p>
+        <p class="note">Teal: TabPFN's chosen speed for each pick. Orange: the commissioning recipe. Red marks: drops. After a changeover TabPFN starts careful and speeds up as rows arrive. When cold cheese fogs up or the cup wears, it slows down only the picks that need it.</p>
       </div>
     </div>
   </section>
@@ -318,7 +318,7 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
     <div class="two">
       <div class="panel">
         <h3>Two meanings of calibration on this line</h3>
-        <p><b>Calibration run.</b> After a changeover the model has no rows for the new product, so its predictions are wide and it chooses slow, safe speeds. Within the first few dozen picks the near-miss signal (vacuum dips) pins down the limit and speed climbs. No engineer tunes anything.</p>
+        <p><b>Calibration run.</b> After a changeover the model has no rows for the new product, so its predictions are wide and it chooses slow, safe speeds. Within the first few dozen picks the near-miss signal (slip and placement error) pins down the limit and speed climbs. No engineer tunes anything.</p>
         <p><b>Calibrated probabilities.</b> When the model says "10% drop risk", about 1 in 10 such picks should really drop. We check this in shadow mode: the model predicts for every pick of every strategy, including the reckless ones, and we compare predictions with what happened. Points on the diagonal mean the numbers can be trusted for setting a risk limit.</p>
         <div class="metrics" id="cal-metrics"></div>
       </div>
@@ -383,11 +383,12 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
   <section aria-labelledby="next-h">
     <div class="eyebrow">8 · What we build and prove</div>
     <h2 id="next-h">From this page to a measured result</h2>
+    <p class="note">This page's animation runs a toy model in your browser. The measured version is in the repository: a validated MuJoCo line and TabPFN in the loop. See <code>README.md</code> and <code>docs/research/evaluation.md</code>.</p>
     <div class="steps">
-      <div class="step"><span class="n">Simulation</span><h3>MuJoCo delta cell</h3><p>Delta kinematics with real limits (10 m/s, 150 m/s², jerk), conveyor and trays, suction modelled with MuJoCo's adhesion actuator plus friction, validated against the shear, lift and peel limits.</p></div>
-      <div class="step"><span class="n">Data</span><h3>Product catalogue</h3><p>Biscuits, pouches, cheese, bars, blister cartons with realistic weight, seal and friction spread, plus humidity, cup wear and changeovers. The log uses the columns above.</p></div>
-      <div class="step"><span class="n">Model</span><h3>TabPFN-3.5</h3><p>Classifier for drop, regressors for vacuum dip and placement error, cached context per product, batched over candidate speeds. Calibration checked in shadow mode.</p></div>
-      <div class="step"><span class="n">Proof</span><h3>Baselines and metrics</h3><p>Fixed recipes, a GOMP-ST-style learned limit, an MLP on the same rows. Good packs per minute, drop rate, picks to recover after changeover, calibration error, decision latency.</p></div>
+      <div class="step"><span class="n">Simulation</span><h3>MuJoCo delta line</h3><p>Closed-chain IRB 360-class delta with ABB's limits and cycle times, a compliant suction cup with vacuum pneumatics from Piab and Schmalz data, a moving belt with PickMaster-style tracking. Every part is checked against vendor data before use.</p></div>
+      <div class="step"><span class="n">Data</span><h3>Product catalogue and drift</h3><p>Blister cards, pralines (Schmalz SPG bell cup), biscuits, flow-wrapped bars, cheese wedges, pouches with sloshing contents. Drift: cup wear, condensation on chilled products, film batch changes, new products.</p></div>
+      <div class="step"><span class="n">Model</span><h3>TabPFN-3.5</h3><p>Classifier for drop and regressor for placement error, with the line's log as context and no training, queried for all 9 speed settings of each pick inside the 35 ms vacuum dwell.</p></div>
+      <div class="step"><span class="n">Proof</span><h3>Baselines and metrics</h3><p>Fixed per-product recipe, logistic regression, boosted trees and a hindsight oracle, replayed on the same 940 picks with honest feedback. Good picks per minute, drop rate, calibration and latency.</p></div>
     </div>
   </section>
 
@@ -435,11 +436,12 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
   (function readColors() { const cs = getComputedStyle(document.documentElement); ['--ink','--muted','--line','--panel','--card','--steel','--steel-dark','--belt','--belt-soft','--tab','--tab-soft','--recipe','--recipe-soft','--safe','--fast','--good','--bad','--bad-soft','--warn'].forEach(k => C[k] = cs.getPropertyValue(k).trim() || '#888'); })();
 
   // ================= products and physics =================
-  // dims mm [L, W, H]; seal = vacuum reached at touch (kPa below ambient, mean/sd); porous = how much humidity opens the surface
+  // dims mm [L, W, H]; seal = vacuum reached at touch (kPa below ambient, mean/sd); chilled = stored cold, so its film
+  // condenses in humid air (below the dew point), and wet film grips with friction 0.2-0.3 (Schmalz reference values)
   const PRODUCTS = {
-    biscuit: { name: 'Butter biscuit', sku: 'BIS-0412', w: [12, 1.2], dims: [60, 45, 8], cup: 15, seal: [36, 5], porous: 1.0, mu: 0.60, h: 4, kappa: 1.0, color: '#d9a95b', edge: '#a8772f' },
-    pouch: { name: 'Coffee pouch', sku: 'COF-2210', w: [60, 3], dims: [110, 70, 22], cup: 25, seal: [44, 8], porous: 0.3, mu: 0.55, h: 9, kappa: 0.6, color: '#7a5230', edge: '#4d321c' },
-    cheese: { name: 'Cheese wedge, foil', sku: 'CHE-0125', w: [125, 4], dims: [80, 60, 35], cup: 30, seal: [56, 4], porous: 0.0, mu: 0.45, h: 17, kappa: 1.0, color: '#efcd57', edge: '#b8962a' },
+    biscuit: { name: 'Butter biscuit', sku: 'BIS-0412', w: [12, 1.2], dims: [60, 45, 8], cup: 15, seal: [36, 5], chilled: false, mu: 0.60, h: 4, kappa: 1.0, color: '#d9a95b', edge: '#a8772f' },
+    pouch: { name: 'Coffee pouch', sku: 'COF-2210', w: [60, 3], dims: [110, 70, 22], cup: 25, seal: [44, 8], chilled: false, mu: 0.55, h: 9, kappa: 0.6, color: '#7a5230', edge: '#4d321c' },
+    cheese: { name: 'Cheese wedge, foil', sku: 'CHE-0125', w: [125, 4], dims: [80, 60, 35], cup: 30, seal: [56, 4], chilled: true, mu: 0.45, h: 17, kappa: 1.0, color: '#efcd57', edge: '#b8962a' },
   };
   const holdForce = (seal, cupMm) => seal * 1000 * Math.PI * (cupMm / 2000) ** 2 * ETA;
   function physicsU(m, a, seal, cupMm, hMm, mu, kappa) {
@@ -449,15 +451,16 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
   }
   function sampleItem(rng, prodKey, env, idx) {
     const p = PRODUCTS[prodKey];
-    const humF = 1 - p.porous * clamp((env.hum - 45) / 100, 0, 1) * 1.6;
+    // condensation: a chilled product below the hall's dew point fogs, with probability rising with humidity
+    const wet = p.chilled && rng() < clamp((env.hum - 35) / 50, 0, 1);
     const off = Math.abs(gauss(rng) * 2.5);
-    let seal = (p.seal[0] + gauss(rng) * p.seal[1]) * humF * (1 - 0.45 * env.wear) * (1 - 0.02 * off);
+    let seal = (p.seal[0] + gauss(rng) * p.seal[1]) * (1 - 0.15 * env.wear) * (1 - 0.02 * off);
     seal = clamp(seal, 3, SETPOINT);
     return {
       idx, prod: prodKey, sku: p.sku, m: (p.w[0] + gauss(rng) * p.w[1]) / 1000,
       dims: p.dims.map(d => d * (1 + gauss(rng) * 0.02)), cup: p.cup, seal, off,
       evac: 14 + 520 / seal + Math.abs(gauss(rng) * 3), hum: env.hum, cupCycles: env.cupCycles,
-      mu: p.mu * Math.exp(gauss(rng) * 0.06), h: p.h * (1 + gauss(rng) * 0.08), kappa: p.kappa,
+      mu: (wet ? 0.25 : p.mu) * (1 - 0.15 * env.wear) * Math.exp(gauss(rng) * 0.06), wet, h: p.h * (1 + gauss(rng) * 0.08), kappa: p.kappa,
       noise: Math.exp(gauss(rng) * 0.04), r1: rng(), r2: rng(), r3: gauss(rng), r4: gauss(rng), r5: gauss(rng), r6: rng(),
     };
   }
@@ -466,9 +469,12 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
     const U = ph.U * it.noise;
     const dropped = U > 1;
     const misplaced = !dropped && U > 0.9 && it.r1 < (U - 0.9) / 0.1 * 0.7;
-    const dip = dropped ? 1 : 0.5 * Math.max(0, U - 0.55) / 0.45;
-    const vacMin = dropped ? Math.max(0.5, 2.5 + it.r3) : Math.max(0.5, it.seal * (1 - dip) + it.r3 * 0.5);
-    const placeOff = dropped ? NaN : 1.2 + 32 * Math.max(0, U - 0.7) ** 2 + Math.abs(it.r4) * 0.7 + (misplaced ? 9 : 0);
+    // near-miss = slip of the product on the cup, which shows as placement error. Only shear-limited picks slip before
+    // they fail; peel-limited picks let go at once with no warning (simulation gate 3, V12).
+    const shearMode = ph.shear * it.noise >= Math.max(ph.peel, ph.lift) * it.noise;
+    const dip = dropped ? 1 : (shearMode ? 0.5 * Math.max(0, U - 0.55) / 0.45 : 0);
+    const vacMin = dropped ? Math.max(0.5, 2.5 + it.r3) : Math.max(0.5, it.seal + it.r3 * 0.5);
+    const placeOff = dropped ? NaN : 1.2 + 32 * dip ** 2 + Math.abs(it.r4) * 0.7 + (misplaced ? 9 : 0);
     const placeRot = dropped ? NaN : it.r5 * (1.5 + 45 * Math.max(0, U - 0.8) ** 2) + (misplaced ? 14 * Math.sign(it.r5 || 1) : 0);
     const stop = dropped && it.r6 < 0.25;
     return { U, dropped, misplaced, dip, vacMin, placeOff, placeRot, stop, detach: 0.3 + 0.3 * it.r2 };
@@ -522,10 +528,10 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
   // ================= scenario =================
   const TOUR = [
     { t: 0, title: 'Butter biscuits, dry morning air', text: 'A well-tuned line. The recipe runs biscuits near full speed. TabPFN starts with no rows, so its first picks are careful, then it catches up within seconds.', prod: 'biscuit', hum: 40, wear: 0 },
-    { t: 35, title: 'Humidity climbs to 80%', text: 'Porous biscuits leak vacuum in humid air: the seal at touch drops. Same product, same recipe, weaker grip. Watch the recipe start dropping biscuits while TabPFN slows only the leaky ones.', prod: 'biscuit', hum: 80, wear: 0 },
-    { t: 75, title: 'Changeover: coffee pouches', text: 'New product, heavier and soft. Its recipe was copied from biscuits until an engineer finds time to retune it. TabPFN has no rows for pouches: it runs a short, cautious calibration and speeds up from near-misses.', prod: 'pouch', hum: 55, wear: 0 },
-    { t: 115, title: 'The suction cup is wearing out', text: 'A worn cup lip leaks a little more vacuum every minute, on every product. Nobody sees it until drops start. TabPFN sees it in the seal readings and the vacuum dips, and backs off gradually.', prod: 'pouch', hum: 55, wear: 1 },
-    { t: 150, title: 'Changeover: cheese wedges, new cup', text: 'Heavy, smooth, well-sealing product with its own tuned recipe and a fresh cup. Everyone does well here. The question is who gets closest to the real limit.', prod: 'cheese', hum: 50, wear: 0, instant: true },
+    { t: 35, title: 'Changeover: chilled cheese wedges', text: 'Heavy, cold, well-sealing product with its own tuned recipe. In dry air everyone does well. The question is who gets closest to the real limit.', prod: 'cheese', hum: 40, wear: 0 },
+    { t: 75, title: 'Humid afternoon: the cold cheese fogs up', text: 'The wedges come out of the chiller below the hall\'s dew point, so their film condenses. A wet film grips with friction 0.2-0.3 instead of 0.45: same seal, weaker grip. The recipe starts dropping wedges; TabPFN sees hall humidity and product temperature and slows only the picks at risk.', prod: 'cheese', hum: 80, wear: 0 },
+    { t: 115, title: 'Changeover: coffee pouches', text: 'New product, heavier and soft. Its recipe was copied from biscuits until an engineer finds time to retune it. TabPFN has no rows for pouches: it runs a short, cautious calibration and speeds up from near-misses.', prod: 'pouch', hum: 55, wear: 0 },
+    { t: 155, title: 'The suction cup is wearing out', text: 'A worn cup lip leaks more vacuum and grips less as it ages, on every product. Nobody sees it until drops start. TabPFN sees it in the seal readings, the cup cycle counter and the slips, and backs off gradually.', prod: 'pouch', hum: 55, wear: 1 },
     { t: 190, title: 'End of the guided shift', text: 'The shift loops and the models keep their memory. Compare good packs per minute and drops in the scoreboard, then try the manual controls.', prod: 'biscuit', hum: 40, wear: 0, instant: true },
   ];
   const TOUR_LEN = 205;
@@ -774,7 +780,7 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
     if (u < 0.62) { o.textContent = 'in flight'; o.style.color = C['--muted']; }
     else if (c.out.dropped) { o.textContent = 'dropped'; o.style.color = C['--bad']; }
     else if (c.out.misplaced) { o.textContent = 'misplaced'; o.style.color = C['--warn']; }
-    else { o.textContent = `placed, dip ${(c.out.dip * 100).toFixed(0)}%`; o.style.color = C['--good']; }
+    else { o.textContent = `placed, ${c.out.placeOff.toFixed(1)} mm off`; o.style.color = C['--good']; }
   }
   function rates(L) {
     const w = L.fin.filter(f => f.t >= S.T - 60), span = Math.min(60, Math.max(1, S.T));
@@ -827,7 +833,7 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
     ['release_height_mm / blow_off_ms', 'act', 'mm / ms', 'robot program', '4 / 15'],
     ['Outputs (measured after)'],
     ['dropped', 'out', '0/1', 'vacuum lost during the move, item missing in tray', '0'],
-    ['vac_min_kPa', 'out', 'kPa', 'lowest vacuum during the move: the near-miss signal', '21.4'],
+    ['place_offset_mm', 'out', 'mm', 'where it landed vs the target: slip is the near-miss signal', '4.2'],
     ['place_offset_mm / place_rot_deg', 'out', 'mm / °', 'camera over the tray', '2.1 / 3.4'],
     ['damaged', 'out', '0/1', 'inspection camera downstream', '0'],
     ['cycle_s', 'out', 's', 'robot controller', '0.44'],
@@ -922,7 +928,7 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
       <span>peel: m·a·h / (F·r) = ${(v.m * v.a * v.h / 1000).toFixed(3)} / ${(ph.F * v.d / 2000).toFixed(3)} = <b>${pc(ph.peel)}</b></span>`;
     const b = $('p-badge'), U = ph.U;
     if (U > 1) { b.textContent = `DROP · ${pc(U)} of capacity used`; b.style.background = C['--bad-soft']; b.style.color = C['--bad']; }
-    else if (U > 0.8) { b.textContent = `NEAR-MISS · ${pc(U)} used, vacuum dips`; b.style.background = '#fff5d6'; b.style.color = C['--warn']; }
+    else if (U > 0.8) { b.textContent = `NEAR-MISS · ${pc(U)} used, slipping`; b.style.background = '#fff5d6'; b.style.color = C['--warn']; }
     else { b.textContent = `HOLDS · ${pc(U)} of capacity used`; b.style.background = C['--tab-soft']; b.style.color = C['--good']; }
   }
   PHYS.forEach(id => $(id).addEventListener('input', updatePhysText));

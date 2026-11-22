@@ -78,10 +78,12 @@ def simple(R, label):
 
 
 if __name__ == "__main__":
-    for name, fn in [("runs_cost.csv", lambda R: cost_tables(R)), ("runs_main.csv", lambda R: simple(R, "Risk-target rule")),
+    for name, fn in [("runs_cost_safe.csv", lambda R: "\n### Drop-cost rule, safe-step expansion (headline)\n" + cost_tables(R)),
+                     ("runs_cost.csv", lambda R: "\n### Drop-cost rule, without safe-step expansion\n" + cost_tables(R)),
+                     ("runs_main.csv", lambda R: simple(R, "Risk-target rule")),
                      ("runs_frozen.csv", lambda R: simple(R, "Growing vs frozen log (TabPFN)")),
                      ("runs_explore.csv", lambda R: simple(R, "Bounded exploration (TabPFN)")),
                      ("runs_tabpfn_3.5-fast.csv", lambda R: simple(R, "TabPFN-3.5-Fast, risk-target rule"))]:
-        f = EV / name
-        if f.exists():
+        f = next((x for x in (EV / name, EV / (name + ".gz")) if x.exists()), None)   # results/ holds them gzipped
+        if f is not None:
             print(fn(pd.read_csv(f)))

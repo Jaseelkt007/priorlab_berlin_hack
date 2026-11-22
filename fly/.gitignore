@@ -1,0 +1,7 @@
+# Fruit-fly track: local-only files (paths relative to fly/)
+.venv-fly/
+third_party/
+data/
+*.mp4
+!results/showreel/tabpfn_ctx16384.mp4
+!results/sweep/tabpfn_ctx32768.mp4

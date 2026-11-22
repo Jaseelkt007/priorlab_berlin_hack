@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Set up a fresh Linux GPU machine (e.g. a cloud H100) to run the closed-loop experiments.
-# Run inside the repo checkout on that machine:   bash scripts/setup_gpu_box.sh
+# Run inside the repo checkout on that machine:   cd fly && bash scripts/setup_gpu_box.sh
 # Creates .venv-fly (Python 3.10: flybody + MuJoCo + TF policy + local TabPFN on CUDA), the same
 # versions as the team's `flybody` conda env. Data, .env and TabPFN weights are copied separately
 # (see README, "Cloud GPU").

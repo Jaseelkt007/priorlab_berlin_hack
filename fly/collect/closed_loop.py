@@ -53,7 +53,7 @@ class TabPFNController:
         bounds: (low, high) to clip the predicted actions to."""
         self.bounds = bounds
         from dotenv import load_dotenv
-        load_dotenv(ROOT / ".env")
+        load_dotenv(ROOT.parent / ".env")  # the one .env at the repo root
         os.environ.setdefault("TABPFN_NO_BROWSER", "1")
         from tabpfn import TabPFNRegressor
         from tabpfn.constants import ModelVersion

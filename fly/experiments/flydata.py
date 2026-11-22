@@ -29,7 +29,7 @@ def load(name, wingbeat=True, keys=None):
 def tabpfn_client_ready():
     """Import tabpfn_client with the key from .env (never printed)."""
     from dotenv import load_dotenv
-    load_dotenv(ROOT / ".env")
+    load_dotenv(ROOT.parent / ".env")  # the one .env at the repo root
     os.environ.setdefault("TABPFN_NO_BROWSER", "1")
     import tabpfn_client
     tabpfn_client.set_access_token(os.environ["TABPFN_TOKEN"])

@@ -207,7 +207,8 @@ The fly needs a decision every 0.2 ms, so the simulator waits for TabPFN: we mea
 ```sh
 git clone https://github.com/Jaseelkt007/priorlab_berlin_hack.git
 cd priorlab_berlin_hack
-echo "TABPFN_TOKEN=<your key from platform.priorlabs.ai>" > .env   # git ignores .env
+echo "TABPFN_TOKEN=<your key from platform.priorlabs.ai>" > .env   # git ignores .env (one key for the whole repo)
+cd fly                  # every command below runs from fly/
 ```
 
 Accept the TabPFN 3.5 licence at https://ux.priorlabs.ai/accept-license?hf_repo_id=tabpfn_3_5.
@@ -268,11 +269,12 @@ We used a Nebius H100 (80 GB). One script builds `.venv-fly` with the same versi
 
 ```sh
 # from your machine: code, data, key and weights (data/ and .env are not in git)
-rsync -a --exclude data/ --exclude third_party/ --exclude .venv/ --exclude '*.mp4' ./ <host>:priorlab_berlin_hack/
-rsync -a data/flights data/policies data/flight-imitation <host>:priorlab_berlin_hack/data/
+rsync -a --exclude data/ --exclude third_party/ --exclude .venv/ --exclude '*.mp4' ./ <host>:priorlab_berlin_hack/fly/
+rsync -a ../.env <host>:priorlab_berlin_hack/
+rsync -a data/flights data/policies data/flight-imitation <host>:priorlab_berlin_hack/fly/data/
 rsync -a ~/.cache/tabpfn/tabpfn-v3.5-fast-*.safetensors <host>:.cache/tabpfn/
 # on the GPU machine
-cd priorlab_berlin_hack && bash scripts/setup_gpu_box.sh
+cd priorlab_berlin_hack/fly && bash scripts/setup_gpu_box.sh
 MUJOCO_GL=egl .venv-fly/bin/python collect/showreel.py --controller tabpfn --context-steps 32768 --once --out results/sweep
 ```
 
@@ -302,8 +304,8 @@ Everything in `collect/` runs in the **flybody** conda env (MuJoCo + the TF poli
 | `experiments/` | offline experiments A–C, sweep summary, plots (run in the **uv** env) |
 | `results/` | JSON results and drift logs; [`results/README.md`](results/README.md) says which runs used the corrected data (videos are local only) |
 | `scripts/setup_gpu_box.sh` | one-step GPU machine setup |
-| `docs/` | report pages, data plan, research notes, hackathon brief |
-| `DEBT.md` | every quick fix taken during the hackathon and its real fix |
+| `docs/` | the project report (`report.html`), its images, the data plan |
+| [`../DEBT.md`](../DEBT.md) | every quick fix taken during the hackathon and its real fix (shared by the whole team) |
 
 ## Credits
 

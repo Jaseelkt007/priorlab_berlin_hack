@@ -8,7 +8,7 @@ after arrival. Logged at 10 Hz: trolley x, hook and load offset from the trolley
 TabPFN context: 3,000 rows sampled from 40 random fleet jobs spanning the same ranges but never a grid point
 (rope 3-6 m, sling 0.5-2.5 m, 0.5-3 t, 50-100 %). TabPFN predicts the load offset 1 s ahead at every 0.1 s of every
 grid run (quantiles 0.05 / 0.5 / 0.95), plus the single-pendulum physics prediction with a 0.5 m entered sling.
-Outputs: crane/results/playground.json (compact, embedded in explainer.html), crane/results/fleet_rows.json
+Outputs: crane/results/playground.json (compact, embedded in docs/report.html), crane/results/fleet_rows.json
 """
 import json
 import os

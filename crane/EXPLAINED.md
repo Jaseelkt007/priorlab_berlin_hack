@@ -5,7 +5,7 @@
 > examples. On a real lab crane it got **3× more accurate after 5 s of a new load**; in a full-size MuJoCo crane the live
 > pick and place learned the right anti-sway setting and ran **27% faster** than the typed-in setting.
 
-Interactive explainer with all charts: https://claude.ai/artifact/7rjNJLFjPqkE2g74ekxL31
+Full project report (interactive, all charts): https://claude.ai/artifact/7rjNJLFjPqkE2g74ekxL31 · source [`docs/report.html`](docs/report.html)
 
 ---
 
@@ -172,4 +172,4 @@ crane/.venv/bin/python crane/check_setup.py
 
 ---
 
-The pitch slides and video script: [`PITCH.md`](PITCH.md). Figures: `figures/` (made by `make_figures.py`).
+Full project report: [`docs/report.html`](docs/report.html) ([live](https://claude.ai/artifact/7rjNJLFjPqkE2g74ekxL31)). Figures: `figures/` (made by `make_figures.py`).

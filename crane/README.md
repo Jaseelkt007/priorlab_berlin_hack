@@ -1,13 +1,137 @@
-# Crane track: where will the load be in 1 second?
+# Can a table steady a crane?
 
-**New to the project? Start with [`EXPLAINED.md`](EXPLAINED.md): the whole idea in diagrams.** Pitch slides: [`slides/`](slides/README.md) (PDF: [`slides/crane_pitch.pdf`](slides/crane_pitch.pdf)); outline and video script: [`PITCH.md`](PITCH.md). Slide figures: [`figures/`](figures/).
+**HackLab #2 Berlin · Prior Labs track "TabPFN for spatial awareness" · 21–22 Nov 2026 · branch `crane`**
 
-Part of our Prior Labs entry ("TabPFN for spatial awareness"). Branch: `crane`.
+An overhead crane's load keeps swinging after every start and stop. Anti-sway control cancels the swing only if it knows the pendulum, including a sling length someone types in. We turned the crane's own sensors into a table (one row every 0.1 s) and asked **TabPFN**, a model that learns from the examples it is shown instead of from training, to predict where the load will be 1 s later and to choose the anti-sway setting for every load.
 
-**Idea.** An overhead crane's load swings after every move. Anti-sway control cancels that swing only if it knows the pendulum, and a new load or a wrong sling entry breaks it. TabPFN reads the crane's own recent moves as a table and predicts the swing 1 s ahead with a 90% range. When a new load arrives, its rows are added to the table; nothing is retrained.
+| Predicting the swing | Adapting to a new load | Choosing the anti-sway | Still fails |
+|---|---|---|---|
+| **5–7×** closer than physics, 1 s ahead (real lab crane: 0.10 vs 0.50 cm; full size: 0.70 vs 4.7 cm) | **3×** lower error after **5 s** of an unseen load's rows, no retraining (real lab crane) | **−35%** time on 12 new loads; live pick and place **47 s instead of 68 s** per cycle once learned | **timing the set-down alone**: the position is right, but the load still moves at 15 cm/s; early cycles pick wrong settings |
 
-- **Explainer page:** `explainer.html`. It's one HTML file: open it in a browser. It has a live 4-strategy crane simulation, the physics, the table, calibration, the real-data results, the MuJoCo demo, the full problem and training spec, and sources.
-- **Pitch and video script:** `PITCH.md`.
+| The crane | Live forecast | TabPFN chooses the anti-sway | It learns in a few cycles |
+|---|---|---|---|
+| ![crane](docs/img/crane_scene.jpg) | ![forecast](docs/img/forecast_live.jpg) | ![closed loop](docs/img/closed_loop.jpg) | ![cycles](docs/img/live_cycles.jpg) |
+| MuJoCo overhead crane: trolley, rope, hook, slings, 2 m beam, racks beside two bays | Ghost = TabPFN's predicted load position 1 s ahead, next to the physics model | Left: industry anti-sway set for the wrong sling; right: TabPFN choosing, done in 261 s vs 403 s | Live pick and place: wrong setting in cycle 1, right setting from cycle 5, 7 of 9 OK |
+
+## Documentation
+
+| Page | What it covers | Live | Source |
+|---|---|---|---|
+| **Crane Sway**: full project report | problem, what is predicted and TabPFN's role, physics and anti-sway, inputs and outputs with a glossary, real-crane and MuJoCo results, interactive playground, closed loop, live pick and place, limits, sources | [open](https://claude.ai/artifact/7rjNJLFjPqkE2g74ekxL31) | [`docs/report.html`](docs/report.html) |
+| **Explained in pictures** | the whole idea in diagrams | | [`EXPLAINED.md`](EXPLAINED.md) |
+| **Result files** | what each file in `results/` is and which script made it | | [`results/README.md`](results/README.md) |
+
+Also: dataset search and credit [`DATASETS.md`](DATASETS.md), the Prior Labs lessons [`LESSONS.md`](LESSONS.md).
+
+---
+
+## The idea in four sentences
+
+A crane already measures what a prediction needs: the rope angle, the trolley and hoist encoders, the load cell and its own planned move. We write those down as one row every 0.1 s and give the crane's past rows to TabPFN as examples. TabPFN then reads the live row and, by analogy with the examples, says where the load will be 1 s later (with a range), and before each move it predicts the wait for every anti-sway setting so the crane can take the shortest safe one. It predicts the swing far better than the physics model when the sling is unknown, and it adapts to a new load by adding rows, but timing the set-down alone does not work.
+
+## Background
+
+### Prior Labs and TabPFN
+
+TabPFN (Tabular Prior-data Fitted Network) is a transformer pre-trained once on millions of synthetic tables. Given a table of example rows (the **context**), it predicts a missing column for new rows in a single forward pass, with no training loop and with a full predictive distribution.
+
+| | |
+|---|---|
+| Model | TabPFN 3.5 (`n_estimators=1`), run locally on a GTX 1650 laptop GPU |
+| Output | a distribution per prediction; we use quantiles 5 / 50 / 95% (forecast) and 50 / 99% (safety rule) |
+| Speed | about 130 ms per live forecast; `fit_mode="fit_with_cache"` encodes the context once |
+| What we never do | fine-tune it: its weights never change; adapting means adding rows |
+
+### The crane, real and simulated
+
+- **Overhead crane:** a trolley on a rail carries the load on a rope, a hook and slings. Every start and stop makes it swing like a (double) pendulum, period T = 2π√(L/g).
+- **Anti-sway (ZV input shaping, Singer & Seering 1990):** each push is split into two half pushes, half a swing apart, so the swings cancel. It needs the pendulum length, including a **sling length someone types in**; typed 0.5 m, real 2.0 m leaves 10 cm of swing.
+- **Real lab crane:** Nazarbayev University tower crane dataset, 33 runs at 100 Hz, cables 0.1–0.8 m, three payloads (CC BY 4.0).
+- **MuJoCo crane:** rail, trolley, rope, hook, slings, 2 m beam, racks with 0.45 m clearance; a free beam for pick and place.
+
+| Forecast inputs (12, every 0.1 s) | | Output | |
+|---|---|---|---|
+| swing now, 0.2 s and 0.5 s ago, rate, largest in 2 s | 5 | load offset from the trolley, 1 s ahead | 5 / 50 / 95% |
+| trolley position, speed, acceleration | 3 | | |
+| rope length, payload | 2 | | |
+| planned trolley move over 0.5 s and 1 s | 2 | | |
+
+The **sling length is never an input**: TabPFN reads it from how the load moves.
+
+## How it works
+
+```mermaid
+flowchart LR
+  S[Crane sensors<br/>+ planned move] -- 12 numbers / 0.1 s --> R[One row]
+  T[(The crane's table<br/>3,000 fleet rows<br/>+ its own rows)] --> P[TabPFN]
+  R --> P
+  P -- load in 1 s + 90% range --> U[Green ghost<br/>safety check]
+  P -- wait + swing per setting --> A[Anti-sway setting<br/>shortest safe wait]
+  A --> C[MuJoCo crane]
+  C -- 1 s later: the true outcome --> T
+```
+
+### Data
+
+| Source | What | Rows | Used for |
+|---|---|---|---|
+| Real lab crane | 13 trolley runs, 99 s each at 100 Hz | ~12,500 rows at 10 Hz | forecast on held-out runs (cable length, beam payload, hoisting) |
+| MuJoCo fleet | 40 back-and-forth jobs, random rope / sling / payload / speed | 3,000 sampled | context for the live forecast |
+| MuJoCo commissioning | 120 single moves with random anti-sway settings | 120 | context for the anti-sway choice |
+| MuJoCo grid | 81 runs: rope × sling × payload × speed | 19,440 predictions | playground and parameter effects |
+
+### One anti-sway decision
+
+TabPFN predicts **one target column**, so each candidate setting is one query row; the crane asks once per move, while the beam is being lifted.
+
+```
+context row:  [sway period, speed, tuning error] -> wait, swing left      120 commissioning moves + this load's moves (x5)
+query rows:   [measured period, speed, error for off, 0.5 ... 3.0 m]       7 rows -> wait + swing (50%, 99%) each
+choice:       shortest (shaper delay + wait) whose 99% swing < 0.45 m      settings already tried on this load use their measured result
+```
+
+### Experiments
+
+| Exp | Question | Mode | Script |
+|---|---|---|---|
+| 1 | Forecast 0.5 / 1 s ahead on held-out real-crane runs: physics vs trees vs TabPFN | offline, real data | `exp1_real.py` |
+| 2 | Adapt to an unseen payload by adding rows; physics + TabPFN | offline, real data | `exp2_real.py` |
+| 3 | Forecast on a full-size crane with a held-out load | MuJoCo | `mujoco_demo.py` |
+| 4 | 81-setting grid; which parameters matter | MuJoCo | `playground_precompute.py`, `influence.py` |
+| 5 | Which inputs can be dropped | offline | `ablation.py` |
+| 6 | TabPFN chooses speed and anti-sway, 12 new loads | closed loop | `mujoco_closed_loop.py` |
+| 7 | Time the set-down instead of killing the swing | offline | `setdown_advisor.py` |
+| 8 | Live pick and place, TabPFN chooses the anti-sway | live window | `live_pick_place.py --auto-tune` |
+
+## Results
+
+**1 · Forecast on the real lab crane.** Mean error at the payload 1 s ahead (cm), whole runs held out:
+
+| Held out | Fitted pendulum | Standard ML (boosted trees) | TabPFN | Physics + TabPFN |
+|---|---|---|---|---|
+| new cable length (0.5 m) | 0.34 | 1.30 | 1.52 | **0.19** |
+| new payload (beam) | 0.57 | 0.48 | **0.35** | 0.36 |
+| hoisting during travel | 0.82 | 1.20 | 0.81 | **0.78** |
+
+**2 · Adapting to the unseen beam.** After 5 s of its rows: TabPFN 0.30 → **0.10 cm**, its 90% range from 32% to 91% reliable; trees 0.37 cm, refitted pendulum 0.50 cm.
+
+**3–4 · Full-size crane (MuJoCo).** Over 81 settings: TabPFN **0.8 cm** vs physics 2.2 cm. Hidden 2.5 m sling: **0.7** vs 4.7 cm. Short sling (typed value right): physics wins, 0.73 vs 0.94 cm.
+
+**5 · Inputs.** The forecast needs all 12 (5 "physics" inputs nearly double the error); the anti-sway choice is as good with 3 (sway period, speed, tuning error).
+
+**6 · Closed loop, 12 new loads.**
+
+| Strategy | Time | Moves / h | Mean wait | Collisions |
+|---|---|---|---|---|
+| Industry anti-sway (set for 0.5 m) | 403 s | 107 | 19.9 s | 0 |
+| Slow and safe (40%) | 333 s | 130 | 1.5 s | 0 |
+| **TabPFN chooses** | **261 s** | **166** | 7.4 s | 0 |
+
+**7 · Timing the set-down.** TabPFN put the touchdown inside ±5 cm on 12/12 moves (physics 4/12), but every early touchdown still moved 13–15 cm/s sideways: not safe. The swing has to be killed.
+
+**8 · Live pick and place** (real sling 2.0 m): 9 cycles, settings 0.5, 1.5, 1.5, 1.0, then 1.5 m for the rest; mean **49.6 s** vs about 68 s with the typed-in 0.5 m; 7 of 9 placed within ±5 cm.
+
+**Limits:** real data is a lab-scale crane; the full-size results are simulation, one seed each; no strategy collided, so the gain shown is time, not safety; TabPFN-3.5 weights are non-commercial.
 
 ## Present the live demo from another laptop
 
@@ -26,44 +150,6 @@ Options: `run_live.sh predict` = live forecast only; extra flags are passed thro
 **Before you go on stage:** start the window 3–5 minutes early and let it run. The first cycles are TabPFN trying settings; from about cycle 5 it keeps the right one, and the cycle table (bottom right) shows the learning. An NVIDIA GPU makes the green forecast ghost smooth. Without one it runs on CPU and the ghost lags; everything else works. On macOS the launcher uses `mjpython`, which MuJoCo's viewer requires.
 
 **In the window:** dark blue = real beam; green = TabPFN's predicted position in 1 s; orange = physics model with the typed-in 0.5 m sling. Top left: mode, state, current cycle timer. Top right: both forecasts, the last 1-s check, the anti-sway setting and what's expected for this move (TabPFN prediction, or measured if already tried on this load). Bottom right: every cycle's time, expected → actual wait, placement, OK/MISS.
-
-## Results
-
-**Real lab crane** (Nazarbayev University tower crane, see Data). Mean error at the payload 1 s ahead, on whole runs held out from the context:
-
-| Held out | Fitted pendulum | Standard ML (boosted trees) | TabPFN | Physics + TabPFN |
-|---|---|---|---|---|
-| New cable length (0.5 m) | 0.34 cm | 1.30 | 1.52 | **0.19** |
-| New payload (beam) | 0.57 | 0.48 | **0.35** | 0.36 |
-| Hoisting during travel | 0.82 | 1.20 | 0.81 | **0.78** |
-
-**Adaptation on the unseen beam:** after 5 s of the beam's own rows, TabPFN's 1-s error drops from 0.30 to 0.10 cm (3×). Its 90% range goes from holding 32% of outcomes to 91%. Standard machine learning (gradient-boosted trees) retrained on the same rows reach 0.37 cm; the refitted pendulum 0.50 cm. Physics alone wins at +0.5 s when only the rope length changes.
-
-**MuJoCo, full-size crane, in simulation:** a held-out 400 kg beam on 2.6 m slings, with the anti-sway set for 0.5 m:
-
-| | TabPFN | Physics model |
-|---|---|---|
-| First move | 3.5 cm | 7.0 cm |
-| Later moves | **2.6 cm** (90% range holds 90%) | 10.9 cm |
-
-Video: `results/mujoco_demo.mp4`.
-
-**Closed loop, MuJoCo, in simulation:** before each move, the crane asks TabPFN (one batched call, 7 speeds × 4 anti-sway tunings) for the predicted swing and settle time, and takes the fastest move whose 99th-percentile swing clears the racks. Its real outcome becomes the next row. On 12 new loads on long slings:
-
-| Strategy | 12 moves | Moves / hour | Mean settle wait | Collisions |
-|---|---|---|---|---|
-| Industry anti-sway (set for 0.5 m sling) | 403 s | 107 | 19.9 s | 0 |
-| Slow and safe (40%) | 333 s | 130 | 1.5 s | 0 |
-| **TabPFN decides** | **261 s** | **166** | 7.4 s | 0 |
-
-Video: `results/closed_loop.mp4`. TabPFN still misjudged 3 of the 12 moves (long settles). No strategy collided, so the gain shown is time, not safety.
-
-**Playground** (page section 6c): 81 precomputed MuJoCo runs (rope × sling × payload × speed). TabPFN's 1-s error averages 0.8 cm vs 2.2 cm for physics; its 90% range holds 80%. To render any other combination: `render_clip.py --rope R --sling S --payload T --speed F`.
-
-**Caveats:**
-- The lab crane is about 10× smaller than an industrial one, with one run per condition and one seed.
-- The beam run has a single trolley move at the start.
-- The MuJoCo demo was rendered offline (7–8 s TabPFN fits on a GTX 1650).
 
 ## Run it
 
@@ -99,8 +185,8 @@ MUJOCO_GL=glfw crane/.venv/bin/python crane/live_pick_place.py --auto-tune # Tab
 | `live_crane.py` | **live** MuJoCo window: the crane shuttles between bays, TabPFN's 1-s-ahead ghost updates in real time; change rope/sling/payload/speed with keys (Up/Down, PgUp/PgDn, Home/End, Ins/Del) or by typing `rope 5` in the terminal |
 | `playground_precompute.py`, `render_clip.py` | page playground (option A, 81 precomputed runs) and any-parameter MP4 clip (option B) |
 | `make_figures.py` | slide figures in `figures/` from the saved results (no simulation needed) |
+| `docs/` | `report.html` (the full project report) and `img/` (README pictures) |
 | `data_tools/` | dataset download, the period check (measured vs. textbook pendulum), an xlsx reader |
-| `sim-check/` | Node checks of the explainer page's in-browser simulation (`node crane/sim-check/test.js 30`) |
 | `DATASETS.md`, `LESSONS.md` | dataset search and citation; the four Prior Labs lessons with links |
 
 ## Data and credit

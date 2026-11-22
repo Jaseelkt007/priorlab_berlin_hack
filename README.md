@@ -17,8 +17,7 @@ We recorded a trained AI flying a simulated fruit fly, turned every 0.2 ms of fl
 
 | Page | What it covers | Live | Source |
 |---|---|---|---|
-| **TabPFN Fruit Fly**: full project report | Prior Labs and TabPFN, the fruit fly, our implementation, all results with charts and video frames, the context-size sweep, limitations, improvements, glossary | [open](https://claude.ai/artifact/FN7XkVNaXNCco5KHm7vcYF) | [`docs/project-status.html`](docs/project-status.html) |
-| **How TabPFN Flies the Fly**: visual explainer | What the context holds, which column is predicted, why 12 rows × 1 column, when TabPFN is called and how its answer drives the physics | [open](https://claude.ai/artifact/F6BAugy5sjpwRBb3EATXrF) | live page only |
+| **TabPFN Fruit Fly**: full project report | Prior Labs and TabPFN, the fruit fly, our implementation, all results with charts and video frames, the context-size sweep, limitations, improvements, glossary | [open](https://claude.ai/artifact/FN7XkVNaXNCco5KHm7vcYF) | [`docs/report.html`](docs/report.html) |
 
 Also: data plan and column layout [`docs/data/collection-plan.md`](docs/data/collection-plan.md)
 

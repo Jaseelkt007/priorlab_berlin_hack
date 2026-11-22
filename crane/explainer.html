@@ -153,7 +153,7 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
     <div class="fact"><span class="v">22–64 ms</span><span class="k">one batched TabPFN-3.5 query on our RTX 4050 laptop GPU</span><a href="#m-tabpfn">team benchmark</a></div>
   </div>
   <nav class="toc" aria-label="Sections">
-    <a href="#live">1 · Live crane</a><a href="#physics">2 · Why loads swing</a><a href="#table">3 · The table</a><a href="#decide">4 · Each move</a><a href="#calib">5 · Calibration</a><a href="#realdata">6 · Real data</a><a href="#mujoco">6b · MuJoCo</a><a href="#playground">6c · Playground</a><a href="#closedloop">6d · Closed loop</a><a href="#influence">6e · Inputs &amp; outputs</a><a href="#method">7 · Problem &amp; training</a><a href="#today">8 · Today</a><a href="#business">9 · Business</a><a href="#sources">Sources</a>
+    <a href="#live">1 · Live crane</a><a href="#physics">2 · Why loads swing</a><a href="#table">3 · The table</a><a href="#decide">4 · Each move</a><a href="#calib">5 · Calibration</a><a href="#realdata">6 · Real data</a><a href="#mujoco">6b · MuJoCo</a><a href="#playground">6c · Playground</a><a href="#closedloop">6d · Closed loop</a><a href="#influence">6e · Inputs &amp; outputs</a><a href="#setdown">6f · Set-down timing</a><a href="#method">7 · Problem &amp; training</a><a href="#today">8 · Today</a><a href="#business">9 · Business</a><a href="#sources">Sources</a>
   </nav>
 </header>
 
@@ -468,6 +468,25 @@ ECE: |observed − predicted| rate, averaged over bins of p̂</div>
     <tr><td>Closed loop (6d)</td><td>settle time</td><td>s</td><td>median</td><td><b>speed:</b> expected cycle = move time + settle; the crane takes the shortest allowed one</td></tr>
   </tbody></table></div>
   <p class="note"><b>Closed-loop inputs</b> (one row per move): rope length, payload, measured lift-off sway period (which reveals the hidden sling), and the two choices being scored, <b>speed fraction</b> and <b>shaper tuning error</b> (shaper period ÷ measured period − 1). A higher speed shortens the move but raises the residual swing. A tuning error near 0 cancels the main swing mode, so the settle wait drops. TabPFN learned this from the table and moved from the 0.5 m to the 1.5 m tuning on long slings.</p>
+</section>
+
+<!-- 6f SET-DOWN TIMING -->
+<section id="setdown">
+  <div class="eyebrow">6f · Could we just time the set-down?</div>
+  <h2>Timing the set-down alone isn't enough; the swing has to be killed</h2>
+  <p>A tempting shortcut is to leave the crane's control alone and use TabPFN only to say <b>when</b> to start the final lowering. Lower as soon as the load is predicted to be inside the ±5 cm target 1 s later (the lowering time), instead of waiting until it has stayed there for a full second. We tested this on the 12 industry anti-sway moves from 6d, using every saved 0.1 s of their settle phase.</p>
+  <div class="box"><table class="ptab"><thead><tr><th>When to start lowering (industry anti-sway moves)</th><th>Fired early</th><th>Load inside ±5 cm at touchdown</th><th>Sideways speed at touchdown (median)</th><th>Safe touchdown (also &lt; 5 cm/s)</th></tr></thead><tbody>
+    <tr><td>Physics predicts inside ±5 cm</td><td class='v'>12/12</td><td class='v'>4/12</td><td class='v'>13 cm/s</td><td class='v'>0/12</td></tr>
+    <tr><td>TabPFN: whole 90% range inside ±5 cm</td><td class='v'>12/12</td><td class='v'>12/12</td><td class='v'>15 cm/s</td><td class='v'>0/12</td></tr>
+    <tr><td>TabPFN: inside for 5 predictions in a row (0.5 s)</td><td class='v'>12/12</td><td class='v'>12/12</td><td class='v'>14 cm/s</td><td class='v'>0/12</td></tr>
+  </tbody></table></div>
+  <ul class="note">
+    <li><b>TabPFN knows where the load will be:</b> its early touchdowns land inside ±5 cm on 12 of 12 moves; the physics model with the wrong sling manages 4 of 12.</li>
+    <li><b>But none is safe.</b> A 15 cm swing passes through the ±5 cm zone for about 0.5 s each crossing, moving sideways at about 15 cm/s. Landing then knocks the load sideways. Today's rule (inside for a full second) implicitly requires the swing itself to be small, and no amount of timing changes that.</li>
+    <li>A safe timing advisor can save at most about the last second of confirmation plus the lowering overlap. The big gain comes from killing the swing, which is what the closed loop in 6d does by re-tuning the anti-sway (35% faster).</li>
+    <li><b>Where timing does win: release jobs.</b> Magnet and grab cranes drop scrap or bulk material into a hopper mid-swing, so only the landing point matters: position at release + sideways speed × fall time. TabPFN's accurate position prediction is exactly what that needs. It's our next demo, not built yet.</li>
+    <li>Script: <span class="mono">crane/setdown_advisor.py</span>; results <span class="mono">crane/results/setdown_advisor.json</span>. Simulation, 12 moves, one seed.</li>
+  </ul>
 </section>
 
 <!-- 7 METHOD -->

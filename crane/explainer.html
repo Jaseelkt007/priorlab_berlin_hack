@@ -574,15 +574,30 @@ impulses 1/(1+K) at t=0  and  K/(1+K) at t = π/ω_d   (ζ≈0: ½ and ½, half 
 
 <section id="livepp">
   <div class="eyebrow">6b · Live pick and place: TabPFN chooses the anti-sway</div>
-  <h2>It learns the right setting within a few cycles, then sticks to it</h2>
-  <p>In the live MuJoCo window (<span class="mono">crane/live_pick_place.py --auto-tune</span>) the crane picks the beam, lifts it, travels, settles, places it in the other bay and repeats. Before each move, while the beam is lifted, TabPFN chooses the anti-sway setting from model 2 (section 3). Real sling 2.0 m, rope 4.5 m, 0.5 t, full speed; the operator-entered setting would be 0.5 m.</p>
-  <div class="box"><table class="ptab"><thead><tr><th>Run</th><th>Cycles</th><th>Settings TabPFN chose, in order</th><th>Mean cycle</th><th>vs. fixed 0.5 m setting</th></tr></thead><tbody>
-    <tr><td>35 cycles (your run, 5 decision inputs)</td><td class='v'>35</td><td class='v' style='white-space:normal'>0.5, 1.5, 1.5, 0.5, 1.5, 1.0, 1.5, 1.0, then 1.5 m for all 27 remaining cycles</td><td class='v'>48.2 s</td><td class='v'>about 68 s → −29%</td></tr><tr><td>13 cycles (your run, 5 decision inputs)</td><td class='v'>13</td><td class='v' style='white-space:normal'>0.5, 1.5, 1.5, 0.5, 1.5, 1.0, 1.5, 1.0, 1.5, 1.5, 1.5, 1.5, 1.5 m</td><td class='v'>50.5 s</td><td class='v'>about 68 s → −26%</td></tr><tr><td>5 cycles (test, 3 decision inputs: current app)</td><td class='v'>5</td><td class='v' style='white-space:normal'>0.5, 1.5, 1.0, 0.5, 1.5 m (early phase only)</td><td class='v'>57.3 s</td><td class='v'>same early pattern as the runs above</td></tr>
+  <h2>Latest live run: wrong setting once, one test of an untried setting, then the right one every cycle: 7 of 9 OK, 49.6 s average</h2>
+  <p>In the live MuJoCo window (<span class="mono">crane/run_live.sh</span>, which runs <span class="mono">live_pick_place.py --auto-tune</span>) the crane picks the beam, lifts it, travels, settles, places it in the other bay and repeats. Before each move, while the beam is lifted, it scores every anti-sway setting. Settings <b>not yet tried on this load</b> get TabPFN's prediction (model 2, section 3). Settings <b>already tried</b> use their <b>measured</b> wait and swing: measurement beats prediction. Real sling 2.0 m, rope 4.5 m, 0.5 t, full speed; the operator-entered setting would be 0.5 m (about 68 s per cycle).</p>
+  <div class="two">
+    <div class="box"><table class="ptab"><thead><tr><th>Cycle</th><th>Total</th><th>Anti-sway</th><th>Wait: expected → actual</th><th>Placed</th><th>Result</th></tr></thead><tbody><tr><td class='v'>#1</td><td class='v'>69.5 s</td><td class='v'>0.5 m</td><td class='v'>1.1 → 23.7 s</td><td class='v'>+6 cm</td><td class='v' style='color:var(--bad);font-weight:600'>MISS</td></tr><tr><td class='v'>#2</td><td class='v'>46.9 s</td><td class='v'>1.5 m</td><td class='v'>2.7 → 1.0 s</td><td class='v'>−1 cm</td><td class='v' style='color:var(--good);font-weight:600'>OK</td></tr><tr><td class='v'>#3</td><td class='v'>46.9 s</td><td class='v'>1.5 m</td><td class='v'>1.0 → 1.0 s</td><td class='v'>−1 cm</td><td class='v' style='color:var(--good);font-weight:600'>OK</td></tr><tr><td class='v'>#4</td><td class='v'>48.8 s</td><td class='v'>1.0 m</td><td class='v'>1.0 → 3.0 s</td><td class='v'>−6 cm</td><td class='v' style='color:var(--bad);font-weight:600'>MISS</td></tr><tr><td class='v'>#5</td><td class='v'>46.9 s</td><td class='v'>1.5 m</td><td class='v'>1.0 → 1.0 s</td><td class='v'>+1 cm</td><td class='v' style='color:var(--good);font-weight:600'>OK</td></tr><tr><td class='v'>#6</td><td class='v'>46.9 s</td><td class='v'>1.5 m</td><td class='v'>1.0 → 1.0 s</td><td class='v'>+1 cm</td><td class='v' style='color:var(--good);font-weight:600'>OK</td></tr><tr><td class='v'>#7</td><td class='v'>46.9 s</td><td class='v'>1.5 m</td><td class='v'>1.0 → 1.0 s</td><td class='v'>−2 cm</td><td class='v' style='color:var(--good);font-weight:600'>OK</td></tr><tr><td class='v'>#8</td><td class='v'>46.9 s</td><td class='v'>1.5 m</td><td class='v'>1.0 → 1.0 s</td><td class='v'>+3 cm</td><td class='v' style='color:var(--good);font-weight:600'>OK</td></tr><tr><td class='v'>#9</td><td class='v'>46.9 s</td><td class='v'>1.5 m</td><td class='v'>1.0 → 1.0 s</td><td class='v'>−3 cm</td><td class='v' style='color:var(--good);font-weight:600'>OK</td></tr>
+      <tr class="g"><td colspan="2">Average 49.6 s</td><td colspan="4">7 of 9 OK · vs about 68 s with the typed-in 0.5 m → −27%</td></tr></tbody></table></div>
+    <div class="panel">
+      <h3>How to read it</h3>
+      <ul class="note" style="font-size:.92rem">
+        <li><b>Cycle 1:</b> with only the 120 commissioning moves, TabPFN expected a 1.1 s wait for 0.5 m. It measured 23.7 s, so the cycle is a MISS (placed 6 cm off).</li>
+        <li><b>Cycles 2–3:</b> it switches to 1.5 m: 1.0 s wait, OK.</li>
+        <li><b>Cycle 4:</b> 1.0 m had never been tried on this load, so it trusts TabPFN's 1.0 s prediction once. That measured 3.0 s, a MISS.</li>
+        <li><b>Cycles 5–9:</b> 1.5 m every time; expected 1.0 s = actual 1.0 s; placed within ±3 cm, OK.</li>
+        <li><b>OK</b> = placed within ±5 cm and the swing stayed clear of the 0.45 m racks.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="box"><table class="ptab"><thead><tr><th>Earlier live runs (before the "measured beats predicted" rule)</th><th>Cycles</th><th>Settings chosen</th><th>Mean cycle</th></tr></thead><tbody>
+    <tr><td>35 cycles</td><td class="v">35</td><td class="v" style="white-space:normal">0.5, 1.5, 1.5, 0.5, 1.5, 1.0, 1.5, 1.0, then 1.5 m for the remaining 27</td><td class="v">48.2 s (−29%)</td></tr>
+    <tr><td>4 cycles</td><td class="v">4</td><td class="v" style="white-space:normal">0.5, 1.5, 1.0, 0.5 m: kept returning to the bad setting</td><td class="v">59.9 s</td></tr>
   </tbody></table></div>
   <ul class="note">
-    <li>With the wrong 0.5 m setting a cycle takes 66.9–69.5 s, with 21–24 s of waiting for the swing. With 1.5 m it takes 46.9–47.7 s with 1.0 s of waiting, placed within a few cm of the bay centre.</li>
-    <li>Early on it sometimes goes back to 0.5 m or tries 1.0 m while its own rows are few. After that it settles on 1.5 m. 1.5 m rather than 2.0 m is not an error: a double pendulum's effective length isn't simply rope + sling, and 1.5 m cancelled best in its data.</li>
-    <li>Each decision: two TabPFN fits plus predict on about 120–150 rows, made while the beam is being lifted, so it costs no cycle time.</li>
+    <li><b>Why the rule was needed:</b> with only 3 inputs (sway period, speed, tuning error), TabPFN couldn't tell this long-sling load apart from commissioning moves where a similar tuning error settled fast. So it kept predicting about 1 s for 0.5 m even after measuring 21–29 s. Using the measured outcome for settings already tried on this load fixed that. TabPFN still decides every untried setting, and the load's own moves count 5× in its table.</li>
+    <li><b>In the window:</b> top right shows "TabPFN / Physics, load in 1 s", the last 1-s check (said → was → inside range), and "expected for this move" (TabPFN prediction or measured on this load). Bottom right is this cycle table, live.</li>
+    <li>1.5 m rather than 2.0 m is not an error: a double pendulum's effective length isn't simply rope + sling, and 1.5 m cancelled best. Simulation, one run.</li>
   </ul>
 </section>
 
@@ -612,7 +627,7 @@ impulses 1/(1+K) at t=0  and  K/(1+K) at t = π/ω_d   (ζ≈0: ½ and ½, half 
     <tr><td>Forecast with a hidden long sling</td><td class="v">4.7 cm</td><td class="v"><b>0.7 cm</b></td><td>MuJoCo (3b)</td></tr>
     <tr><td>Forecast, all 81 playground settings</td><td class="v">2.2 cm</td><td class="v"><b>0.8 cm</b></td><td>MuJoCo (5b)</td></tr>
     <tr><td>12 new loads, total time</td><td class="v">403 s (107 moves/h)</td><td class="v"><b>261 s (166 moves/h)</b></td><td>closed loop (6)</td></tr>
-    <tr><td>Pick-and-place cycle, live</td><td class="v">about 68 s (setting fixed at 0.5 m)</td><td class="v"><b>48.2 s average over 35 cycles</b></td><td>live (6b)</td></tr>
+    <tr><td>Pick-and-place cycle, live</td><td class="v">about 68 s (setting fixed at 0.5 m)</td><td class="v"><b>49.6 s average over 9 cycles, 7/9 OK</b> (latest run; 48.2 s over 35 in an earlier run)</td><td>live (6b)</td></tr>
     <tr><td>Collisions</td><td class="v">0</td><td class="v">0</td><td>no safety gain shown yet</td></tr>
   </tbody></table></div>
   <p class="note">There is no retraining anywhere: a new load is handled by adding rows. Predictions take about 130 ms on a GTX 1650 laptop GPU. It can start in manual mode as advice to the operator, then run in auto.</p>

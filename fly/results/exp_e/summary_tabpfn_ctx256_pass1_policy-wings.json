@@ -1,0 +1,15 @@
+{
+ "curve": {
+  "steps": 4994,
+  "sim_s": 0.9988,
+  "reached_end": true,
+  "saccade_t": null,
+  "wall_s": 1656.7,
+  "drift_mm": {
+   "all": {
+    "mean": 0.12388779449358614,
+    "max": 0.16012548140500263
+   }
+  }
+ }
+}

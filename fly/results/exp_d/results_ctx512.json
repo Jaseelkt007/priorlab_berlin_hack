@@ -1,0 +1,48 @@
+{
+ "context_steps": 512,
+ "latency_ms": 97.07024574279785,
+ "flights": {
+  "14": {
+   "steps": 335,
+   "planned": 335,
+   "reached_end": true,
+   "tabpfn_drift_mm": {
+    "mean": 1.3950541569022183,
+    "max": 7.417003243565336
+   },
+   "policy_drift_mm": {
+    "mean": 0.21552540361881256,
+    "max": 0.3956652581691742
+   },
+   "wall_s": 42.4
+  },
+  "106": {
+   "steps": 335,
+   "planned": 335,
+   "reached_end": true,
+   "tabpfn_drift_mm": {
+    "mean": 2.0396578135745096,
+    "max": 9.99807240974037
+   },
+   "policy_drift_mm": {
+    "mean": 0.17917399108409882,
+    "max": 0.44372880458831787
+   },
+   "wall_s": 39.1
+  },
+  "68": {
+   "steps": 317,
+   "planned": 407,
+   "reached_end": false,
+   "tabpfn_drift_mm": {
+    "mean": 1.673570801459159,
+    "max": 6.906562342816834
+   },
+   "policy_drift_mm": {
+    "mean": 0.2984401285648346,
+    "max": 0.6833215355873108
+   },
+   "wall_s": 37.0
+  }
+ }
+}

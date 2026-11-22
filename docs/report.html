@@ -1,0 +1,900 @@
+<title>TabPFN Suction Picker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Same design as fly/docs/report.html: a white technical report, a sticky contents bar, numbered chapters.
+   Each chapter: an "In simple words" box, then the detail as video, diagrams, charts and tables. Single light theme by design. */
+:root {
+  color-scheme: light;
+  --bg: #ffffff; --panel: #f7f8fa; --ink: #0f172a; --ink-2: #475569; --ink-3: #94a3b8; --line: #e2e8f0; --line-2: #cbd5e1;
+  --tab: #2563eb; --tab-soft: #dbe7fd;   /* TabPFN */
+  --f50: #ea580c; --f50-soft: #fde8d9;   /* fast fixed recipe, baselines */
+  --f30: #0d9488; --f30-soft: #d5f0ec;   /* cautious fixed recipe */
+  --sim: #7c3aed; --sim-soft: #ece4fd;   /* physics / simulation */
+  --good: #15803d; --good-soft: #dcf3e3; --bad: #dc2626; --bad-soft: #fde4e4; --warn: #b45309; --warn-soft: #fbeed5;
+  --f-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 var(--f-sans); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 72px; display: grid; gap: 72px; }
+nav.toc { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: rgba(255,255,255,.96); border-bottom: 1px solid var(--line); }
+nav.toc .in { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 10px; display: flex; gap: 6px 18px; overflow-x: auto; white-space: nowrap; font: 500 12.5px var(--f-mono); }
+nav.toc a { color: var(--ink-2); text-decoration: none; }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--tab); }
+a { color: var(--tab); }
+a:focus-visible { outline: 2px solid var(--tab); outline-offset: 2px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; letter-spacing: -0.015em; }
+h1 { font-size: clamp(2rem, 4.6vw, 2.9rem); font-weight: 700; line-height: 1.08; }
+h2 { font-size: 1.6rem; font-weight: 700; line-height: 1.2; }
+h3 { font-size: 1.08rem; font-weight: 650; line-height: 1.3; }
+p { margin: 0; }
+ul { margin: 0; padding-left: 1.2em; }
+code, .mono { font-family: var(--f-mono); font-size: .92em; }
+.kicker { font: 500 12px/1.2 var(--f-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
+.chap { display: grid; gap: 22px; scroll-margin-top: 56px; }
+.chap > header { display: grid; gap: 8px; }
+.chap > header .num { font: 600 13px var(--f-mono); color: var(--tab); }
+.sub { display: grid; gap: 12px; align-content: start; }
+.text { max-width: 76ch; color: var(--ink-2); }
+.text b { color: var(--ink); }
+.simple { background: var(--panel); border-radius: 12px; padding: 16px 18px; display: grid; gap: 6px; max-width: 86ch; }
+.simple .kicker { color: var(--tab); }
+.simple p { color: var(--ink); font-size: 15.5px; }
+
+.hero { display: grid; gap: 20px; padding-top: 44px; }
+.hero .lede { font-size: 1.1rem; color: var(--ink-2); max-width: 74ch; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 13px; color: var(--ink-2); }
+.meta b { color: var(--ink); font-weight: 600; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tile { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; min-width: 0; }
+.tile .t { font: 500 11px/1.2 var(--f-mono); text-transform: uppercase; letter-spacing: .06em; }
+.tile .v { font: 650 1.75rem/1.1 var(--f-sans); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.tile .l { font-size: 13px; color: var(--ink-2); }
+.t.good { color: var(--good); } .t.bad { color: var(--bad); } .t.info { color: var(--tab); } .t.warn { color: var(--warn); }
+@media (max-width: 860px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* video: the 4K renders, web-encoded (docs/media); played only while on screen */
+.vid { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.vid video, .vid img { width: 100%; height: auto; display: block; border-radius: 10px; border: 1px solid var(--line); background: #0b0f14; aspect-ratio: 16 / 9; object-fit: cover; }
+.vid.wide video { aspect-ratio: 32 / 9; }
+.vid figcaption { font-size: 12.5px; color: var(--ink-2); }
+.vid figcaption b { color: var(--ink); }
+.vid .lr { display: flex; justify-content: space-between; font: 500 11px var(--f-mono); color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; }
+.gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 860px) { .gallery { grid-template-columns: 1fr; } }
+
+figure.panel { margin: 0; border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 10px; min-width: 0; }
+figure.panel > figcaption { font-size: 13px; color: var(--ink-2); max-width: 86ch; }
+figure.panel > figcaption b { color: var(--ink); }
+figure.panel img.fig { width: 100%; height: auto; display: block; }
+.ftitle { font-weight: 600; font-size: 14px; }
+.scroll { overflow-x: auto; }
+svg { display: block; max-width: 100%; height: auto; }
+svg text { font-family: var(--f-sans); fill: var(--ink); }
+svg .m { font-family: var(--f-mono); }
+svg .t2 { fill: var(--ink-2); } svg .t3 { fill: var(--ink-3); }
+.g2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.g3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 860px) { .g2, .g3 { grid-template-columns: 1fr; } }
+
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.legend i.dot { border-radius: 50%; }
+.legend i.dia { transform: rotate(45deg) scale(.85); border-radius: 1px; }
+.legend i.x { background: none !important; width: 10px; height: 10px; position: relative; }
+.legend i.x::before, .legend i.x::after { content: ""; position: absolute; left: 4px; top: -1px; width: 2px; height: 12px; background: var(--bad); border-radius: 1px; transform: rotate(45deg); }
+.legend i.x::after { transform: rotate(-45deg); }
+.chart { position: relative; }
+.chart text { font: 11px var(--f-mono); fill: var(--ink-3); }
+.chart text.lbl { fill: var(--ink-2); font-family: var(--f-sans); }
+.chart .gl { stroke: var(--line); }
+.chart .hit { cursor: crosshair; }
+.chart .hit:hover { fill: rgba(37, 99, 235, .06); }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: #fff; font: 12px/1.4 var(--f-mono); padding: 6px 8px; border-radius: 6px; max-width: min(560px, 92vw); white-space: normal; transform: translate(-50%, calc(-100% - 10px)); z-index: 2; }
+
+.tw { border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 500 11px/1.3 var(--f-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); background: var(--panel); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--f-mono); font-size: 13px; white-space: nowrap; }
+td.k { font-weight: 600; white-space: nowrap; }
+.g2 td.n, .g2 td.k { white-space: normal; }
+tr.us td { background: #f5f8ff; }
+.ok { color: var(--good); font-weight: 600; } .no { color: var(--bad); font-weight: 600; } .mid { color: var(--warn); font-weight: 600; }
+
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.card { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; min-width: 0; font-size: 13.5px; color: var(--ink-2); }
+.card .h { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.card b { color: var(--ink); font-size: 14.5px; }
+.card .x { font: 600 12.5px var(--f-mono); white-space: nowrap; }
+.card .fix { color: var(--ink); border-top: 1px dashed var(--line-2); padding-top: 6px; }
+.card .src { font-size: 12px; color: var(--ink-3); }
+.card .src a { color: var(--ink-2); }
+@media (max-width: 860px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .cards { grid-template-columns: 1fr; } }
+.pill { display: inline-block; font: 600 11px/1 var(--f-mono); letter-spacing: .04em; padding: 4px 8px; border-radius: 999px; white-space: nowrap; }
+.pill.hi { background: var(--good-soft); color: var(--good); } .pill.md { background: var(--warn-soft); color: var(--warn); } .pill.lo { background: var(--panel); color: var(--ink-2); } .pill.bd { background: var(--bad-soft); color: var(--bad); }
+.proj { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: grid; min-width: 0; }
+.proj video { width: 100%; display: block; aspect-ratio: 16 / 9; object-fit: cover; background: #0b0f14; }
+.proj.wide video { object-fit: contain; }
+.proj .body { padding: 12px 14px; display: grid; gap: 6px; font-size: 13.5px; color: var(--ink-2); }
+.proj .body b { color: var(--ink); }
+.proj .stat { font: 650 1.25rem/1.1 var(--f-sans); color: var(--ink); font-variant-numeric: tabular-nums; }
+dl.gloss { display: grid; grid-template-columns: 180px 1fr; gap: 8px 18px; margin: 0; font-size: 14px; }
+dl.gloss dt { font-weight: 600; } dl.gloss dd { margin: 0; color: var(--ink-2); }
+@media (max-width: 560px) { dl.gloss { grid-template-columns: 1fr; } dl.gloss dd { margin-bottom: 8px; } }
+footer { color: var(--ink-3); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 14px; display: grid; gap: 6px; }
+footer a { color: var(--ink-2); }
+</style>
+<nav class="toc" aria-label="Contents"><div class="in">
+  <a href="#summary">Summary</a><a href="#problem">01 Problem</a><a href="#today">02 Today</a><a href="#tabpfn">03 TabPFN</a><a href="#approach">04 Our method</a><a href="#line">05 The line</a><a href="#results">06 Results</a><a href="#jax">07 JAX speed</a><a href="#apps">08 Applications</a><a href="#value">09 Value</a><a href="#limits">10 Limits</a><a href="#next">11 Next</a><a href="#glossary">Glossary</a>
+</div></nav>
+<div class="wrap">
+
+<!-- ============ SUMMARY ============ -->
+<section class="chap hero" id="summary">
+  <div class="kicker">HackLab #2 Berlin · Prior Labs track "TabPFN for spatial awareness" · 21–22 Nov 2026</div>
+  <h1>How fast can this pick be?</h1>
+  <p class="lede">A delta robot picks food products with a suction cup at up to 150 picks a minute. Too fast and the product flies off the cup. We let <b>TabPFN</b> read the line's own log, including the vacuum the cup measures at touch, and choose the speed of every single pick. No training, no tuning: each pick's outcome becomes a new row.</p>
+  <div class="meta"><span>Status <b>Sun 22 Nov, 11:45 CET</b></span><span>Repo <b class="mono">Jaseelkt007/priorlab_berlin_hack</b> · branch <b>main</b></span><span>Everything below is <b>simulated</b> (MuJoCo, validated against vendor data)</span></div>
+  <div class="tiles">
+    <div class="tile"><span class="t good">One shift, 120 picks</span><span class="v">1 vs 31</span><span class="l">drops: TabPFN vs the fast fixed recipe, on identical items</span></div>
+    <div class="tile"><span class="t good">Good picks per minute</span><span class="v">152.6</span><span class="l">vs 145.7 for the cautious recipe (0 drops) and 122.7 for the fast one</span></div>
+    <div class="tile"><span class="t info">Decision time (JAX)</span><span class="v">2.35 ms</span><span class="l">median per pick (max 3.53) inside the 35 ms the cup takes to seal</span></div>
+    <div class="tile"><span class="t bad">Still fails</span><span class="v">1st heavy bar</span><span class="l">it drops the first unseen heavy bar, then slows every one after</span></div>
+  </div>
+  <figure class="vid"><video src="media/hero.mp4" poster="media/hero.jpg" muted loop playsinline preload="metadata" controls></video>
+    <figcaption><b>The cell.</b> An IRB 360-class delta robot (closed-chain MuJoCo model) tracks bars on a 0.30 m/s belt and places them on the outfeed. Every pick's speed is chosen by TabPFN. Rendered at 4K60 from the simulation; this is a web copy.</figcaption></figure>
+  <div class="simple"><span class="kicker">The whole project in four sentences</span>
+    <p>Packaging lines run every product at one fixed speed, set once by an engineer, so they waste speed on easy picks and still drop the hard ones. The data to do better is already on the line: weight, size, temperature, the cup's age, and the vacuum the cup reaches when it touches the product. We give that log to TabPFN as examples, and in the 35 ms the cup takes to seal it predicts the drop risk at all nine speeds, so the robot takes the fastest speed worth its risk. Each outcome is added as a new row, which is how it adapts during a shift to a heavier product, a bad film roll or a worn cup.</p></div>
+</section>
+
+<!-- ============ 01 PROBLEM ============ -->
+<section class="chap" id="problem">
+  <header><span class="num">01</span><h2>The problem: speed vs drops</h2></header>
+  <div class="simple"><span class="kicker">In simple words</span>
+    <p>The cup holds the product with a fixed grip: vacuum times cup area. When the robot accelerates at 10–15 g, the product pulls against that grip, and a tall or off-centre product also tips and peels the cup off. Faster means more picks per minute but more drops; slower means fewer drops but lost output. The right speed changes with every product, and even with every item.</p></div>
+
+  <div class="g2">
+    <figure class="vid"><video src="media/fling.mp4" poster="media/fling.jpg" muted loop playsinline preload="none" controls></video>
+      <figcaption><b>Too fast.</b> The same bar at 100 % speed, about 17× slow motion: at the acceleration reversal the cup tilts, the seal breaks and the bar is flung. This mechanism was not scripted; it comes out of the cup and pneumatics models (chapter 05).</figcaption></figure>
+    <div class="sub">
+      <h3>What a drop costs</h3>
+      <ul class="text">
+        <li><b>Scrap, a stop, or contamination:</b> the product falls onto the belt or into the machine.</li>
+        <li><b>Out of position</b> in the tray: a reject or a jam downstream.</li>
+        <li><b>Damage:</b> a cracked biscuit, a dented pack.</li>
+      </ul>
+      <div class="tw"><table>
+        <tr><th>The motion</th><th>ABB IRB 360 FlexPicker</th></tr>
+        <tr><td>Speed, acceleration</td><td class="n">up to 10 m/s · ~150 m/s² (1 kg version)</td></tr>
+        <tr><td>Typical cycle</td><td class="n">0.36–0.44 s</td></tr>
+        <tr><td>Picks per robot</td><td class="n">up to 120/min (Syntegon, vendor claim)</td></tr>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="sub">
+    <h3>Evidence that this hurts, from the industry and research</h3>
+    <div class="cards">
+      <div class="card"><div class="h"><b>ABB, the largest delta maker</b></div><p>High-speed motion "creates forces that impact the stability of the product in the gripper, as well as the potential for product damage".</p><p class="src"><a href="https://library.e.abb.com/public/d02772b2e8cc14fcc12575bb005c2c06/ABB%20white%20paper%20Rick%20Tallian%20High%20speed%20picking.pdf">ABB white paper, high-speed picking</a></p></div>
+      <div class="card"><div class="h"><b>UC Berkeley, GOMP-ST</b></div><p>"High-speed motions can cause failure of suction cups." They had to learn the failure limits from 420 physical trials with a sample object.</p><p class="src"><a href="https://arxiv.org/pdf/2203.08359">arXiv 2203.08359 (WAFR 2022)</a></p></div>
+      <div class="card"><div class="h"><b>Failed picks stop lines</b></div><p>A delta robot stacking packages: an error otherwise "requires stopping the line for manual correction".</p><p class="src"><a href="https://www2.iea.lth.se/publications/MS-Theses/Full%20document/5434_full_document.pdf">Lund University thesis</a></p></div>
+      <div class="card"><div class="h"><b>Small rates, big volumes</b></div><p>"Even fractions of a percent of failed picks" scale to significant cost at warehouse volumes.</p><p class="src"><a href="https://locusrobotics.com/blog/robotic-grasping-warehouse-automation">Locus Robotics (vendor)</a></p></div>
+      <div class="card"><div class="h"><b>Lines run at 55–68 % OEE</b></div><p>High-speed food packaging lines lose most time to minor stops and changeovers.</p><p class="src"><a href="https://oxmaint.com/industries/food-manufacturing/oee-optimization-food-production-lines-practical-guide">Oxmaint (vendor content)</a></p></div>
+      <div class="card"><div class="h"><b>Micro-stops add up</b></div><p>10 stops/hour × 10 s ≈ 2.8 % of time ≈ 3,300 packs per 8-hour shift on a 250 packs/min line (illustrative).</p><p class="src"><a href="https://shoplogix.com/oee-for-packaging-industry/">Shoplogix</a></p></div>
+    </div>
+    <p class="text">Full research with all sources: <code>docs/research/application-delta-picking.md</code>.</p>
+  </div>
+</section>
+
+<!-- ============ 02 TODAY ============ -->
+<section class="chap" id="today">
+  <header><span class="num">02</span><h2>How it is handled today</h2></header>
+  <div class="simple"><span class="kicker">In simple words</span>
+    <p>An engineer picks one cautious speed per product at commissioning, and the line runs it all day. Vacuum sensors only say "held" or "lost" after the fact, and the smart vacuum monitors on modern grippers feed maintenance, not motion. The closest research (GOMP-ST) proves item-aware speed limits pay off, 16–58 % faster with no failures, but it needs dedicated physical trials for every object.</p></div>
+  <div class="tw"><table>
+    <tr><th>Approach</th><th>What it does</th><th>What it leaves open</th></tr>
+    <tr><td class="k">Fixed speed recipe per product</td><td>conservative settings chosen once, by experience</td><td>wastes speed on easy items, still fails on unusual ones, ignores drift during a shift</td></tr>
+    <tr><td class="k">Vacuum switch per pick</td><td>confirms "item held" or "item lost"</td><td><b>reacts after</b> the failure; never changes how the robot moves</td></tr>
+    <tr><td class="k">Smart vacuum monitoring</td><td>Piab, Schmalz, Festo AX, SMC IO-Link: leaks, wear, evacuation-time drift</td><td>aimed at <b>maintenance</b>; but it means the data stream <b>already exists</b> on modern grippers</td></tr>
+    <tr><td class="k">ABB PickMaster Twin</td><td>digital twin of the line; ABB claims changeover from hours to minutes, 15 % faster picking</td><td>models layout and flow; does not learn each product's grip from live picks</td></tr>
+    <tr><td class="k">Research: GOMP-ST (Berkeley)</td><td>learns failure limits from vacuum readings, feeds them to a time-optimal planner: 16–58 % shorter transport, near 100 % success</td><td>dedicated trials with a sample object; no calibrated uncertainty; no update during production</td></tr>
+    <tr class="us"><td class="k">This project</td><td>TabPFN predicts the drop risk of <b>this</b> pick at every speed from the line's own log, in the seal window</td><td>no trials, no training, calibrated risk, updates with every pick; <b>simulation only so far</b></td></tr>
+  </table></div>
+</section>
+
+<!-- ============ 03 TABPFN ============ -->
+<section class="chap" id="tabpfn">
+  <header><span class="num">03</span><h2>Prior Labs and TabPFN</h2></header>
+  <div class="simple"><span class="kicker">In simple words</span>
+    <p>Most AI models must be trained on your data before they can predict. TabPFN was trained once, by Prior Labs, on more than a hundred million made-up tables, to learn one skill: look at a table of examples and fill in the answers for new rows. You hand it your table and it answers in one pass, with a probability you can trust. Change the rows and you change the behaviour.</p></div>
+  <figure class="panel">
+    <div class="scroll">
+    <svg viewBox="0 0 1000 250" role="img" aria-label="A normal model is trained on your data with gradient steps before it predicts; TabPFN reads your data as context and predicts in one forward pass.">
+      <defs>
+        <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker>
+        <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker>
+      </defs>
+      <text x="20" y="28" class="m t3" font-size="11">USUAL MODEL (TREES, NEURAL NETWORK)</text>
+      <rect x="20" y="40" width="160" height="56" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="100" y="73" text-anchor="middle">the line's log</text>
+      <rect x="260" y="40" width="210" height="56" rx="8" fill="#fde8d9" stroke="#ea580c"/><text x="365" y="65" text-anchor="middle" font-weight="600">training loop</text><text x="365" y="84" text-anchor="middle" font-size="12" class="t2">thousands of gradient steps</text>
+      <rect x="550" y="40" width="160" height="56" rx="8" fill="#fff" stroke="#ea580c"/><text x="630" y="73" text-anchor="middle">fitted model</text>
+      <rect x="790" y="40" width="190" height="56" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="885" y="73" text-anchor="middle">drop risk</text>
+      <path d="M182,68 H256" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/><path d="M472,68 H546" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/><path d="M712,68 H786" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/>
+      <text x="20" y="150" class="m" font-size="11" fill="#2563eb">TABPFN (IN-CONTEXT LEARNING)</text>
+      <rect x="20" y="162" width="160" height="56" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="100" y="195" text-anchor="middle">the line's log</text>
+      <rect x="260" y="162" width="450" height="56" rx="8" fill="#dbe7fd" stroke="#2563eb"/><text x="485" y="187" text-anchor="middle" font-weight="600">one forward pass of a pre-trained transformer</text><text x="485" y="206" text-anchor="middle" font-size="12" class="t2">the log's rows are the "context"; no weights change</text>
+      <rect x="790" y="162" width="190" height="56" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="885" y="186" text-anchor="middle">drop risk</text><text x="885" y="204" text-anchor="middle" font-size="12" class="t2">calibrated probability</text>
+      <path d="M182,190 H256" stroke="#2563eb" stroke-width="2" marker-end="url(#ab)"/><path d="M712,190 H786" stroke="#2563eb" stroke-width="2" marker-end="url(#ab)"/>
+    </svg>
+    </div>
+    <figcaption>Prior Labs' deck (<code>docs/HackLab_Berlin_x_TabPFN_Prior_Labs.pdf</code>): "a pre-trained transformer that predicts on structured data in-context", trained once on "100M+ synthetic datasets"; at use, "one forward pass, no gradient step, no tuning". <b>"Robots run on tables. Every sensor tick, joint reading and log line is a row."</b></figcaption>
+  </figure>
+  <div class="tw"><table>
+    <tr><th>The model we use</th><th></th></tr>
+    <tr><td class="k">Checkpoint</td><td>TabPFN-3.5-Fast (84M parameters; the full 3.5 has 220M), open weights, non-commercial licence; <code>tabpfn</code> 10.2.0</td></tr>
+    <tr><td class="k">Setting</td><td>classifier, 1 estimator, <code>fit_mode="fit_with_cache"</code>: the context is encoded once, each query only runs the new rows</td></tr>
+    <tr><td class="k">Context</td><td>the commissioning log, 2,700 picks: 13 sensor columns (mass; length, width, height; product and room temperature; humidity; cup cycles and diameter; vacuum setpoint; belt speed; seal kPa; evacuation ms) plus the speed setting → dropped yes/no</td></tr>
+    <tr><td class="k">Query</td><td>the current pick as 9 rows, one per speed setting (20 %…100 %): one call returns P(drop) at every speed</td></tr>
+    <tr><td class="k">Query engine</td><td>our JAX port of the cached query path (chapter 07): the same probabilities as PyTorch fp32, 2.35 ms per pick</td></tr>
+  </table></div>
+</section>
+
+<!-- ============ 04 APPROACH ============ -->
+<section class="chap" id="approach">
+  <header><span class="num">04</span><h2>Our method: one decision per pick</h2></header>
+  <div class="simple"><span class="kicker">In simple words</span>
+    <p>When the cup touches the product it waits 35 ms for the vacuum to build. The sensor's reading at the end of that wait tells us how good this seal is, before the robot moves. In that window TabPFN scores all nine speeds for this exact pick; the robot takes the fastest one that is worth its risk; and the outcome goes back into the table.</p></div>
+  <figure class="panel">
+    <div class="scroll">
+    <svg viewBox="0 0 1000 230" role="img" aria-label="Per-pick loop: touch, 35 ms vacuum dwell, sensor reads the seal, TabPFN predicts drop risk at 9 speeds, the fastest worthwhile speed is chosen, the loaded move, and the outcome is appended to the log, which is TabPFN's context.">
+      <defs><marker id="c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker>
+        <marker id="cb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker></defs>
+      <rect x="10" y="30" width="120" height="62" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="70" y="57" text-anchor="middle" font-weight="600">touch</text><text x="70" y="77" text-anchor="middle" font-size="12" class="t2">cup on product</text>
+      <rect x="160" y="30" width="170" height="62" rx="8" fill="#ece4fd" stroke="#7c3aed"/><text x="245" y="57" text-anchor="middle" font-weight="600">35 ms vacuum dwell</text><text x="245" y="77" text-anchor="middle" font-size="12" class="t2">sensor: seal kPa, evac ms</text>
+      <rect x="360" y="30" width="200" height="62" rx="8" fill="#dbe7fd" stroke="#2563eb"/><text x="460" y="57" text-anchor="middle" font-weight="600">TabPFN: P(drop)</text><text x="460" y="77" text-anchor="middle" font-size="12" class="t2">at 9 speeds, 2.35 ms</text>
+      <rect x="590" y="30" width="180" height="62" rx="8" fill="#fff" stroke="#2563eb"/><text x="680" y="57" text-anchor="middle" font-weight="600">choose speed</text><text x="680" y="77" text-anchor="middle" font-size="12" class="t2">best expected value</text>
+      <rect x="800" y="30" width="190" height="62" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="895" y="57" text-anchor="middle" font-weight="600">loaded move</text><text x="895" y="77" text-anchor="middle" font-size="12" class="t2">placed or dropped</text>
+      <path d="M132,61 H156" stroke="#475569" stroke-width="1.6" marker-end="url(#c)"/><path d="M332,61 H356" stroke="#475569" stroke-width="1.6" marker-end="url(#c)"/><path d="M562,61 H586" stroke="#2563eb" stroke-width="2" marker-end="url(#cb)"/><path d="M772,61 H796" stroke="#475569" stroke-width="1.6" marker-end="url(#c)"/>
+      <rect x="300" y="150" width="400" height="56" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="500" y="175" text-anchor="middle" font-weight="600">the line's log = TabPFN's context</text><text x="500" y="194" text-anchor="middle" font-size="12" class="t2">fixed-size rolling window of 2,700 picks; drops are never evicted</text>
+      <path d="M895,94 V178 H704" fill="none" stroke="#475569" stroke-width="1.6" marker-end="url(#c)"/><text x="883" y="140" font-size="12" class="t2" text-anchor="end">outcome becomes a row</text>
+      <path d="M460,148 V96" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#cb)"/><text x="470" y="128" font-size="12" class="t2">refit every 2 picks</text>
+    </svg>
+    </div>
+    <figcaption>Every input already exists on a modern line: the checkweigher (mass), the vision system (size, pick offset), the room sensors, the cup's cycle counter, and the IO-Link vacuum sensor in the gripper.</figcaption>
+  </figure>
+  <div class="g2">
+    <figure class="vid"><video src="media/decision.mp4" poster="media/decision.jpg" muted loop playsinline preload="none" controls></video>
+      <figcaption><b>The decision window, about 17× slow motion.</b> The cup lands, the vacuum builds for 35 ms, and the speed for this pick is decided before the arms accelerate (this pick: 3.2 ms).</figcaption></figure>
+    <div class="sub">
+      <h3>How the speed is chosen</h3>
+      <ul class="text">
+        <li><b>Objective:</b> good picks per minute minus <i>c</i> × drops per minute, where a drop costs <i>c</i> picks' worth (the shift uses <i>c</i> = 10).</li>
+        <li><b>Expected value</b> per speed = (1 − (1 + <i>c</i>) × P(drop)) / cycle time; take the best (<code>policy/policies.py</code> <code>value_rate</code>).</li>
+        <li><b>Safe step:</b> never more than one setting above the fastest speed this product has held so far. A new product starts slow and climbs.</li>
+        <li><b>Online:</b> each executed pick is appended; the context is refitted every 2 picks (about once a second on a live line).</li>
+        <li><b>Fixed-size window:</b> each new pick in, the oldest held pick out, every drop kept, so the JAX program compiles once.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 05 LINE ============ -->
+<section class="chap" id="line">
+  <header><span class="num">05</span><h2>The simulated line, and how we know it is right</h2></header>
+  <div class="simple"><span class="kicker">In simple words</span>
+    <p>No real line was available, so we built one in MuJoCo from vendor data sheets: the vacuum generator and hoses, a soft suction cup, the closed-chain delta robot with ABB's limits, the belt and six products that drift during a shift. Every part was checked against an outside reference before we trusted it. Drops are not scripted: they happen when the physics says the grip loses.</p></div>
+  <div class="tw"><table>
+    <tr><th>Gate</th><th>What</th><th>Checked against</th></tr>
+    <tr><td class="k">1 Pneumatics</td><td>vacuum generator, cup volume, lip leaks (ISO 6358 + slit flow), sensor</td><td>Piab evacuation tables (±3 %), SMC adsorption test, Schmalz forces</td></tr>
+    <tr><td class="k">2 Cup</td><td>compliant lip ring (Dex-Net 3.0 spring model), vacuum force, bellows</td><td>lift and shear limits within 4 % of theory; peel onset</td></tr>
+    <tr><td class="k">3 Seal and warning</td><td>seal vs surface roughness; what a near-miss looks like</td><td>Schmalz/SMC data; peel is abrupt, shear gives graded slip</td></tr>
+    <tr><td class="k">4 Delta robot</td><td>closed-chain IRB 360-class robot, exact feedforward, TOPP-RA time-optimal planner with ABB's foundation-load limits</td><td>ABB workspace, path accuracy, cycle times (held-out cycle −2.5 %)</td></tr>
+    <tr><td class="k">5 Line</td><td>belt, PickMaster-style tracking, vision error, 6-product catalogue with drift (cup wear, condensation, batches)</td><td>placement error vs ABB's table; drop onset vs Schmalz's sizing rule (S* = 1.94)</td></tr>
+  </table></div>
+  <p class="text">Write-ups: <code>docs/research/*-validation.md</code>; tests: <code>tests/</code> (gates 1–5); every estimated value is listed in <code>DEBT.md</code>.</p>
+</section>
+
+<!-- ============ 06 RESULTS ============ -->
+<section class="chap" id="results">
+  <header><span class="num">06</span><h2>Results</h2></header>
+  <div class="simple"><span class="kicker">In simple words</span>
+    <p>TabPFN learns the drop risk from a few hundred logged picks, and its probabilities are honest. On a shift where a heavier product, a bad film roll and a worn cup all show up, it drops one bar where the fast fixed recipe drops 31, and it picks faster than the cautious recipe. It is not magic: a fixed speed chosen in hindsight would have done slightly better, and with a big dedicated test campaign a tuned recipe catches up.</p></div>
+
+  <div class="sub">
+    <h3>6a · One shift, fast-forwarded: TabPFN vs fixed recipes on the same 120 picks</h3>
+    <p class="text">Every pick was simulated at all 9 speeds, so each policy is replayed on <b>identical items</b>. From pick 30 a 60 g protein bar (+33 % mass, never in the log) arrives every third pick; picks 60–89 use a creased film roll (seal −12 kPa); picks 90–109 run an overdue cup (750k → 1.04M cycles); at 110 the cup is changed.</p>
+    <figure class="vid wide"><video src="media/shift_split.mp4" poster="media/shift_split.jpg" muted loop playsinline preload="none" controls></video>
+      <div class="lr"><span>fixed recipe 50 %</span><span>TabPFN, per pick</span></div>
+      <figcaption><b>The whole shift, time-lapse.</b> Left: the fast fixed recipe flings every heavy bar (31 drops stay on the belt). Right: TabPFN drops the first heavy bar, then slows heavy bars to 20–30 % and keeps normal bars at 40–50 %.</figcaption></figure>
+    <figure class="panel">
+      <div class="ftitle">Speed chosen for each pick</div>
+      <div class="legend"><span><i style="background:#2563eb" class="dot"></i>TabPFN, normal bar</span><span><i style="background:#2563eb" class="dia"></i>TabPFN, heavy bar</span><span><i style="background:#ea580c"></i>fixed recipe 50 %</span><span><i style="background:#0d9488"></i>fixed recipe 30 %</span><span><i class="x"></i>drop</span></div>
+      <div class="chart scroll"><!--SVG:shift-->
+<svg viewBox="0 0 1000 360" role="img" aria-label="Speed chosen for each of the 120 picks of the shift: the fixed 50 % recipe drops 31 bars, the fixed 30 % recipe none, TabPFN one (pick 30), slowing heavy bars to 20–30 %.">
+<rect x="520.0" y="70" width="232.0" height="230" fill="#f7f8fa"/>
+<line x1="520.0" y1="66" x2="520.0" y2="300" stroke="#e2e8f0"/>
+<text x="636.0" y="84" text-anchor="middle" class="lbl" style="font-size:11px">new film roll</text>
+<rect x="752.0" y="70" width="154.7" height="230" fill="#f7f8fa"/>
+<line x1="752.0" y1="66" x2="752.0" y2="300" stroke="#e2e8f0"/>
+<text x="829.3" y="84" text-anchor="middle" class="lbl" style="font-size:11px">overdue cup</text>
+<rect x="906.7" y="70" width="77.3" height="230" fill="#f7f8fa"/>
+<line x1="906.7" y1="66" x2="906.7" y2="300" stroke="#e2e8f0"/>
+<text x="945.3" y="84" text-anchor="middle" class="lbl" style="font-size:11px">cup changed</text>
+<path d="M288.0,60 v-6 H984 v6" fill="none" stroke="#94a3b8"/>
+<text x="292.0" y="48" class="lbl" style="font-size:11px">from pick 30: a 60 g protein bar (+33 % mass) every 3rd pick, a product the log has never seen</text>
+<line class="gl" x1="56" x2="984" y1="300.0" y2="300.0"/>
+<text x="48" y="304.0" text-anchor="end">0 %</text>
+<line class="gl" x1="56" x2="984" y1="261.7" y2="261.7"/>
+<text x="48" y="265.7" text-anchor="end">10 %</text>
+<line class="gl" x1="56" x2="984" y1="223.3" y2="223.3"/>
+<text x="48" y="227.3" text-anchor="end">20 %</text>
+<line class="gl" x1="56" x2="984" y1="185.0" y2="185.0"/>
+<text x="48" y="189.0" text-anchor="end">30 %</text>
+<line class="gl" x1="56" x2="984" y1="146.7" y2="146.7"/>
+<text x="48" y="150.7" text-anchor="end">40 %</text>
+<line class="gl" x1="56" x2="984" y1="108.3" y2="108.3"/>
+<text x="48" y="112.3" text-anchor="end">50 %</text>
+<line class="gl" x1="56" x2="984" y1="70.0" y2="70.0"/>
+<text x="48" y="74.0" text-anchor="end">60 %</text>
+<text x="59.9" y="318" text-anchor="middle">0</text>
+<text x="291.9" y="318" text-anchor="middle">30</text>
+<text x="523.9" y="318" text-anchor="middle">60</text>
+<text x="755.9" y="318" text-anchor="middle">90</text>
+<text x="980.1" y="318" text-anchor="middle">119</text>
+<text x="520.0" y="340" text-anchor="middle" class="lbl">pick number in the shift (120 picks, every one simulated at all 9 speeds)</text>
+<line x1="56" x2="984" y1="108.3" y2="108.3" stroke="#ea580c" stroke-width="2"/>
+<line x1="56" x2="984" y1="185.0" y2="185.0" stroke="#0d9488" stroke-width="2"/>
+<circle cx="59.9" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="67.6" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="75.3" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="83.1" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="90.8" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="98.5" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="106.3" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="114.0" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="121.7" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="129.5" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="137.2" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="144.9" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="152.7" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="160.4" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="168.1" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="175.9" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="183.6" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="191.3" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="199.1" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="206.8" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="214.5" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="222.3" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="230.0" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="237.7" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="245.5" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="253.2" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="260.9" cy="223.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="268.7" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="276.4" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="284.1" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M291.9,103.3 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="299.6" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="307.3" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M315.1,180.0 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="322.8" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="330.5" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M338.3,180.0 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="346.0" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="353.7" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M361.5,180.0 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="369.2" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="376.9" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M384.7,180.0 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="392.4" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="400.1" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M407.9,180.0 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="415.6" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="423.3" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M431.1,180.0 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="438.8" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="446.5" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M454.3,180.0 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="462.0" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="469.7" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M477.5,180.0 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="485.2" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="492.9" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M500.7,180.0 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="508.4" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="516.1" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M523.9,218.3 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="531.6" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="539.3" cy="223.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M547.1,180.0 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="554.8" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="562.5" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M570.3,218.3 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="578.0" cy="223.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="585.7" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M593.5,218.3 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="601.2" cy="223.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="608.9" cy="185.0" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M616.7,180.0 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="624.4" cy="223.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="632.1" cy="185.0" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M639.9,218.3 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="647.6" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="655.3" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M663.1,218.3 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="670.8" cy="223.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="678.5" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M686.3,180.0 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="694.0" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="701.7" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M709.5,180.0 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="717.2" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="724.9" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M732.7,218.3 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="740.4" cy="185.0" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="748.1" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M755.9,218.3 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="763.6" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="771.3" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M779.1,218.3 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="786.8" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="794.5" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M802.3,218.3 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="810.0" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="817.7" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M825.5,218.3 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="833.2" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="840.9" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M848.7,180.0 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="856.4" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="864.1" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M871.9,218.3 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="879.6" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="887.3" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M895.1,218.3 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="902.8" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="910.5" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M918.3,180.0 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="926.0" cy="146.7" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="933.7" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M941.5,180.0 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="949.2" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="956.9" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M964.7,180.0 l5,5 l-5,5 l-5,-5z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="972.4" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<circle cx="980.1" cy="108.3" r="4" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<path d="M256.9,93.3 l8,8 M264.9,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M287.9,93.3 l8,8 M295.9,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M311.1,93.3 l8,8 M319.1,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M334.3,93.3 l8,8 M342.3,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M357.5,93.3 l8,8 M365.5,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M380.7,93.3 l8,8 M388.7,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M403.9,93.3 l8,8 M411.9,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M427.1,93.3 l8,8 M435.1,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M450.3,93.3 l8,8 M458.3,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M473.5,93.3 l8,8 M481.5,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M496.7,93.3 l8,8 M504.7,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M519.9,93.3 l8,8 M527.9,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M543.1,93.3 l8,8 M551.1,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M566.3,93.3 l8,8 M574.3,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M589.5,93.3 l8,8 M597.5,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M612.7,93.3 l8,8 M620.7,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M635.9,93.3 l8,8 M643.9,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M659.1,93.3 l8,8 M667.1,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M682.3,93.3 l8,8 M690.3,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M705.5,93.3 l8,8 M713.5,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M728.7,93.3 l8,8 M736.7,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M751.9,93.3 l8,8 M759.9,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M775.1,93.3 l8,8 M783.1,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M798.3,93.3 l8,8 M806.3,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M821.5,93.3 l8,8 M829.5,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M844.7,93.3 l8,8 M852.7,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M867.9,93.3 l8,8 M875.9,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M891.1,93.3 l8,8 M899.1,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M914.3,93.3 l8,8 M922.3,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M937.5,93.3 l8,8 M945.5,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M960.7,93.3 l8,8 M968.7,93.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M287.9,115.3 l8,8 M295.9,115.3 l-8,8" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+<text x="254.9" y="245.3" text-anchor="end" class="lbl" style="font-size:11px">pick 26: seal 43.5 kPa (usual 48.8) → 20 %</text>
+<rect class="hit" x="56.0" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 0 · bar 45 g · film standard · cup 150k cycles · seal 48.6 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="63.7" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 1 · bar 45 g · film standard · cup 152k cycles · seal 49.1 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="71.5" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 2 · bar 45 g · film standard · cup 154k cycles · seal 48.9 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="79.2" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 3 · bar 45 g · film standard · cup 156k cycles · seal 48.8 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="86.9" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 4 · bar 45 g · film standard · cup 158k cycles · seal 48.8 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="94.7" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 5 · bar 45 g · film standard · cup 160k cycles · seal 48.6 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="102.4" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 6 · bar 45 g · film standard · cup 162k cycles · seal 48.5 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="110.1" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 7 · bar 45 g · film standard · cup 164k cycles · seal 49.0 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="117.9" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 8 · bar 45 g · film standard · cup 166k cycles · seal 48.6 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="125.6" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 9 · bar 45 g · film standard · cup 168k cycles · seal 48.5 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="133.3" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 10 · bar 45 g · film standard · cup 170k cycles · seal 48.8 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="141.1" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 11 · bar 45 g · film standard · cup 172k cycles · seal 48.9 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="148.8" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 12 · bar 45 g · film standard · cup 174k cycles · seal 48.6 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="156.5" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 13 · bar 45 g · film standard · cup 176k cycles · seal 48.5 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="164.3" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 14 · bar 45 g · film standard · cup 178k cycles · seal 49.0 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="172.0" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 15 · bar 45 g · film standard · cup 180k cycles · seal 48.7 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="179.7" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 16 · bar 45 g · film standard · cup 182k cycles · seal 48.8 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="187.5" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 17 · bar 45 g · film standard · cup 184k cycles · seal 48.5 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="195.2" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 18 · bar 45 g · film standard · cup 186k cycles · seal 48.9 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="202.9" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 19 · bar 45 g · film standard · cup 188k cycles · seal 48.7 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="210.7" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 20 · bar 45 g · film standard · cup 190k cycles · seal 48.4 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="218.4" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 21 · bar 45 g · film standard · cup 192k cycles · seal 48.6 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="226.1" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 22 · bar 45 g · film standard · cup 194k cycles · seal 49.0 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="233.9" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 23 · bar 45 g · film standard · cup 196k cycles · seal 49.1 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="241.6" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 24 · bar 45 g · film standard · cup 198k cycles · seal 49.0 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="249.3" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 25 · bar 45 g · film standard · cup 200k cycles · seal 48.8 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="257.1" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 26 · bar 45 g · film standard · cup 202k cycles · seal 43.5 kPa | TabPFN 20 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="264.8" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 27 · bar 45 g · film standard · cup 204k cycles · seal 48.6 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="272.5" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 28 · bar 45 g · film standard · cup 206k cycles · seal 48.5 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="280.3" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 29 · bar 45 g · film standard · cup 208k cycles · seal 49.1 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="288.0" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 30 · protein bar 60 g · film standard · cup 210k cycles · seal 48.5 kPa | TabPFN 50 %: DROP | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="295.7" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 31 · bar 45 g · film standard · cup 212k cycles · seal 48.8 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="303.5" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 32 · bar 45 g · film standard · cup 214k cycles · seal 48.8 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="311.2" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 33 · protein bar 60 g · film standard · cup 216k cycles · seal 48.8 kPa | TabPFN 30 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="318.9" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 34 · bar 45 g · film standard · cup 218k cycles · seal 48.9 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="326.7" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 35 · bar 45 g · film standard · cup 220k cycles · seal 48.8 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="334.4" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 36 · protein bar 60 g · film standard · cup 222k cycles · seal 48.5 kPa | TabPFN 30 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="342.1" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 37 · bar 45 g · film standard · cup 224k cycles · seal 48.7 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="349.9" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 38 · bar 45 g · film standard · cup 226k cycles · seal 48.7 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="357.6" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 39 · protein bar 60 g · film standard · cup 228k cycles · seal 48.5 kPa | TabPFN 30 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="365.3" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 40 · bar 45 g · film standard · cup 230k cycles · seal 48.5 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="373.1" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 41 · bar 45 g · film standard · cup 232k cycles · seal 48.9 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="380.8" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 42 · protein bar 60 g · film standard · cup 234k cycles · seal 48.4 kPa | TabPFN 30 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="388.5" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 43 · bar 45 g · film standard · cup 236k cycles · seal 48.4 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="396.3" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 44 · bar 45 g · film standard · cup 238k cycles · seal 49.0 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="404.0" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 45 · protein bar 60 g · film standard · cup 240k cycles · seal 48.9 kPa | TabPFN 30 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="411.7" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 46 · bar 45 g · film standard · cup 242k cycles · seal 48.5 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="419.5" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 47 · bar 45 g · film standard · cup 244k cycles · seal 48.9 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="427.2" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 48 · protein bar 60 g · film standard · cup 246k cycles · seal 48.7 kPa | TabPFN 30 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="434.9" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 49 · bar 45 g · film standard · cup 248k cycles · seal 48.9 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="442.7" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 50 · bar 45 g · film standard · cup 250k cycles · seal 48.5 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="450.4" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 51 · protein bar 60 g · film standard · cup 252k cycles · seal 48.8 kPa | TabPFN 30 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="458.1" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 52 · bar 45 g · film standard · cup 254k cycles · seal 48.6 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="465.9" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 53 · bar 45 g · film standard · cup 256k cycles · seal 48.6 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="473.6" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 54 · protein bar 60 g · film standard · cup 258k cycles · seal 48.7 kPa | TabPFN 30 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="481.3" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 55 · bar 45 g · film standard · cup 260k cycles · seal 48.9 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="489.1" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 56 · bar 45 g · film standard · cup 262k cycles · seal 48.4 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="496.8" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 57 · protein bar 60 g · film standard · cup 264k cycles · seal 48.5 kPa | TabPFN 30 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="504.5" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 58 · bar 45 g · film standard · cup 266k cycles · seal 48.9 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="512.3" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 59 · bar 45 g · film standard · cup 268k cycles · seal 48.6 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="520.0" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 60 · protein bar 60 g · film new roll · cup 270k cycles · seal 44.8 kPa | TabPFN 20 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="527.7" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 61 · bar 45 g · film new roll · cup 272k cycles · seal 47.8 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="535.5" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 62 · bar 45 g · film new roll · cup 274k cycles · seal 41.2 kPa | TabPFN 20 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="543.2" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 63 · protein bar 60 g · film new roll · cup 276k cycles · seal 47.8 kPa | TabPFN 30 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="550.9" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 64 · bar 45 g · film new roll · cup 278k cycles · seal 47.0 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="558.7" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 65 · bar 45 g · film new roll · cup 280k cycles · seal 47.5 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="566.4" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 66 · protein bar 60 g · film new roll · cup 282k cycles · seal 41.2 kPa | TabPFN 20 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="574.1" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 67 · bar 45 g · film new roll · cup 284k cycles · seal 41.8 kPa | TabPFN 20 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="581.9" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 68 · bar 45 g · film new roll · cup 286k cycles · seal 48.3 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="589.6" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 69 · protein bar 60 g · film new roll · cup 288k cycles · seal 42.1 kPa | TabPFN 20 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="597.3" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 70 · bar 45 g · film new roll · cup 290k cycles · seal 43.4 kPa | TabPFN 20 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="605.1" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 71 · bar 45 g · film new roll · cup 292k cycles · seal 45.1 kPa | TabPFN 30 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="612.8" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 72 · protein bar 60 g · film new roll · cup 294k cycles · seal 48.3 kPa | TabPFN 30 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="620.5" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 73 · bar 45 g · film new roll · cup 296k cycles · seal 41.1 kPa | TabPFN 20 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="628.3" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 74 · bar 45 g · film new roll · cup 298k cycles · seal 43.5 kPa | TabPFN 30 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="636.0" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 75 · protein bar 60 g · film new roll · cup 300k cycles · seal 43.9 kPa | TabPFN 20 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="643.7" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 76 · bar 45 g · film new roll · cup 302k cycles · seal 47.6 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="651.5" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 77 · bar 45 g · film new roll · cup 304k cycles · seal 47.4 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="659.2" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 78 · protein bar 60 g · film new roll · cup 306k cycles · seal 44.3 kPa | TabPFN 20 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="666.9" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 79 · bar 45 g · film new roll · cup 308k cycles · seal 41.5 kPa | TabPFN 20 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="674.7" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 80 · bar 45 g · film new roll · cup 310k cycles · seal 48.2 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="682.4" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 81 · protein bar 60 g · film new roll · cup 312k cycles · seal 47.1 kPa | TabPFN 30 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="690.1" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 82 · bar 45 g · film new roll · cup 314k cycles · seal 48.3 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="697.9" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 83 · bar 45 g · film new roll · cup 316k cycles · seal 48.0 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="705.6" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 84 · protein bar 60 g · film new roll · cup 318k cycles · seal 47.9 kPa | TabPFN 30 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="713.3" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 85 · bar 45 g · film new roll · cup 320k cycles · seal 45.2 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="721.1" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 86 · bar 45 g · film new roll · cup 322k cycles · seal 46.8 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="728.8" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 87 · protein bar 60 g · film new roll · cup 324k cycles · seal 45.8 kPa | TabPFN 20 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="736.5" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 88 · bar 45 g · film new roll · cup 326k cycles · seal 43.7 kPa | TabPFN 30 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="744.3" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 89 · bar 45 g · film new roll · cup 328k cycles · seal 47.6 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="752.0" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 90 · protein bar 60 g · film standard · cup 750k cycles · seal 48.0 kPa | TabPFN 20 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="759.7" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 91 · bar 45 g · film standard · cup 765k cycles · seal 48.2 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="767.5" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 92 · bar 45 g · film standard · cup 780k cycles · seal 48.4 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="775.2" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 93 · protein bar 60 g · film standard · cup 795k cycles · seal 48.0 kPa | TabPFN 20 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="782.9" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 94 · bar 45 g · film standard · cup 810k cycles · seal 48.5 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="790.7" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 95 · bar 45 g · film standard · cup 825k cycles · seal 48.6 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="798.4" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 96 · protein bar 60 g · film standard · cup 840k cycles · seal 47.9 kPa | TabPFN 20 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="806.1" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 97 · bar 45 g · film standard · cup 855k cycles · seal 48.1 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="813.9" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 98 · bar 45 g · film standard · cup 870k cycles · seal 48.2 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="821.6" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 99 · protein bar 60 g · film standard · cup 885k cycles · seal 48.6 kPa | TabPFN 20 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="829.3" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 100 · bar 45 g · film standard · cup 900k cycles · seal 48.6 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="837.1" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 101 · bar 45 g · film standard · cup 915k cycles · seal 47.9 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="844.8" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 102 · protein bar 60 g · film standard · cup 930k cycles · seal 48.0 kPa | TabPFN 30 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="852.5" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 103 · bar 45 g · film standard · cup 945k cycles · seal 48.2 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="860.3" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 104 · bar 45 g · film standard · cup 960k cycles · seal 48.4 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="868.0" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 105 · protein bar 60 g · film standard · cup 975k cycles · seal 48.0 kPa | TabPFN 20 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="875.7" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 106 · bar 45 g · film standard · cup 990k cycles · seal 48.5 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="883.5" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 107 · bar 45 g · film standard · cup 1005k cycles · seal 48.2 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="891.2" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 108 · protein bar 60 g · film standard · cup 1020k cycles · seal 48.4 kPa | TabPFN 20 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="898.9" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 109 · bar 45 g · film standard · cup 1035k cycles · seal 48.6 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="906.7" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 110 · bar 45 g · film standard · cup 0k cycles · seal 48.9 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="914.4" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 111 · protein bar 60 g · film standard · cup 0k cycles · seal 49.0 kPa | TabPFN 30 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="922.1" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 112 · bar 45 g · film standard · cup 1k cycles · seal 49.1 kPa | TabPFN 40 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="929.9" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 113 · bar 45 g · film standard · cup 1k cycles · seal 49.2 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="937.6" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 114 · protein bar 60 g · film standard · cup 2k cycles · seal 48.8 kPa | TabPFN 30 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="945.3" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 115 · bar 45 g · film standard · cup 2k cycles · seal 48.8 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="953.1" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 116 · bar 45 g · film standard · cup 3k cycles · seal 48.9 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="960.8" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 117 · protein bar 60 g · film standard · cup 3k cycles · seal 48.9 kPa | TabPFN 30 %: placed | fixed 50 %: DROP | fixed 30 %: placed"/>
+<rect class="hit" x="968.5" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 118 · bar 45 g · film standard · cup 4k cycles · seal 49.3 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+<rect class="hit" x="976.3" y="70" width="7.73" height="230" fill="transparent" data-tip="pick 119 · bar 45 g · film standard · cup 4k cycles · seal 48.6 kPa | TabPFN 50 %: placed | fixed 50 %: placed | fixed 30 %: placed"/>
+</svg>
+<!--/SVG--></div>
+      <figcaption>Hover a pick for its item, seal reading and all three outcomes. <b>Pick 26</b> is a normal bar whose seal read 43.5 kPa (usual 48.8): TabPFN predicted a 92 % drop risk at 50 % and slowed to 20 %; the fixed 50 % recipe dropped it. Data: <code>results/shift/decisions_jax.csv</code>.</figcaption>
+    </figure>
+      <figure class="panel">
+      <div class="ftitle">Good picks per minute, same 120 picks</div>
+      <div class="chart scroll"><!--SVG:gpm-->
+<svg viewBox="0 0 1000 190" role="img" aria-label="Good picks per minute over the same 120 picks: fixed 50 % 122.7, fixed 30 % 145.7, TabPFN 152.6, best fixed speed in hindsight 155.6.">
+<text x="318" y="34" text-anchor="end" class="lbl" style="font-size:12.5px">fixed recipe, 50 % (fast)</text>
+<path d="M330,22 h407.4 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-407.4 z" fill="#ea580c"/>
+<text x="749.4" y="34" class="lbl" style="font-size:12.5px;font-weight:600;fill:#0f172a">122.7 / min · 31 drops</text>
+<rect class="hit" x="330" y="18" width="660" height="34" fill="transparent" data-tip="fixed 50 %: 120 picks, 89 placed, 31 dropped (every heavy bar + pick 26)"/>
+<text x="318" y="74" text-anchor="end" class="lbl" style="font-size:12.5px">fixed recipe, 30 % (cautious)</text>
+<path d="M330,62 h484.5 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-484.5 z" fill="#0d9488"/>
+<text x="826.5" y="74" class="lbl" style="font-size:12.5px;font-weight:600;fill:#0f172a">145.7 / min · 0 drops</text>
+<rect class="hit" x="330" y="58" width="660" height="34" fill="transparent" data-tip="fixed 30 %: 120 placed, 0 dropped, every pick slow"/>
+<text x="318" y="114" text-anchor="end" class="lbl" style="font-size:12.5px">TabPFN, per pick</text>
+<path d="M330,102 h507.7 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-507.7 z" fill="#2563eb"/>
+<text x="849.7" y="114" class="lbl" style="font-size:12.5px;font-weight:600;fill:#0f172a">152.6 / min · 1 drop</text>
+<rect class="hit" x="330" y="98" width="660" height="34" fill="transparent" data-tip="TabPFN: 119 placed, 1 dropped (pick 30, the first heavy bar)"/>
+<text x="318" y="154" text-anchor="end" class="lbl" style="font-size:12.5px">best fixed speed, known only afterwards (40 %)</text>
+<path d="M330,142 h517.7 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-517.7 z" fill="#94a3b8"/>
+<text x="859.7" y="154" class="lbl" style="font-size:12.5px;font-weight:600;fill:#0f172a">155.6 / min · 1 drop</text>
+<rect class="hit" x="330" y="138" width="660" height="34" fill="transparent" data-tip="fixed 40 % for the whole shift, picked in hindsight from the bank: 1 drop"/>
+<line x1="330" x2="330" y1="14" y2="170" stroke="#94a3b8"/>
+</svg>
+<!--/SVG--></div>
+      <figcaption>The grey bar is not a policy: it is the best single speed for this shift, found only after seeing every outcome. TabPFN gets within 2 % of it without knowing the shift ahead.</figcaption>
+    </figure>
+      <div class="tw"><table>
+      <tr><th>Segment</th><th>Fixed 50 %</th><th>Fixed 30 %</th><th>TabPFN</th></tr>
+      <tr><td>Picks 0–29, normal bars</td><td class="n">1 drop (pick 26)</td><td class="n">0</td><td class="n">0 · mean 46 %</td></tr>
+      <tr><td>Heavy bars, 30–119</td><td class="n no">30 drops</td><td class="n">0</td><td class="n">1 (pick 30) · then 20–30 %</td></tr>
+      <tr><td>Film roll, 60–89</td><td class="n">10 drops</td><td class="n">0</td><td class="n">0 · mean 31 %</td></tr>
+      <tr><td>Overdue cup, 90–109</td><td class="n">7 drops</td><td class="n">0</td><td class="n">0 · mean 39 %</td></tr>
+      <tr><td>New cup, 110–119</td><td class="n">3 drops</td><td class="n">0</td><td class="n">0 · mean 43 %</td></tr>
+      <tr><td class="k">Whole shift</td><td class="n no">31 drops · 122.7/min</td><td class="n">0 · 145.7/min</td><td class="n ok">1 · 152.6/min</td></tr>
+    </table></div>
+    <figure class="vid wide"><video src="media/heavy_split.mp4" poster="media/heavy_split.jpg" muted loop playsinline preload="none" controls></video>
+      <div class="lr"><span>fixed recipe 50 %</span><span>TabPFN, per pick</span></div>
+      <figcaption><b>The first heavy bar (pick 30), at 4× slow motion.</b> Both drop it: nothing in the log looked like a 60 g bar. At pick 33, the next heavy bar, TabPFN has the drop in its context and takes 30 %; the fixed recipe drops it again.</figcaption></figure>
+  </div>
+
+  <div class="sub">
+    <h3>6b · It learns the drop risk from a few hundred picks, and the probabilities are calibrated</h3>
+    <div class="tw"><table>
+      <tr><th>Test: 940 unseen picks × 9 speeds</th><th>log-loss</th><th>calibration error</th><th>AUC</th></tr>
+      <tr class="us"><td class="k">TabPFN, 250 logged picks</td><td class="n">0.159</td><td class="n">2.5 %</td><td class="n">0.985</td></tr>
+      <tr><td>logistic regression, 2,700 picks</td><td class="n">0.157</td><td class="n">1.8 %</td><td class="n">0.985</td></tr>
+      <tr class="us"><td class="k">TabPFN, 2,700 picks</td><td class="n">0.124</td><td class="n">1.1 %</td><td class="n">0.990</td></tr>
+      <tr><td>boosted trees, 2,700 picks</td><td class="n">0.176</td><td class="n">4.0 %</td><td class="n">0.987</td></tr>
+    </table></div>
+    <div class="text"><p><b>Where the product lands, too.</b> Median placement error 1.18 mm. TabPFN's 90 % intervals cover 85 % of outcomes, against 77 % for boosted trees at the same width; a linear model needs 44 % wider intervals to cover 89 %.</p></div>
+    <figure class="panel"><img class="fig" src="figures/learning_curve.png" alt="Learning curve: log-loss and calibration error against the number of logged picks, TabPFN vs logistic regression and boosted trees" width="2560" height="576" loading="lazy">
+      <figcaption><b>Learning curve.</b> TabPFN with 250 picks is about as good as logistic regression with 2,700. Source: <code>docs/research/evaluation.md</code>.</figcaption></figure>
+  </div>
+
+  <div class="sub">
+    <h3>6c · Against hand tuning, with the small log a real line has</h3>
+    <figure class="panel"><img class="fig" src="figures/value_vs_cost.png" alt="Net value per minute against the cost of a drop, for TabPFN and fixed recipes with safety margins" width="1984" height="672" loading="lazy">
+      <figcaption><b>Net value (good picks − c × drops per minute) vs the drop cost c,</b> with 10 test picks per speed and product. The recipe tuned on that small log drops 10 % (10 lucky tests made 60 % look safe for the bar). An engineer's safety margin fixes that, but the right margin flips with c. <b>TabPFN matches or beats the best margin at every cost, with no margin to choose</b> (c = 1: +3.8 net picks/min, 95 % CI +1.6 to +5.7).</figcaption></figure>
+  </div>
+
+  <div class="sub">
+    <h3>6d · A product the line has never logged</h3>
+    <div class="g2">
+      <figure class="panel"><img class="fig" src="figures/demo_new_bar.gif" alt="TabPFN choosing the speed of each pick on a product it has never seen, climbing from 20 % to 50–60 %" loading="lazy">
+        <figcaption>TabPFN starts at 20 % and climbs to 50–60 % as its own picks enter the context.</figcaption></figure>
+      <div class="text"><p><b>146.6 good picks/min with 0 drops</b> against 129.5 for the slow default (+13 %). Logistic regression and boosted trees reach the same speed but drop 5–6 % of picks. Not every new product gains: the cheese is already at its limit at the slowest setting.</p></div>
+    </div>
+  </div>
+
+  <div class="sub">
+    <h3>6e · Physics we did not script</h3>
+    <figure class="panel"><img class="fig" src="figures/drop_heatmap.png" alt="Drop rate by product and speed setting" width="1200" height="544" loading="lazy">
+      <figcaption><b>Drop rate by product and speed.</b> Pouches whose contents slosh at 4–5 Hz drop more at 60 % than at 70–80 %, because the move timing pumps the slosh mode. A "slower is always safer" rule is wrong for them; a model that reads the log sees it.</figcaption></figure>
+  </div>
+
+  <div class="sub">
+    <h3>6f · Where a fixed recipe is just as good</h3>
+    <p class="text">With an abundant, dedicated test campaign (50 picks per speed and product), a recipe tuned on the true drop rates is as good as per-pick choice; no difference is significant. Most per-pick risk on this line comes from what no sensor sees (cup–product friction, vision error, a pouch's slosh). TabPFN still ranks items well inside a product's limit (AUC 0.81–0.84), but few items are safe enough to go one step faster. <b>The value is in the small-log, changing-product, drifting-shift case</b>, which is the normal case on a real line.</p>
+  </div>
+</section>
+
+<!-- ============ 07 JAX ============ -->
+<section class="chap" id="jax">
+  <header><span class="num">07</span><h2>Faster inference: TabPFN's query path in JAX</h2></header>
+  <div class="simple"><span class="kicker">In simple words</span>
+    <p>The decision must land inside the 35 ms the cup takes to seal. Standard TabPFN took about 30 ms per query on our laptop GPU, too close for comfort, and most of that was overhead (1,671 small GPU launches for 5.8 ms of real work). We rewrote the part that answers queries in JAX, which compiles the whole model into a few fused GPU programs. It gives the same probabilities as PyTorch and answers in 3.7 ms on a laptop and 2.35 ms on an H100 (exact fp32 mode, live in the shift).</p></div>
+  <figure class="panel">
+    <div class="ftitle">Per-pick query latency, 15 rows, RTX 4050 laptop GPU (median)</div>
+    <div class="chart scroll"><!--SVG:latency-->
+<svg viewBox="0 0 1000 252" role="img" aria-label="Per-pick query latency on an RTX 4050 laptop GPU, 15 rows: PyTorch default 30.9 ms, fp32 24.3 ms, CUDA graph 6.9 ms, JAX fp32 4.7 ms, JAX fast 3.7 ms; the vacuum dwell is 35 ms.">
+<text x="288" y="34" text-anchor="end" class="lbl" style="font-size:12.5px">PyTorch, TabPFN default</text>
+<path d="M300,22 h459.5 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-459.5 z" fill="#cbd5e1"/>
+<text x="771.5" y="34" class="lbl" style="font-size:12.5px;font-weight:600;fill:#0f172a">30.9 ms</text>
+<rect class="hit" x="300" y="18" width="690" height="34" fill="transparent" data-tip="torch default (fp16 autocast, int8 KV), median of 200; p95 46 ms"/>
+<text x="288" y="74" text-anchor="end" class="lbl" style="font-size:12.5px">PyTorch, fp32</text>
+<path d="M300,62 h360.5 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-360.5 z" fill="#cbd5e1"/>
+<text x="672.5" y="74" class="lbl" style="font-size:12.5px;font-weight:600;fill:#0f172a">24.3 ms</text>
+<rect class="hit" x="300" y="58" width="690" height="34" fill="transparent" data-tip="torch fp32, median"/>
+<text x="288" y="114" text-anchor="end" class="lbl" style="font-size:12.5px">PyTorch + CUDA graph</text>
+<path d="M300,102 h99.5 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-99.5 z" fill="#cbd5e1"/>
+<text x="411.5" y="114" class="lbl" style="font-size:12.5px;font-weight:600;fill:#0f172a">6.9 ms</text>
+<rect class="hit" x="300" y="98" width="690" height="34" fill="transparent" data-tip="one captured CUDA graph per query shape; p95 8.4 ms"/>
+<text x="288" y="154" text-anchor="end" class="lbl" style="font-size:12.5px">JAX port, fp32 (exact)</text>
+<path d="M300,142 h66.5 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-66.5 z" fill="#2563eb"/>
+<text x="378.5" y="154" class="lbl" style="font-size:12.5px;font-weight:600;fill:#0f172a">4.7 ms</text>
+<rect class="hit" x="300" y="138" width="690" height="34" fill="transparent" data-tip="JAX fp32: max |Δp| vs torch fp32 1.8e-5; 0 of 3,825 decisions differ"/>
+<text x="288" y="194" text-anchor="end" class="lbl" style="font-size:12.5px">JAX port, fast (fp16 + cuDNN flash)</text>
+<path d="M300,182 h51.5 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-51.5 z" fill="#2563eb"/>
+<text x="363.5" y="194" class="lbl" style="font-size:12.5px;font-weight:600;fill:#0f172a">3.7 ms</text>
+<rect class="hit" x="300" y="178" width="690" height="34" fill="transparent" data-tip="JAX fast: p95 4.9 ms; drifts less than TabPFN&#x27;s own fp16 default"/>
+<line x1="300" x2="300" y1="14" y2="210" stroke="#94a3b8"/>
+<line x1="825.0" x2="825.0" y1="12" y2="214" stroke="#475569" stroke-width="1.5"/>
+<text x="825.0" y="232" text-anchor="middle" class="lbl" style="font-size:11.5px">35 ms vacuum dwell: the decision must land inside it</text>
+</svg>
+<!--/SVG--></div>
+    <figcaption>End to end: CPU preprocessing, upload, model, softmax, download, the same work as <code>clf.predict_proba</code>. Medians over 200 calls. Sources: <code>docs/research/tabpfn-jax-port.md</code>, <code>tabpfn-latency.md</code>.</figcaption>
+  </figure>
+  <div class="tiles">
+    <div class="tile"><span class="t info">Live, H100, the shift</span><span class="v">2.35 ms</span><span class="l">median per pick over 120 picks; p95 3.34, max 3.53 ms</span></div>
+    <div class="tile"><span class="t good">Same answers</span><span class="v">1.8e-5</span><span class="l">worst probability gap, JAX fp32 vs PyTorch fp32 (target 1e-4)</span></div>
+    <div class="tile"><span class="t good">Same decisions</span><span class="v">0 / 3,825</span><span class="l">chosen speeds that differ from PyTorch fp32 (independent check)</span></div>
+    <div class="tile"><span class="t warn">Cold start</span><span class="v">12–145 s</span><span class="l">first compile on a new machine; then a persistent cache (~0.5 s)</span></div>
+  </div>
+    <div class="sub">
+    <h3>What makes it fast</h3>
+    <ul class="text">
+      <li><b>Fused programs:</b> XLA runs 270 kernels per call instead of 1,671.</li>
+      <li><b>Context folded once per refit:</b> including the K/V projections of the cached inducing states, which PyTorch recomputes on every query.</li>
+      <li><b>cuDNN flash attention</b> for every attention (fast mode, fp16 operands, fp32 accumulation, like TabPFN's own autocast).</li>
+      <li><b>Static shapes:</b> query rows padded (test rows never attend to each other, so padding is exact); a <b>fixed-size rolling context</b> so a refit reuses the compiled program: context swap 16–31 ms, no recompile.</li>
+      <li><b>PyTorch fits, JAX answers,</b> in one process: the cache is exported in about 3 ms, so it stays bit-identical to TabPFN's.</li>
+    </ul>
+  </div>
+    <div class="tw"><table>
+    <tr><th>Independent verification</th><th>Result</th></tr>
+    <tr><td>JAX fp32 vs PyTorch fp32, 9 settings, fresh seeds</td><td class="n ok">max |Δp| 1.8e-5</td></tr>
+    <tr><td>Chosen speeds that differ (fp32)</td><td class="n ok">0 of 3,825</td></tr>
+    <tr><td>Fast mode vs PyTorch fp32</td><td class="n">max 1.1e-2; 17 of 3,825 ties at the threshold</td></tr>
+    <tr><td>TabPFN's own default vs PyTorch fp32</td><td class="n mid">max 1.3e-1; 28 of 3,825</td></tr>
+    <tr><td>3,000-row speed map</td><td class="n">52.6 ms vs 80.8 (CUDA graph), 90.2 (PyTorch)</td></tr>
+    <tr><td>Weights accounted for</td><td class="n">307 tensors; query path reads 205</td></tr>
+  </table></div>
+  <p class="text">Code: <code>jax_tabpfn/</code> (<code>runtime.py</code>, <code>model.py</code>, <code>export.py</code>, <code>parity.py</code>, <code>bench.py</code>). Prior Labs ships no JAX port; the only other one is the educational nanoTabPFN. Not ported: the context-side forward (refit stays in PyTorch, ~0.3 s), categorical encoding, ensembles. Only TabPFN-3.5-Fast is tested.</p>
+</section>
+
+<!-- ============ 08 APPLICATIONS ============ -->
+<section class="chap" id="apps">
+  <header><span class="num">08</span><h2>The same idea elsewhere</h2></header>
+  <div class="simple"><span class="kicker">In simple words</span>
+    <p>"Robots run on tables": any machine that logs what it sensed and what happened can hand that log to TabPFN. Our team took the idea to three more machines: a crane, a drone defence radar and a simulated fruit fly. Each project lives in its own folder of this repo with its own report.</p></div>
+  <div class="g3">
+    <div class="proj wide"><video src="media/crane_split.mp4" poster="media/crane_split.jpg" muted loop playsinline preload="none" controls></video>
+      <div class="body"><b>Crane: can a table steady a crane?</b><span class="stat">−35 % time</span><p>TabPFN predicts where the swinging load will be 1 s ahead (5× closer than physics on a real lab crane) and chooses the anti-sway per load: 403 → 261 s on 12 new loads, against anti-sway set for the wrong sling. Left: industry anti-sway; right: TabPFN's choice. <a href="https://github.com/Jaseelkt007/priorlab_berlin_hack/blob/main/crane/README.md">crane/</a></p></div></div>
+    <div class="proj"><video src="media/drone.mp4" poster="media/drone.jpg" muted loop playsinline preload="none" controls></video>
+      <div class="body"><b>Drone: where will the intruder be in 1 s?</b><span class="stat">1.80 → 1.62 m</span><p>For a pilot no model has seen, TabPFN given the radar tracker's (IMM) estimate is 10 % more accurate than the IMM. Live, at 252 ms per answer, the gain shrinks to 4 %; on the alarm it's a tie. <a href="https://github.com/Jaseelkt007/priorlab_berlin_hack/blob/main/drone/README.md">drone/</a></p></div></div>
+    <div class="proj"><video src="media/fly.mp4" poster="media/fly.jpg" muted loop playsinline preload="none" controls></video>
+      <div class="body"><b>Fruit fly: can a table fly a fruit fly?</b><span class="stat">0.10 mm</span><p>TabPFN flies a simulated fruit fly along an S-curve from 393k rows of a trained policy's flights, all 12 actions; −44 % error on a 20 % heavier fly after 16 example flights. A sudden 80° turn still beats it. <a href="https://github.com/Jaseelkt007/priorlab_berlin_hack/blob/main/fly/README.md">fly/</a></p></div></div>
+  </div>
+  <div class="sub">
+    <h3>TabPFN in robotics before us (Prior Labs' examples)</h3>
+    <div class="tw"><table>
+      <tr><th>Project</th><th>What TabPFN does</th><th>Result</th></tr>
+      <tr><td class="k">duckpfn (Microduck)</td><td>walks a simulated duck robot: one row per joint, 61 readings, 50 Hz closed loop</td><td class="n">57,344 context rows, 0 gradient steps</td></tr>
+      <tr><td class="k">sEMG gestures</td><td>8 hand gestures from a 24-channel armband, 215k windows from 40 people as context</td><td class="n">84.7 % on 4 new people (LDA 82.1, SVM 77.8)</td></tr>
+      <tr><td class="k">Breakout</td><td>picks the 256 most similar teacher states as context for every frame</td><td class="n">cleared all 108 bricks</td></tr>
+    </table></div>
+    <p class="text">Source: Prior Labs' HackLab deck, pages 8–12. The track text also cites snakes that roam and bots that play badminton.</p>
+  </div>
+  <div class="sub">
+    <h3>Where the per-pick risk model could go next <span class="pill lo">ideas, not tested</span></h3>
+    <div class="cards">
+      <div class="card"><b>Other suction picking</b><p>E-commerce and parcel picking, depalletizing, pharma blister handling: any cell with a vacuum sensor and a speed or acceleration override.</p></div>
+      <div class="card"><b>Inside the gripper vendors' software</b><p>Piab, Schmalz, Festo and SMC already sell IO-Link vacuum sensing for maintenance; the same stream can choose the motion.</p></div>
+      <div class="card"><b>Robot OEM picking software</b><p>ABB PickMaster, FANUC, Yaskawa: per-pick speed on top of the existing digital twin, which handles layout and flow.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 09 VALUE ============ -->
+<section class="chap" id="value">
+  <header><span class="num">09</span><h2>Why it is worth building</h2></header>
+  <div class="simple"><span class="kicker">In simple words</span>
+    <p>The sensors and the data already exist on modern lines, so this sells as a software add-on. A few percent more good picks on a line whose robot is the bottleneck is worth six figures a year per line. These are back-of-envelope figures from public summaries, not measurements.</p></div>
+  <div class="g2">
+    <div class="tw"><table>
+      <tr><th>Delta robot market (report summaries)</th><th>Estimate</th></tr>
+      <tr><td>Global Industry Analysts</td><td class="n">~$2.2 B (2024) → $4.2 B (2030)</td></tr>
+      <tr><td>MarketIntelo</td><td class="n">~$2.1 B (2025) → $3.6 B (2030); pick-and-place 32.5 %</td></tr>
+      <tr><td>Next Move</td><td class="n">250k units (2023) → 641k (2030)</td></tr>
+      <tr><td>Food robotics (GM Insights)</td><td class="n">$3.07 B (2025) → $13.16 B (2035)</td></tr>
+    </table></div>
+    <div class="tw"><table>
+      <tr><th>Illustrative value per line <span class="pill md">assumptions</span></th><th></th></tr>
+      <tr><td>Line</td><td class="n">250 packs/min, robot is the bottleneck, 2 shifts × 250 days</td></tr>
+      <tr><td>+5 % throughput, same rejects</td><td class="n">~6.0 M extra packs/year</td></tr>
+      <tr><td>At €0.02–0.05 margin per pack</td><td class="n">~€120k–300k per year per line</td></tr>
+      <tr><td>Our shift (simulated)</td><td class="n">+4.7 % vs the cautious recipe, 30 fewer drops than the fast one</td></tr>
+    </table></div>
+  </div>
+</section>
+
+<!-- ============ 10 LIMITS ============ -->
+<section class="chap" id="limits">
+  <header><span class="num">10</span><h2>Limitations</h2></header>
+  <div class="cards">
+    <div class="card"><div class="h"><b>Simulation only</b><span class="pill bd">biggest</span></div><p>Every number comes from a MuJoCo line validated part by part against vendor data, not from a real robot. Real drop rates are not published.</p><p class="fix">Next: a hardware cell, or a vendor's logged picks.</p></div>
+    <div class="card"><div class="h"><b>It drops once to learn</b><span class="pill md">by design</span></div><p>The first heavy bar is dropped because nothing like it is in the log. A cautious start for unknown SKUs (from the checkweigher) would avoid it.</p></div>
+    <div class="card"><div class="h"><b>Hindsight beats it</b><span class="pill md">honest</span></div><p>A fixed 40 % for this shift gives 155.6/min vs 152.6. Nobody knows that speed in advance; TabPFN gets within 2 % of it without the future.</p></div>
+    <div class="card"><div class="h"><b>Big test campaigns catch up</b><span class="pill lo">measured</span></div><p>With 50 test picks per speed and product, a tuned recipe is as good. The gain is in small logs, new products and drift.</p></div>
+    <div class="card"><div class="h"><b>Unseen causes stay unseen</b><span class="pill lo">physics</span></div><p>Friction, vision error and slosh are not in any sensor. Constant columns in the context are invisible to the model (e.g. humidity that never varied).</p></div>
+    <div class="card"><div class="h"><b>Engineering gaps</b><span class="pill lo">JAX</span></div><p>Cold compile 12–145 s on a new machine; context size is a static shape; only 3.5-Fast is ported; weights are non-commercial.</p></div>
+  </div>
+</section>
+
+<!-- ============ 11 NEXT ============ -->
+<section class="chap" id="next">
+  <header><span class="num">11</span><h2>How it can be improved</h2></header>
+  <div class="tw"><table>
+    <tr><th>Next step</th><th>Why</th></tr>
+    <tr><td class="k">Real line data</td><td>an IO-Link vacuum log plus the robot's speed override and a pick-outcome camera is enough to replay this method offline</td></tr>
+    <tr><td class="k">Cautious start for unknown SKUs</td><td>treat a pick whose checkweigher mass is outside the logged range as a new product and start it slow, as the new-product runs do, so the first heavy bar is not dropped</td></tr>
+    <tr><td class="k">Context retrieval per product</td><td>select the most similar logged picks per query, as Breakout did, instead of one rolling window</td></tr>
+    <tr><td class="k">Port the context side to JAX</td><td>refit stays in PyTorch (~0.3 s); a JAX context path would make the whole loop one program</td></tr>
+    <tr><td class="k">Act on more than speed</td><td>vacuum setpoint, release height and pick offset are already candidate columns</td></tr>
+  </table></div>
+</section>
+
+<!-- ============ GLOSSARY ============ -->
+<section class="chap" id="glossary">
+  <header><span class="num">··</span><h2>Glossary</h2></header>
+  <dl class="gloss">
+    <dt>Delta robot</dt><dd>a fast parallel robot with three arms hanging from a base (ABB IRB 360 FlexPicker class), used for picking on packaging lines.</dd>
+    <dt>Seal kPa</dt><dd>the vacuum the cup reaches during the 35 ms dwell at touch; a leaky or creased surface shows here before the robot moves.</dd>
+    <dt>Speed setting</dt><dd>one of 9 overrides, 20 %…100 % of the time-optimal motion planned within ABB's limits.</dd>
+    <dt>Fixed recipe</dt><dd>one speed per product, chosen at commissioning (today's practice). "Fixed 30 %" is the cost-weighted choice from the commissioning log; "fixed 50 %" is the fastest speed with ≤ 5 % commissioning drops.</dd>
+    <dt>In-context learning</dt><dd>the model learns from examples given with the question, without changing its weights.</dd>
+    <dt>Calibration error</dt><dd>how far predicted probabilities are from observed frequencies, on average; 1.1 % means predicted risks are within about one percentage point of how often picks really dropped.</dd>
+    <dt>JAX / XLA</dt><dd>a Python library that compiles numerical code into fused GPU programs.</dd>
+    <dt>OEE</dt><dd>overall equipment effectiveness: availability × performance × quality.</dd>
+  </dl>
+</section>
+
+<footer>
+  <span>Code: <code>sim/</code> (line physics), <code>policy/</code> (speed policies), <code>showcase/</code> (shift, footage), <code>jax_tabpfn/</code> (JAX port), <code>tests/</code> (gates 1–5). Results: <code>results/</code>. Research and sources: <code>docs/research/</code>.</span>
+  <span>Videos are web copies of 4K60 renders of the simulation (<code>showcase/render_footage.py</code>; crane, drone and fly: <code>showcase/launch_*.py</code>). Team: delta, crane, drone and fly projects, HackLab #2 Berlin.</span>
+</footer>
+</div>
+
+<script>
+// Hover tooltips for every chart mark with data-tip (inline SVG built from the result files).
+document.querySelectorAll(".chart").forEach(box => {
+  const tip = document.createElement("div"); tip.className = "tip"; tip.hidden = true; box.appendChild(tip);
+  box.addEventListener("mousemove", e => {
+    const t = e.target.closest("[data-tip]");
+    if (!t) { tip.hidden = true; return; }
+    const r = box.getBoundingClientRect();
+    tip.textContent = t.dataset.tip; tip.hidden = false;
+    tip.style.left = Math.min(Math.max(e.clientX - r.left, 140), r.width - 140) + "px";
+    tip.style.top = (e.clientY - r.top) + "px";
+  });
+  box.addEventListener("mouseleave", () => { tip.hidden = true; });
+});
+// Play videos only while they are on screen (they are muted and loop); with reduced motion, only on request.
+const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const io = new IntersectionObserver(es => es.forEach(e => {
+  if (still) return;
+  const v = e.target;
+  if (e.isIntersecting) { v.play().catch(() => {}); } else { v.pause(); }
+}), { threshold: 0.35 });
+document.querySelectorAll("video").forEach(v => io.observe(v));
+</script>

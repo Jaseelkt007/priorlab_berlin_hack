@@ -1,0 +1,121 @@
+/* Site shell in the reports' own white theme (Inter + IBM Plex Mono, same ink and line colours). */
+:root {
+  color-scheme: light;
+  --bg: #ffffff; --panel: #f7f8fa; --ink: #0f172a; --ink-2: #475569; --ink-3: #94a3b8;
+  --line: #e2e8f0; --line-2: #cbd5e1; --tab: #2563eb; --tab-soft: #dbe7fd;
+  --f-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --f-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --head: 60px;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.6 var(--f-sans); -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+img { display: block; max-width: 100%; }
+
+/* ---------- top header, shared by every page ---------- */
+.site-head {
+  position: sticky; top: 0; z-index: 10;
+  height: var(--head); display: flex; align-items: center; gap: 28px;
+  padding: 0 28px; background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 600; font-size: 15px; white-space: nowrap; }
+.brand .mark { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg, var(--tab), #7c3aed); }
+.brand .sub { font-weight: 400; color: var(--ink-2); }
+.tabs { display: flex; gap: 4px; margin: 0 auto; }
+.tabs a {
+  padding: 7px 14px; border-radius: 8px; text-decoration: none;
+  font-size: 14.5px; font-weight: 500; color: var(--ink-2);
+}
+.tabs a:hover { background: var(--panel); color: var(--ink); }
+.tabs a[aria-current="page"] { background: var(--tab-soft); color: var(--tab); }
+.head-link { font: 500 13.5px var(--f-mono); color: var(--ink-2); text-decoration: none; white-space: nowrap; }
+.head-link:hover { color: var(--tab); }
+
+/* ---------- project pages: the report itself, unchanged, under the header ---------- */
+body.report-page { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+.report { flex: 1; width: 100%; border: 0; display: block; }
+
+/* ---------- overview: one heading, one line, four slanted cards on a light floor ---------- */
+body.hub {
+  min-height: 100vh; overflow: hidden;
+  background: radial-gradient(120% 80% at 50% 20%, #ffffff 0%, #f3f5fa 55%, #e8ecf4 100%);
+}
+.hub .site-head { background: transparent; border-bottom-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.floor {
+  position: fixed; left: 0; right: 0; top: 81vh; bottom: 0; z-index: -1;
+  background: linear-gradient(to bottom, #e9edf5, #dfe5ef);
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+.floor::before { /* faint perspective grid: the spatial floor the machines stand on */
+  content: ''; position: absolute; left: -50%; right: -50%; top: 0; height: 140%;
+  transform-origin: 50% 0; transform: perspective(360px) rotateX(60deg);
+  background:
+    linear-gradient(to right, rgba(37, 99, 235, 0.14) 1px, transparent 1px) 0 0 / 70px 70px,
+    linear-gradient(to bottom, rgba(37, 99, 235, 0.14) 1px, transparent 1px) 0 0 / 70px 70px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 50%);
+          mask-image: linear-gradient(to bottom, transparent, #000 50%);
+}
+.hub-title { text-align: center; padding: 3.5vh 24px 0; }
+.hub-title h1 { margin: 0; font-size: clamp(38px, 4.6vw, 80px); line-height: 1.05; letter-spacing: -0.035em; font-weight: 700; }
+.hub-title h1 span {
+  background: linear-gradient(90deg, #2563eb, #7c3aed 55%, #db2777);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.hub-title p { margin: 14px 0 0; font-size: clamp(16px, 1.25vw, 21px); color: var(--ink-2); }
+
+.deck {
+  --ch: clamp(320px, 50vh, 600px); --cw: calc(var(--ch) * 0.56);
+  position: fixed; left: 0; right: 0; top: calc(81vh - var(--ch));
+  display: flex; justify-content: center; gap: calc(var(--cw) * 0.2);
+  list-style: none; margin: 0; padding: 0;
+}
+.deck li { width: var(--cw); height: var(--ch); }
+.tile {
+  --tz: 0px; --ry: -22deg;
+  position: relative; display: flex; flex-direction: column; width: 100%; height: 100%;
+  border-radius: 18px; overflow: hidden; background: #fff;
+  text-decoration: none; color: var(--ink);
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.07), 0 34px 60px -30px rgba(15, 23, 42, 0.45);
+  /* the tilt carries its own perspective, so it never depends on a shared 3D context */
+  transform: perspective(1100px) rotateY(var(--ry)) translateZ(var(--tz));
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease;
+  -webkit-box-reflect: below 12px linear-gradient(to bottom, transparent 74%, rgba(255, 255, 255, 0.3));
+  outline: none;
+}
+.tile:hover, .tile:focus-visible {
+  --tz: 50px; --ry: -10deg;
+  box-shadow: 0 0 0 2px var(--c), 0 40px 70px -28px color-mix(in oklab, var(--c) 55%, rgba(15, 23, 42, 0.5));
+}
+.tile img { flex: 1; min-height: 0; width: 100%; object-fit: cover; object-position: var(--pos, 50% 50%); background: #0b0f14; }
+.tile .label { position: relative; padding: 16px 20px 20px; border-top: 3px solid var(--c); }
+.tile .tag { display: block; font: 500 12px var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--c); }
+.tile .nm { display: block; margin-top: 4px; font-size: calc(var(--cw) * 0.085); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+.tile .q { display: block; margin-top: 4px; font-size: 15px; color: var(--ink-2); line-height: 1.4; }
+.tile .key {
+  position: absolute; top: 14px; right: 14px; z-index: 1;
+  font: 500 12px var(--f-mono); color: #fff; padding: 2px 8px; border-radius: 6px;
+  background: rgba(15, 23, 42, 0.55); border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) { .tile { transition: none; } }
+
+@media (max-width: 760px) {
+  .site-head { height: auto; flex-wrap: wrap; gap: 8px 16px; padding: 10px 16px; }
+  .brand .sub { display: none; }
+  .tabs { order: 3; width: 100%; margin: 0; overflow-x: auto; }
+  .tabs a { padding: 6px 10px; font-size: 13.5px; white-space: nowrap; }
+  body.hub { overflow: auto; }
+  .floor { top: 60vh; }
+  .hub-title { padding: 24px 16px 0; }
+  .deck { position: static; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 24px 16px 40px; --cw: auto; --ch: auto; }
+  .deck li { width: auto; height: 320px; }
+  .tile { transform: none; -webkit-box-reflect: none; --cw: 170px; }
+  .tile:hover, .tile:focus-visible { transform: none; }
+  .tile .label { padding: 12px 14px 14px; }
+  .tile .q { font-size: 13.5px; }
+  .tile .key { display: none; }
+}

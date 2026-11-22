@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%232563eb%27/%3E%3C/svg%3E">
+<title>Drone · Intruder Forecast</title>
+<link rel="stylesheet" href="../assets/fonts.css">
+<style>
+  :root { color-scheme: light; --ink: #0f172a; --ink-2: #475569; --line: #e2e8f0; --panel: #f7f8fa; --tab: #2563eb; }
+  body { margin: 0; background: #fff; color: var(--ink); font: 16px/1.65 Inter, system-ui, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 40px 28px 80px; }
+  h1 { font-size: 34px; line-height: 1.2; letter-spacing: -0.01em; margin: 0 0 18px; }
+  h2 { font-size: 24px; margin: 44px 0 12px; padding-top: 20px; border-top: 1px solid var(--line); }
+  h3 { font-size: 18px; margin: 28px 0 8px; }
+  p, li { color: #1e293b; }
+  a { color: var(--tab); }
+  img { max-width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14.5px; }
+  th, td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--panel); font-weight: 600; }
+  code { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 0.9em; background: var(--panel); padding: 1px 5px; border-radius: 4px; }
+  pre { background: var(--panel); padding: 14px 16px; border-radius: 10px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  .src { font: 13px 'IBM Plex Mono', monospace; color: var(--ink-2); margin: 0 0 24px; }
+</style>
+</head>
+<body>
+<main>
+<p class="src">Rendered from drone/README.md, unchanged.</p>
+<h1>Drone track: where is the intruder drone going?</h1>
+<p><strong>New to the project? Start with <a href="../../drone/EXPLAINED.md"><code>EXPLAINED.md</code></a>: the whole idea in diagrams.</strong></p>
+<p><img alt="IMM, TabPFN B and IMM + TabPFN on the same flight" src="../../drone/results/compare.gif" /></p>
+<p><em>Green: where the drone really went. Blue: the IMM (what radars use). Orange: TabPFN. Purple: IMM + TabPFN, our best.
+Each line is where the model said the drone would be, 1 s earlier.</em></p>
+<p>Part of our Prior Labs entry ("TabPFN for spatial awareness"). Branch: <code>drone</code>.
+Full detail and every experiment: <a href="../../drone/EXPERIMENTS.md"><code>EXPERIMENTS.md</code></a>.</p>
+<h2>The idea</h2>
+<p>A radar knows where a drone <strong>is</strong>. To stop it, you need where it <strong>will be</strong>, and a small drone can change course within a second. This matters wherever small drones are a threat: airports, stadiums, power plants, prisons.</p>
+<p>A small drone flies toward a protected site. A radar sees it, but the readings are noisy and sometimes missing.</p>
+<p><strong>TabPFN predicts where the drone will be in 1 second, with a range ("it will be somewhere in this cone"), and raises the alarm before it reaches the site.</strong> It has never seen this kind of drone before; it adapts from a few radar readings, without retraining.</p>
+<p>We compare it with what real radar trackers use: an <strong>IMM</strong>, three Kalman-type filters (straight, speeding up, turning) that switch automatically.</p>
+<h2>How it works</h2>
+<ol>
+<li><strong>A simulated sky</strong> (MuJoCo): a red protected zone in the middle, a radar at its centre.</li>
+<li><strong>Intruder flights</strong>: a script flies drones toward the zone, randomly attacking, passing by or circling, with zigzags, dives, dashes and wind.</li>
+<li><strong>Radar recording</strong>: 10 positions a second, with noise and gaps.</li>
+<li><strong>Tables</strong>: each radar reading becomes one row: what the radar sees now (inputs) and where the drone really went next (answers).</li>
+<li><strong>Models</strong> learn from the big drone's flights and are tested on the small drone's.</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Drone</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Skydio X2 (big, 10 m/s)</td>
+<td>flights to learn from (2,000); later the defender</td>
+</tr>
+<tr>
+<td>Crazyflie (small, 3 m/s)</td>
+<td>the attacker we test on (300 flights)</td>
+</tr>
+</tbody>
+</table>
+<h2>Inputs and outputs</h2>
+<p><strong>Inputs</strong> (16 numbers, from the radar only): where the drone is relative to the zone, how fast it goes, whether it is turning, climbing or speeding up, the same a second or two ago, and how many radar readings were missing.</p>
+<p><strong>Output</strong>: where it will be in 1 s, as x, y, z (with a range), and <strong>alarm</strong>: will it enter the zone within 2 s?</p>
+<h2>Status</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Simulation, both drones, intruder flights</td>
+<td>done</td>
+</tr>
+<tr>
+<td>Data: 2,000 X2 flights, 300 Crazyflie flights</td>
+<td>done</td>
+</tr>
+<tr>
+<td>Tables</td>
+<td>done</td>
+</tr>
+<tr>
+<td>IMM tracker (what real radars use)</td>
+<td>done: tuned on X2, and re-tuned on Crazyflie flights 0-49 for a fair check</td>
+</tr>
+<tr>
+<td>TabPFN</td>
+<td>done (run on an H100; 1 minute)</td>
+</tr>
+<tr>
+<td>Fairness check, example sweep, new pilot</td>
+<td>done (experiments 12-14)</td>
+</tr>
+<tr>
+<td>IMM + TabPFN (TabPFN corrects the IMM)</td>
+<td>done: 10% better than the IMM on the new pilot (experiment 15)</td>
+</tr>
+<tr>
+<td>Speed per radar reading</td>
+<td>5.2 s → 252 ms (H100, example cache); radar budget is 100 ms (experiment 16)</td>
+</tr>
+<tr>
+<td>Live replay (IMM every 0.1 s, TabPFN every 0.3 s)</td>
+<td>done: 4% better than the IMM (experiment 17)</td>
+</tr>
+<tr>
+<td>TabPFN fine-tuned</td>
+<td>dropped: the point is "no training"</td>
+</tr>
+<tr>
+<td>3D demo: real vs predicted x, y, z + alarm, live or as video</td>
+<td>done for the IMM and TabPFN</td>
+</tr>
+<tr>
+<td>Pitch videos: every model, and the best three together (+ GIF)</td>
+<td>done (<code>make_videos.sh</code>, experiment 18)</td>
+</tr>
+</tbody>
+</table>
+<h2>Results so far</h2>
+<p>250 small-drone test flights per pilot. Error = how far the prediction for 1 s ahead is from where the drone
+really was (median). Pilot a flew every example; pilot b is a more evasive pilot no model has seen.</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Error, pilot a</th>
+<th>Error, pilot b (new)</th>
+<th>Alarm: breaches caught (a / b)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IMM (what real radars use), tuned on X2</td>
+<td>1.54 m</td>
+<td>1.80 m</td>
+<td>99% / 100%</td>
+</tr>
+<tr>
+<td>IMM re-tuned on the same 50 Crazyflie flights as TabPFN B</td>
+<td>1.50 m</td>
+<td>1.82 m</td>
+<td>98% / 97%</td>
+</tr>
+<tr>
+<td>TabPFN A (examples from X2 only)</td>
+<td>1.70 m</td>
+<td>2.25 m</td>
+<td>95% / 85%</td>
+</tr>
+<tr>
+<td><strong>TabPFN B (X2 + 1,000 rows from 50 other Crazyflie flights)</strong></td>
+<td><strong>1.37 m</strong></td>
+<td><strong>1.67 m</strong></td>
+<td>98% / 96%</td>
+</tr>
+<tr>
+<td><strong>IMM + TabPFN (the IMM's answer as 6 extra inputs)</strong></td>
+<td></td>
+<td><strong>1.62 m</strong></td>
+<td>- / 97%</td>
+</tr>
+<tr>
+<td>IMM + TabPFN live: TabPFN's correction every 0.3 s (fast setting)</td>
+<td></td>
+<td>1.72 m</td>
+<td>not scored</td>
+</tr>
+</tbody>
+</table>
+<p><strong>With the same Crazyflie data and no training, TabPFN B is 8% more accurate than the IMM</strong> (pilot a: 1.37 vs 1.50 m;
+pilot b: 1.67 vs 1.80 m; better on 208 and 217 of 250 flights). About <strong>250 Crazyflie rows (25 s of radar)</strong> are
+enough to beat both IMMs. <strong>IMM + TabPFN</strong>, where TabPFN corrects the IMM, is <strong>10% better than the IMM</strong> on pilot b.
+Live (TabPFN needs 252 ms, so it corrects every 0.3 s) it keeps <strong>4%</strong>: the gap is speed, not accuracy.
+<strong>It knows when it is unsure:</strong> TabPFN B's 90% range holds the real position 93% of the time on pilot a and 90% on pilot b, as promised; the IMM re-tuned on the small drone only 82% (pilot a).
+The alarm is about a tie. Full analysis, charts and caveats:
+<a href="../../drone/results/README.md"><code>results/README.md</code></a>.</p>
+<h2>Try it</h2>
+<p>From the repo root, with Python 3.12 and <code>pip install -r drone/requirements.txt</code> (the exact versions used). First get
+the drone models: see <code>models/README.md</code>. TabPFN needs <code>TABPFN_TOKEN</code> in <code>.env</code> (repo root README) and a GPU.</p>
+<pre><code class="language-sh">python drone/view_drones.py                      # fly the two drones with the keyboard
+python drone/intruder.py --drone cf2 --view 54   # building, red zone, an intruder, the X2 defender hovering
+python drone/demo_imm.py --view radar --tabpfn   # a test flight live: real vs IMM and TabPFN predictions
+python drone/pitch_video.py --pilot b --flight 78 --model imm,tabpfn,combo --out drone/results/videos/compare.mp4
+</code></pre>
+<p>Videos render offscreen, so a GPU server works: prefix <code>MUJOCO_GL=egl</code>. <code>drone/make_videos.sh</code> makes every video.</p>
+<h2>Reproduce every result</h2>
+<p>The data is not in git (402 MB). Run these in order from the repo root; times are for a laptop CPU (simulation) and
+an H100 (TabPFN). Every number in <code>drone/results/</code> then comes from the last command.</p>
+<pre><code class="language-sh"># 1. flights (MuJoCo) and tables
+python drone/intruder.py --flights 2000                          # X2 flights, 16 min
+python drone/intruder.py --drone cf2 --flights 300               # Crazyflie flights, pilot a, 15 min
+python drone/intruder.py --drone cf2 --pilot b --flights 250     # Crazyflie flights, pilot b (never in the examples)
+python drone/features.py                                         # tables, 30 s each
+python drone/features.py --drone cf2
+python drone/features.py --drone cf2_pilotb
+
+# 2. the IMM (the radar standard)
+python drone/imm.py --drone x2                                   # X2 tuning; also the combo's examples
+python drone/imm.py --drone cf2
+python drone/imm.py --drone cf2_pilotb
+python drone/imm.py --tune --drone cf2                           # optional: re-finds TUNED_CF2 (already in imm.py)
+python drone/imm.py --drone cf2 --settings cf2                   # fairness check: IMM tuned on Crazyflie flights 0-49
+python drone/imm.py --drone cf2_pilotb --settings cf2
+
+# 3. TabPFN (needs TABPFN_TOKEN; GPU)
+python drone/tabpfn_model.py --every 1                                                    # A and B, pilot a
+python drone/tabpfn_model.py --versions A,B --test cf2_pilotb --every 1 --out drone/data/tabpfn_cf2_pilotb.npz
+python drone/tabpfn_model.py --versions B --imm-features --test cf2_pilotb --every 1 --out drone/data/tabpfn_cf2_pilotb_combo.npz
+python drone/tabpfn_model.py --versions B --imm-features --fast --context 1000 --adapt-rows 1000 \
+    --test cf2_pilotb --every 1 --batch 10000 --out drone/data/tabpfn_cf2_pilotb_combo_fast.npz  # live replay
+for n in 0 100 250 500 1000 2000; do                                                      # example sweep
+    python drone/tabpfn_model.py --versions B --adapt-rows $n --out drone/data/sweep/B_$n.npz
+done
+python drone/latency.py                                          # speed per radar reading -&gt; drone/results/latency.csv
+
+# 4. results and videos
+python drone/report.py                                           # drone/results/README.md, CSVs, charts
+MUJOCO_GL=egl drone/make_videos.sh                               # drone/results/videos/, world.gif and compare.gif
+</code></pre>
+<h2>Project tree</h2>
+<pre><code>priorlab_berlin_hack/
+├── README.md                 the front page: the idea and the headline results
+├── DEBT.md                   quick fixes taken during the hackathon, and their real fix
+├── docs/                     hackathon brief and background research
+├── drone/                    all code and the drone docs
+│   ├── README.md             this page: how to run, and how to reproduce every result
+│   ├── EXPLAINED.md          the whole idea in diagrams (start here)
+│   ├── EXPERIMENTS.md        every experiment, what we tried and what we learned
+│   ├── requirements.txt      the exact package versions used
+│   ├── sim.py                the MuJoCo world: building, red zone, radar mast, scenery
+│   ├── flight.py             flies a drone: &quot;go this way&quot; → motor commands
+│   ├── intruder.py           random intruder flights (pilots a and b), wind, the radar, data recording
+│   ├── features.py           radar readings → table rows (16 inputs, the answers 1 s later)
+│   ├── imm.py                the IMM tracker: what real radars use (the baseline)
+│   ├── tabpfn_model.py       TabPFN A, B, IMM + TabPFN, the fast setting
+│   ├── compare.py            scoring, and the live replay
+│   ├── latency.py            how fast TabPFN answers per radar reading
+│   ├── report.py             builds results/: write-up, CSVs, charts
+│   ├── demo_imm.py           the live 3D demo window
+│   ├── pitch_video.py        the pitch videos and GIFs
+│   ├── make_videos.sh        rebuilds every video and GIF
+│   ├── view_drones.py        fly the drones with the keyboard
+│   ├── models/README.md      how to get the drone models (MuJoCo Menagerie)
+│   ├── results/              every number we quote
+│   │   ├── README.md         all results, analysis and caveats
+│   │   ├── *.csv             the tables behind every number
+│   │   ├── charts/           the charts
+│   │   ├── world.gif, compare.gif
+│   │   └── videos/           the videos (not in git: drone/make_videos.sh)
+│   └── data/                 flights, tables, saved predictions (not in git: drone/README.md)
+</code></pre>
+<h2>References</h2>
+<ul>
+<li><strong>TabPFN:</strong> N. Hollmann, S. Müller, L. Purucker et al., "Accurate predictions on small data with a tabular
+  foundation model", <em>Nature</em> 637, 2025. N. Hollmann, S. Müller, K. Eggensperger, F. Hutter, "TabPFN: A Transformer
+  That Solves Small Tabular Classification Problems in a Second", <em>ICLR</em> 2023. Code: https://github.com/PriorLabs/TabPFN
+  (we used the <code>tabpfn</code> package 10.2.0 through the Prior Labs API).</li>
+<li><strong>IMM tracker:</strong> H. A. P. Blom, Y. Bar-Shalom, "The interacting multiple model algorithm for systems with Markovian
+  switching coefficients", <em>IEEE Transactions on Automatic Control</em> 33(8), 1988. Y. Bar-Shalom, X. R. Li,
+  T. Kirubarajan, <em>Estimation with Applications to Tracking and Navigation</em>, Wiley, 2001.</li>
+<li><strong>Simulator:</strong> E. Todorov, T. Erez, Y. Tassa, "MuJoCo: A physics engine for model-based control", <em>IROS</em> 2012.</li>
+<li><strong>Drone models (Skydio X2, Bitcraze Crazyflie 2):</strong> MuJoCo Menagerie, Google DeepMind,
+  https://github.com/google-deepmind/mujoco_menagerie (commit in <a href="../../drone/models/README.md"><code>models/README.md</code></a>).</li>
+<li><strong>Related work</strong> we read: <a href="../../drone/../docs/research/related-work.md"><code>docs/research/related-work.md</code></a>.</li>
+</ul>
+</main>
+</body>
+</html>

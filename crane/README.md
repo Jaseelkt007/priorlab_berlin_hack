@@ -62,6 +62,7 @@ MUJOCO_GL=egl crane/.venv/bin/python crane/render_clip.py --rope 5.2 --sling 2.8
 MUJOCO_GL=glfw crane/.venv/bin/python crane/live_crane.py      # LIVE 3D window: TabPFN predicts 1 s ahead in real time
 MUJOCO_GL=glfw crane/.venv/bin/python crane/live_pick_place.py # LIVE pick and place with anti-sway tuning keys
 MUJOCO_GL=glfw crane/.venv/bin/python crane/live_pick_place.py --manual   # one cycle per Enter; --stopped starts idle
+MUJOCO_GL=glfw crane/.venv/bin/python crane/live_pick_place.py --auto-tune # TabPFN chooses the anti-sway setting (key 3)
 ```
 
 `python3 -I crane/exp1_real.py --no-ml` runs only the physics baselines, with the standard library.

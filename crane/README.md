@@ -7,6 +7,24 @@ Part of our Prior Labs entry ("TabPFN for spatial awareness"). Branch: `crane`.
 - **Explainer page:** `explainer.html`. It's one HTML file: open it in a browser. It has a live 4-strategy crane simulation, the physics, the table, calibration, the real-data results, the MuJoCo demo, the full problem and training spec, and sources.
 - **Pitch and video script:** `PITCH.md`.
 
+## Present the live demo from another laptop
+
+Everything the demo needs is in this folder: the code, the cached tables TabPFN reads (`results/live_fleet_rows.json`, `results/pickplace_decision_fleet.json`) and launchers. Only your own TabPFN key stays out of git.
+
+1. **Get the code:** `git clone https://github.com/Jaseelkt007/priorlab_berlin_hack.git && cd priorlab_berlin_hack && git checkout crane`
+2. **Install uv** (once): https://docs.astral.sh/uv/getting-started/installation/
+3. **TabPFN key:** log in at https://platform.priorlabs.ai, accept the **TabPFN-3.5** licence, copy your API key, and create `.env` in the repo root containing one line, `TABPFN_TOKEN=yourkey` (no quotes, no `< >`). `.env` is git-ignored.
+4. **Start the demo.** The first run creates `crane/.venv`, installs the packages (needs internet, a few minutes) and downloads the TabPFN weights once.
+   - Linux / macOS: `crane/run_live.sh`
+   - Windows (PowerShell, in the repo folder): `powershell -ExecutionPolicy Bypass -File crane\run_live.ps1`
+5. **Pre-flight check** (after the first start, before presenting): `crane/.venv/bin/python crane/check_setup.py` (Windows: `crane\.venv\Scripts\python.exe crane\check_setup.py`). Every line should say OK.
+
+Options: `run_live.sh predict` = live forecast only; extra flags are passed through, e.g. `run_live.sh pick --stopped` (start idle, Enter to begin) or `--manual` (one cycle per Enter).
+
+**Before you go on stage:** start the window 3–5 minutes early and let it run. The first cycles are TabPFN trying settings; from about cycle 5 it keeps the right one, and the cycle table (bottom right) shows the learning. An NVIDIA GPU makes the green forecast ghost smooth. Without one it runs on CPU and the ghost lags; everything else works. On macOS the launcher uses `mjpython`, which MuJoCo's viewer requires.
+
+**In the window:** dark blue = real beam; green = TabPFN's predicted position in 1 s; orange = physics model with the typed-in 0.5 m sling. Top left: mode, state, current cycle timer. Top right: both forecasts, the last 1-s check, the anti-sway setting and what's expected for this move (TabPFN prediction, or measured if already tried on this load). Bottom right: every cycle's time, expected → actual wait, placement, OK/MISS.
+
 ## Results
 
 **Real lab crane** (Nazarbayev University tower crane, see Data). Mean error at the payload 1 s ahead, on whole runs held out from the context:

@@ -9,7 +9,8 @@ travel height -> TRAVEL to the other bay -> SETTLE (|swing| < 5 cm for 1 s, the 
 -> RELEASE (weld off) -> RAISE empty -> pick the same beam again and carry it back.
 TabPFN (teal ghost + 90% floor band) and the physics model (orange) predict the load 1 s ahead during TRAVEL and SETTLE.
 TabPFN chooses the anti-sway setting: key 3, 'tune auto' or --auto-tune. While the beam is lifted, one batched
-TabPFN call per target predicts residual swing and settle time for every setting (off, 0.5 ... 3.0 m) from 3 inputs
+TabPFN call per target predicts residual swing and settle time for every setting not yet tried on this load (settings
+already tried use their measured outcome; reset when a new load is picked) (off, 0.5 ... 3.0 m) from 3 inputs
 (measured sway period, speed, tuning error = shaper period / measured period - 1; the ablation showed rope and payload
 add nothing) and 120
 simulated commissioning moves (results/pickplace_decision_fleet.json, built once) plus this session's own moves, and
@@ -179,17 +180,22 @@ def build_decision_fleet(n=120, seed=11):
     print(); return rows
 
 
+OWN_W = 5                 # weight of this crane's own moves vs commissioning rows (each own row listed 5 times)
 DEC_COLS = [2, 3, 4]      # measured sway period, speed, tuning error: as good as all 5 (crane/ablation.py)
 
 
-def decide_tune(ctx, L1, payload_t, meas, speed):
+def decide_tune(ctx, L1, payload_t, meas, speed, known=None):
     """One batched TabPFN call per target over all anti-sway settings: fastest expected cycle with 99% swing < clearance."""
     from tabpfn import TabPFNRegressor
     X = np.array([[r['x'][j] for j in DEC_COLS] for r in ctx]); C = np.array([[dfeat(L1, payload_t, meas, speed, tu)[j] for j in DEC_COLS] for tu in TUNES])
     a50, a99 = (np.asarray(v) for v in TabPFNRegressor(n_estimators=1).fit(X, np.array([r['amp'] for r in ctx])).predict(C, output_type='quantiles', quantiles=[0.5, 0.99]))
     s50 = np.asarray(TabPFNRegressor(n_estimators=1).fit(X, np.array([r['settle'] for r in ctx])).predict(C, output_type='median'))
     cands = [dict(tune=tu, amp50=float(x), amp99=float(y), settle=float(max(0, z)), extra=(math.pi * math.sqrt(tune_len(L1, tu) / mc.G) if tu else 0.0)) for tu, x, y, z in zip(TUNES, a50, a99, s50)]
-    for c_ in cands: c_['score'] = c_['settle'] + c_['extra']                  # shaper delay + predicted settle wait
+    for c_ in cands:                                                          # already tried on this load: measured beats predicted
+        m_ = (known or {}).get(c_['tune'])
+        if m_: c_['settle'] = float(np.mean([x['settle'] for x in m_])); c_['amp50'] = float(np.mean([x['amp'] for x in m_])); c_['amp99'] = float(max(x['amp'] for x in m_)); c_['src'] = 'measured'
+        else: c_['src'] = 'predicted'
+        c_['score'] = c_['settle'] + c_['extra']                                 # shaper delay + settle wait
     ok = [c_ for c_ in cands if c_['amp99'] < CLEAR] or cands
     return min(ok, key=lambda c_: c_['score']), cands
 
@@ -215,7 +221,8 @@ def main():
     dpath = os.path.join(OUT, 'pickplace_decision_fleet.json')
     if not os.path.exists(dpath):
         print('simulating commissioning moves for the anti-sway decision (once, ~2-3 min) ...', flush=True); json.dump(build_decision_fleet(), open(dpath, 'w'))
-    dctx = json.load(open(dpath)); own = []; import random as _rr; srng = _rr.Random(5)
+    dctx = json.load(open(dpath)); own = []; tried = {}   # tried: anti-sway setting -> measured outcomes on the CURRENT load
+    import random as _rr; srng = _rr.Random(5)
     print('fitting TabPFN on', len(fleet), 'fleet rows ...', flush=True)
     model = TabPFNRegressor(n_estimators=1, fit_mode='fit_with_cache').fit(np.array([[r['f'][k] for k in FEAT] for r in fleet]), np.array([r['y'] for r in fleet]))
     model.predict(np.zeros((1, len(FEAT))))
@@ -264,8 +271,8 @@ def main():
             S['hoist_from'] = d.qpos[jh]; S['decision'] = None; S['deciding'] = T['auto']; S['meas'] = None
             if T['auto']:                                                     # decide while the beam is lifted
                 S['meas'] = sway_period(P['rope'], P['sling'], P['payload'], srng)
-                def _dec(args=(list(dctx) + list(own), P['rope'], P['payload'], S['meas'], P['speed'])):
-                    t0_ = time.time(); best, cands = decide_tune(*args); S['decision'] = dict(best=best, cands=cands, s=time.time() - t0_)
+                def _dec(args=(list(dctx) + list(own) * OWN_W, P['rope'], P['payload'], S['meas'], P['speed']), known=dict(tried)):   # own moves count 5x
+                    t0_ = time.time(); best, cands = decide_tune(*args, known=known); S['decision'] = dict(best=best, cands=cands, s=time.time() - t0_)
                 threading.Thread(target=_dec, daemon=True).start()
             set_phase('RAISE')
         elif ph == 'RAISE':
@@ -274,6 +281,7 @@ def main():
                 if S['attached'] and S.get('deciding') and S.get('decision') is None: pass   # still deciding: hold at height
                 elif S['attached']:
                     if S.get('deciding'): T['i'] = TUNES.index(S['decision']['best']['tune'])
+                    S['exp'] = S['decision']['best'] if S.get('deciding') and S.get('decision') else None
                     tl = TUNES[T['i']]; hist.clear(); mover.x0 = mover.ref(t); mover.t0 = None
                     mover.start(t, P['speed'], (P['rope'] + HOOK_DROP + tl + LOAD_H / 2) if tl else None); set_phase('TRAVEL')
                 else: set_phase('NEXT')
@@ -285,16 +293,19 @@ def main():
                 S['settle_s'] = el; S['hoist_from'] = d.qpos[jh]
                 if S.get('meas'):                                             # the outcome becomes one more row
                     own.append(dict(x=dfeat(P['rope'], P['payload'], S['meas'], P['speed'], TUNES[T['i']]), amp=S['amp'], settle=el, move=0.0)); S['meas'] = None
-                S['amp'] = 0.0; set_phase('LOWER')
+                tried.setdefault(TUNES[T['i']], []).append(dict(settle=el, amp=S['amp']))
+                S['last_amp'] = S['amp']; S['amp'] = 0.0; set_phase('LOWER')
         elif ph == 'RELEASE' and el > 0.6: S['hoist_from'] = d.qpos[jh]; set_phase('RAISE')
         elif ph == 'NEXT':                                                    # cycle done
-            S['cycles'].append(dict(cycle_s=round(t - S['cycle0'], 1), settle_s=round(S.get('settle_s', 0), 1), placed_cm=S.get('place_cm'), antisway=TUNES[T['i']], chosen_by='TabPFN' if S.get('deciding') else 'operator', mode=S['mode'], **P))
+            ex = S.get('exp'); amp_ = S.get('last_amp', 0.0); ok_ = abs(S.get('place_cm') or 0) <= 5 and amp_ < CLEAR
+            S['cycles'].append(dict(cycle_s=round(t - S['cycle0'], 1), settle_s=round(S.get('settle_s', 0), 1), placed_cm=S.get('place_cm'),
+                                    exp_wait=round(ex['settle'], 1) if ex else None, exp_swing=round(ex['amp50'], 2) if ex else None, swing=round(float(amp_), 2), ok=bool(ok_), antisway=TUNES[T['i']], chosen_by='TabPFN' if S.get('deciding') else 'operator', mode=S['mode'], **P))
             mover.x0 = mover.ref(t); mover.t0 = None
             if S['mode'] == 'manual': S['run'] = False                        # manual: one cycle per start
             set_phase('IDLE')
         elif ph == 'IDLE' and S['run']:                                      # start (auto: keeps going; manual: one cycle)
             with lock: new = dict(pending)
-            if new != P: P.update(new); rebuild()
+            if new != P: P.update(new); rebuild(); tried.clear()
             S['cycle0'] = t; S['hoist_from'] = d.qpos[jh]; set_phase('LOWER')
         M = float(m.body_subtreemass[tid]) + (P['payload'] * 1000 if S['attached'] else 0.0)
         xr, vr, ar = mover.state(t)                                          # holds at the end bay after the move
@@ -304,13 +315,14 @@ def main():
             S['last_row'] = d.time; off = offset(); hist.append((d.time, d.qpos[jtx], off)); tt = round(d.time, 1)
             if round(tt - 1.0, 1) in preds:
                 p = preds.pop(round(tt - 1.0, 1)); errs.append((abs(p[0] - off), abs(p[1] - off) if p[1] is not None else None))
+                S['check'] = dict(pred=p[0], lo=p[2], hi=p[3], phys=p[1], actual=off, t=d.time)
             if len(hist) >= 21:
                 c = cond(); f = features(list(hist), mover, d.time, c)
                 S['phys'] = (d.time, physics_pred(f, mover, d.time, c['L1'])); phys_at[round(d.time, 1)] = S['phys'][1]
                 try: req.put_nowait((d.time, features(list(hist), mover, d.time, c, mover.dir), mover.dir))
                 except queue.Full: pass
                 r = res['pred']
-                if r: preds[round(r[0], 1)] = (r[2], phys_at.get(round(r[0], 1)))
+                if r: preds[round(r[0], 1)] = (r[2], phys_at.get(round(r[0], 1)), r[1], r[3])
         elif S['phase'] not in ('TRAVEL', 'SETTLE'): S['phys'] = None
 
     def control(cmd):
@@ -368,21 +380,36 @@ def main():
                      TRAVEL='travelling', SETTLE=f"waiting for the swing to settle ({d.time - S['t0']:.1f} s)", RELEASE='releasing', NEXT='next pick')[S['phase']]
         last = S['cycles'][-1] if S['cycles'] else None
         with lock: nxt = dict(pending)
-        runst = 'RUNNING' if S['run'] else ('STOPPING after this cycle' if S['phase'] != 'IDLE' else 'STOPPED')
-        status = f"{S['mode'].upper()} - {runst}\n{label}"
+        # ---- layout: two-column label/value blocks (MuJoCo draws text1 and text2 as aligned columns) ----
+        runst = 'running' if S['run'] else ('stopping after this cycle' if S['phase'] != 'IDLE' else 'stopped')
+        elapsed = (d.time - S['cycle0']) if S['phase'] != 'IDLE' else 0.0
         tl = TUNES[T['i']]
-        nums = (f"GREEN  TabPFN in 1 s: {('%+.2f m  (90%%: %+.2f..%+.2f)' % (r[2], r[1], r[3])) if (r and show) else '-'}\n"
-                f"ORANGE physics in 1 s: {('%+.2f m' % S['phys'][1]) if S['phys'] else '-'}\n"
-                f"error last 10 s: TabPFN {ep:.1f} cm | physics {ef:.1f} cm\n"
-                f"anti-sway: {('%.1f m sling' % tl) if tl else 'off'} ({'TabPFN chooses' if T['auto'] else 'you choose'})"
-                + ((f"\nTabPFN expects: wait {S['decision']['best']['settle']:.1f} s, swing {S['decision']['best']['amp50']:.2f} m, own rows {len(own)}") if (T['auto'] and S.get('decision')) else '')
-                + (f"\nlast cycle: {last['cycle_s']} s, wait {last['settle_s']} s, placed {last['placed_cm']:+d} cm" if last else '')
-                + f"\ncycles: {len(S['cycles'])}   rope {P['rope']} m  sling {P['sling']} m  {P['payload']} t  {int(P['speed'] * 100)}%")
-        keys = (f"next pick: rope {nxt['rope']}  sling {nxt['sling']}  payload {nxt['payload']}  speed {int(nxt['speed'] * 100)}%\n"
-                "Enter start/stop | 1 auto | 2 manual | 3 TabPFN tunes anti-sway | Left/Right anti-sway | Up/Down speed | PgUp/PgDn sling | Home/End rope | Ins/Del payload")
-        return [(mujoco.mjtFont.mjFONT_BIG, mujoco.mjtGridPos.mjGRID_TOPLEFT, status, None),
-                (mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_TOPRIGHT, nums, None),
-                (mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_BOTTOMLEFT, keys, None)]
+        st_l = "Mode\nState\nNow\nThis cycle"
+        st_v = f"{S['mode']}\n{runst}\n{label}\n" + (f"{elapsed:5.1f} s" if S['phase'] != 'IDLE' else '-')
+        pr_l = "TabPFN, load in 1 s\n  90% sure between\nPhysics, load in 1 s\nLast 1-s check\nError, last 10 s\nAnti-sway setting"
+        pr_v = ((f"{r[2]:+.2f} m from trolley\n  {r[1]:+.2f} .. {r[3]:+.2f} m\n") if (r and show) else "-\n-\n") + \
+               (f"{S['phys'][1]:+.2f} m from trolley\n" if S['phys'] else "-\n") + \
+               ((lambda c_: f"said {c_['pred']:+.2f}, was {c_['actual']:+.2f} m -> " + ('inside range' if c_['lo'] <= c_['actual'] <= c_['hi'] else 'OUTSIDE range') + "\n")(S['check'])
+                if S.get('check') and d.time - S['check']['t'] < 1.0 else "-\n") + \
+               (f"TabPFN {ep:.1f} cm | physics {ef:.1f} cm\n" if e else "-\n") + \
+               ((f"{tl:.1f} m sling" if tl else 'off') + (' (TabPFN)' if T['auto'] else ' (you)'))
+        if T['auto'] and S.get('decision'):
+            b = S['decision']['best']; pr_l += "\nExpected for this move"; pr_v += f"\nwait {b['settle']:.1f} s, swing {b['amp50']:.2f} m (" + ('measured on this load' if b.get('src') == 'measured' else 'TabPFN prediction') + ")"
+        hist_c = S['cycles'][-8:]; n0 = len(S['cycles']) - len(hist_c)
+        hi_l = "Cycle" + ''.join(f"\n#{n0 + k + 1}" for k in range(len(hist_c)))
+        hi_v = "total    anti-sway  wait: expected -> actual   placed   result" + ''.join(
+            f"\n{c_['cycle_s']:5.1f} s   " + (f"{c_['antisway']:.1f} m" if c_['antisway'] else 'off  ') +
+            (f"      {c_['exp_wait']:4.1f} s -> {c_['settle_s']:4.1f} s" if c_.get('exp_wait') is not None else f"         -  -> {c_['settle_s']:4.1f} s") +
+            f"      {c_['placed_cm']:+d} cm    " + ('OK' if c_.get('ok') else 'MISS') for c_ in hist_c)
+        if hist_c:
+            avg = sum(c_['cycle_s'] for c_ in S['cycles']) / len(S['cycles']); nok = sum(c_.get('ok', False) for c_ in S['cycles'])
+            hi_l += "\naverage"; hi_v += f"\n{avg:5.1f} s over {len(S['cycles'])} cycles  -  {nok}/{len(S['cycles'])} OK (placed within 5 cm, clear of racks)"
+        keys = (f"next pick: rope {nxt['rope']} m  sling {nxt['sling']} m  payload {nxt['payload']} t  speed {int(nxt['speed'] * 100)}%\n"
+                "Enter start/stop    1 auto    2 manual    3 TabPFN chooses anti-sway    Left/Right set anti-sway yourself\n"
+                "Up/Down speed    PgUp/PgDn sling    Home/End rope    Ins/Del payload")
+        F = mujoco.mjtFont.mjFONT_NORMAL; G = mujoco.mjtGridPos
+        return [(F, G.mjGRID_TOPLEFT, st_l, st_v), (F, G.mjGRID_TOPRIGHT, pr_l, pr_v),
+                (F, G.mjGRID_BOTTOMRIGHT, hi_l, hi_v), (F, G.mjGRID_BOTTOMLEFT, keys, None)]
 
     if a.headless:
         t0 = time.time(); last_print = -5
@@ -391,6 +418,11 @@ def main():
             if d.time > time.time() - t0: time.sleep(max(0.0, d.time - (time.time() - t0)))
             if a.manual and S['phase'] == 'IDLE' and not S['run'] and len(S['cycles']) < 2 and d.time > 2: control('start')   # test: press start
             if d.time - last_print >= 5:
+                class _V: pass
+                _v = _V(); _v.user_scn = mujoco.MjvScene(m, maxgeom=200); _tx = overlay(_v)   # exercise the window overlay too
+                if d.time > a.headless - 6 and not S.get('_shown'):
+                    S['_shown'] = True
+                    for f_, g_, a_, b_ in _tx: print('---', g_, '\n' + '\n'.join(f'{x:28s}{y}' for x, y in zip(a_.split(chr(10)), (b_ or '').split(chr(10)) + [''] * 20)), flush=True)
                 last_print = d.time; e = list(errs); ef = [x[1] for x in e if x[1] is not None]
                 print(f"t={d.time:5.1f} {S['mode']:6s} run={S['run']!s:5s} {S['phase']:8s} attached={S['attached']} trolley x={d.qpos[jtx]:5.2f} load x={d.xpos[lid][0]:5.2f} z={d.xpos[lid][2]:4.2f}  "
                       f"TabPFN {np.mean([x[0] for x in e]) * 100 if e else float('nan'):.1f} cm  physics {np.mean(ef) * 100 if ef else float('nan'):.1f} cm  cycles {len(S['cycles'])}", flush=True)

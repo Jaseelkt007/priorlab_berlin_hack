@@ -13,7 +13,9 @@ import os
 
 import numpy as np
 
-os.environ.setdefault('MUJOCO_GL', 'egl')
+import sys
+if sys.platform.startswith('linux') and not (os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')):
+    os.environ.setdefault('MUJOCO_GL', 'egl')       # headless Linux only; Windows / macOS / desktop Linux use the default (glfw)
 import mujoco
 
 HERE = os.path.dirname(os.path.abspath(__file__))

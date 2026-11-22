@@ -353,6 +353,16 @@ def project(cam, p, W, H):
     return u, v, z
 
 
+def _bbox(uv):
+    """Screen bbox of the projected corners; NaN when every corner is behind the camera."""
+    ok = np.isfinite(uv).all(axis=1)
+    if not ok.any():
+        return dict(bbox_x0=np.nan, bbox_y0=np.nan, bbox_x1=np.nan, bbox_y1=np.nan)
+    q = uv[ok]
+    return dict(bbox_x0=round(float(q[:, 0].min()), 1), bbox_y0=round(float(q[:, 1].min()), 1),
+                bbox_x1=round(float(q[:, 0].max()), 1), bbox_y1=round(float(q[:, 1].max()), 1))
+
+
 def render_clip(job: dict) -> dict:
     import mujoco
     from sim.line import X_PICK
@@ -489,8 +499,7 @@ def render_clip(job: dict) -> dict:
                    placement_err_mm=round(p["out"]["place_offset_mm"], 2) if outcome == "placed" else np.nan,
                    picks=cnt["picks"], placed=cnt["placed"], dropped=cnt["dropped"], good_per_min=round(cnt["gpm"], 1),
                    cup_x=round(cu, 1), cup_y=round(cv, 1), product_x=round(pu, 1), product_y=round(pv, 1),
-                   bbox_x0=round(np.nanmin(uv[:, 0]), 1), bbox_y0=round(np.nanmin(uv[:, 1]), 1),
-                   bbox_x1=round(np.nanmax(uv[:, 0]), 1), bbox_y1=round(np.nanmax(uv[:, 1]), 1), visible=int(vis))
+                   **_bbox(uv), visible=int(vis))
         rows.append(row)
         cams.append(dict(frame=f, pos=[round(float(x), 5) for x in gl.pos], forward=[round(float(x), 5) for x in gl.forward],
                          up=[round(float(x), 5) for x in gl.up], lookat=[round(float(x), 5) for x in cam.lookat],
@@ -557,7 +566,8 @@ def write_poses(path, m0, poses, cams, fps_sim, t0):
                        "the render (replaced by the 'cup' items)."))
 
 
-POLICY_LABEL = {"tabpfn_jax": "tabpfn", "fixed": "fixed30", "fixed50": "fixed50"}   # decisions key -> file label
+POLICY_LABEL = {"tabpfn_jax": "tabpfn", "fixed": "fixed30", "fixed50": "fixed50", "recipe50": "recipe50",
+                "full100": "full100"}   # decisions key -> file label (no underscores: the name field separator)
 
 
 # ================================================================================================ plan
@@ -638,6 +648,40 @@ def make_plan_test():
         ])
 
 
+def make_plan_full():
+    """The full batch (clip-studio's shot list S01–S04). Each sub-plan: one stream at one policy, simulated once,
+    several clips. S02 overrides the speed of picks 3–6 (5 is placed at 50 % and dropped at 100 % in the bank)."""
+    out = "/home/nebius/delta_line/footage"
+    events = [("heavy", [30, 33]), ("filmroll", [60, 63]), ("worncup", [90, 93]), ("cupchange", [110, 113])]
+    shift = list(range(120))
+    return [
+        dict(name="tabpfn", out=out, stream="shift:bar", policy="tabpfn_jax", idxs=shift, clips=[
+            dict(scene="S01", label="hero", camera="A-wide", picks=[1, 14], sim_fps=60),
+            dict(scene="S01", label="hero", camera="A-wide-orbit", picks=[1, 14], sim_fps=60),
+            dict(scene="S01", label="hero", camera="B-top", picks=[1, 14], sim_fps=60),
+            dict(scene="S01", label="hero", camera="C-close", picks=[1, 14], sim_fps=60),
+            dict(scene="S03", label="decision", camera="C-close", pick=4, window="touch", sim_fps=1000),
+            dict(scene="S03", label="decision", camera="A-wide", pick=4, window="touch", sim_fps=1000),
+            dict(scene="S04", label="shift", camera="A-wide", picks=[0, 119], sim_fps=60),
+            dict(scene="S04", label="shift", camera="B-top", picks=[0, 119], sim_fps=60),
+        ] + [dict(scene="S04", label=ev, camera="D-track", picks=w, sim_fps=250) for ev, w in events]),
+        dict(name="fixed50", out=out, stream="shift:bar", policy="fixed50", idxs=shift, clips=[
+            dict(scene="S04", label="shift", camera="A-wide", picks=[0, 119], sim_fps=60),
+            dict(scene="S04", label="shift", camera="B-top", picks=[0, 119], sim_fps=60),
+        ] + [dict(scene="S04", label=ev, camera="D-track", picks=w, sim_fps=250) for ev, w in events]),
+        dict(name="recipe50", out=out, stream="shift:bar", policy="recipe50", alpha=0.5, idxs=[3, 4, 5, 6], clips=[
+            dict(scene="S02", label="problem", camera="C-close", pick=5, window="touch", sim_fps=250),
+            dict(scene="S02", label="problem", camera="D-track", pick=5, window="move", sim_fps=250),
+            dict(scene="S02", label="problem", camera="E-side", pick=5, window="move", sim_fps=250),
+        ]),
+        dict(name="full100", out=out, stream="shift:bar", policy="full100", alpha=1.0, idxs=[3, 4, 5, 6], clips=[
+            dict(scene="S02", label="problem", camera="C-close", pick=5, window="touch", sim_fps=250),
+            dict(scene="S02", label="problem", camera="D-track", pick=5, window="move", sim_fps=1000),
+            dict(scene="S02", label="problem", camera="E-side", pick=5, window="move", sim_fps=1000),
+        ]),
+    ]
+
+
 def clip_window(picks, c):
     by = {p["idx"]: p for p in picks}
     if "picks" in c:
@@ -659,7 +703,7 @@ def clip_window(picks, c):
         t_far = p["t_start_g"] + (i_t + (far[0] if len(far) else len(tool) - 1 - i_t)) * MS
         return max(e["touch"] - 1.0, 0.0), t_far + 1.0
     end = e["drop_impact"] or e["placed"] or e["release"]
-    return e["move_start"] - 1.0, end + 1.0
+    return max(e["move_start"] - 1.0, 0.0), end + 1.0
 
 
 def main():
@@ -670,14 +714,27 @@ def main():
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--out", default=None, help="override the plan's output folder")
     ap.add_argument("--only", default="", help="comma-separated cameras to render (default: all in the plan)")
+    ap.add_argument("--only-plan", dest="only_plan", default="", help="comma-separated sub-plan names (full plan)")
     a = ap.parse_args()
-    plan = make_plan_test() if a.plan == "test" else json.loads(Path(a.plan).read_text())
+    plans = {"test": lambda: [make_plan_test()], "full": make_plan_full}[a.plan]() if a.plan in ("test", "full") \
+        else json.loads(Path(a.plan).read_text())
+    if a.only_plan:
+        plans = [p for p in plans if p.get("name") in a.only_plan.split(",")]
+    for plan in plans:
+        run_plan(plan, a)
+
+
+def run_plan(plan, a):
     if a.only:
         plan["clips"] = [c for c in plan["clips"] if c["camera"] in a.only.split(",")]
+    if not plan["clips"]:
+        return
     out = Path(a.out or plan["out"])
     out.mkdir(parents=True, exist_ok=True)
-    # shift decisions: TabPFN answered in JAX (policy key tabpfn_jax), fixed recipes fixed (30 %) and fixed50 (50 %)
-    decisions = pd.read_csv(ROOT / "results/shift/decisions_jax.csv") if plan["stream"] == "shift:bar" else None
+    decisions = None
+    if plan["stream"] == "shift:bar" and "alpha" not in plan:
+        # shift decisions: TabPFN answered in JAX (policy key tabpfn_jax), fixed recipes fixed (30 %) and fixed50 (50 %)
+        decisions = pd.read_csv(ROOT / "results/shift/decisions_jax.csv")
     picks = build_stream(plan["stream"], plan["idxs"], plan["policy"], decisions, plan.get("alpha"), a.workers)
     pitch = queue_pitch(picks)
     story = []
@@ -687,10 +744,9 @@ def main():
                 if p["idx"] == i:
                     story.append(dict(event=name, pick_id=i, sim_time=round(p["t_start_g"], 6)))
     jobs = []
+    label = POLICY_LABEL.get(plan["policy"], plan["policy"])
     for c in plan["clips"]:
         t0, t1 = clip_window(picks, c)
-        pol = plan["policy"]
-        label = POLICY_LABEL.get(pol, pol)
         name = f"{c['scene']}_{c['label']}_{c['camera']}_{label}_{c['sim_fps']}.mp4"
         jobs.append(dict(picks=picks, pitch=pitch, policy=label, story=story, path=str(out / name),
                          clip=dict(camera=c["camera"], t0=t0, t1=t1, sim_fps=c["sim_fps"], W=a.W, H=a.H)))
@@ -699,13 +755,16 @@ def main():
     man_p = out / "manifest.json"
     man = json.loads(man_p.read_text()) if man_p.exists() else []
     commit = git_commit()
-    for c, rres, j in zip(plan["clips"], results, jobs):
+    for c, rres in zip(plan["clips"], results):
         man = [e for e in man if e["file"] != rres["file"]]
-        man.append(dict(file=rres["file"], scene=c["scene"], camera=c["camera"], policy=POLICY_LABEL.get(plan["policy"], plan["policy"]),
+        man.append(dict(file=rres["file"], scene=c["scene"], camera=c["camera"], policy=label,
                         sim_fps=c["sim_fps"], video_fps=60, resolution=f"{a.W}x{a.H}", frames=rres["frames"],
                         sim_t0=rres["sim_t0"], sim_t1=rres["sim_t1"], stream=plan["stream"],
+                        speed_override=plan.get("alpha"),
                         pick_ids=[p["idx"] for p in picks if p["t_start_g"] + p["dur"] >= rres["sim_t0"] and p["t_start_g"] <= rres["sim_t1"]],
-                        sim_commit=commit, display_only=["infeed queue", "outfeed carry-off", "support frame", "studio"]))
+                        sim_commit=commit, motion_blur_substates={60: 8, 250: 2}.get(c["sim_fps"], 1),
+                        display_only=["infeed queue", "outfeed carry-off", "base housing", "drawn suction cup",
+                                      "wrap seal fins", "belt rails"]))
         print(f"{rres['file']}: {rres['frames']} frames, sim {rres['sim_t0']:.3f}-{rres['sim_t1']:.3f} s", flush=True)
     man_p.write_text(json.dumps(man, indent=1, default=_num))
 

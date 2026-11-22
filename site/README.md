@@ -11,6 +11,7 @@ reports' white theme. Plain HTML and CSS, no build step, fonts self-hosted.
 | `crane.html` | `crane/docs/report.html` (Crane Sway) |
 | `drone.html` | `site/reports/drone.html`, rendered from `drone/README.md` (the drone project has no report page) |
 | `fly.html` | `fly/docs/report.html` (fruit fly, MuJoCo flybody) |
+| `deck.html` | the five-slide pitch (16:9, scales to any screen; ← → or click, F for full screen, `#1`–`#5` deep links, prints one slide per page) |
 
 ## Open it
 
@@ -20,7 +21,7 @@ Serve the repo root, so the pages can reach the reports in the project folders:
 python3 -m http.server 8765 --bind 127.0.0.1    # then open http://localhost:8765/site/
 ```
 
-Opening `site/index.html` as a file also works. On GitHub Pages, serve from the repo root.
+Opening `site/index.html` as a file also works. On GitHub Pages or Vercel, deploy the **repo root** (the pages read `../docs`, `../crane`, `../fly`, `../drone`): `vercel.json` sends `/` to `/site/` and `/pitch` to the deck.
 
 Keys: `1`–`4` open a project, `Esc` returns to the overview (click the header first if the report has focus).
 

@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%232563eb%27/%3E%3C/svg%3E">
+  <title>One Table, Four Machines · Pitch</title>
+  <meta name="description" content="Five-slide pitch: TabPFN in-context learning for spatial awareness on four machines. HackLab Berlin 2026, Prior Labs track.">
+  <link rel="stylesheet" href="assets/fonts.css">
+  <link rel="stylesheet" href="assets/deck.css">
+</head>
+<body class="deck">
+<div class="stage">
+<div class="slides" id="slides">
+
+  <!-- 1 · cover -->
+  <section class="slide cover" aria-label="One table. Four machines.">
+    <p class="kicker">Prior Labs track · TabPFN for spatial awareness · HackLab Berlin 2026</p>
+    <h1>One table.<br><span class="grad">Four machines.</span></h1>
+    <p class="lead">Robots that predict what happens next from a table of their own past.<br>One pretrained model, four machines, no training.</p>
+    <div class="floor"></div>
+    <p class="tag"><b>TabPFN</b> learns from the examples it is shown, in one forward pass. We gave it each robot's own log and asked: <b>what happens next?</b></p>
+    <div class="row">
+      <div class="vcard" style="--c: var(--pick)"><video src="../docs/media/hero.mp4" poster="../docs/media/hero.jpg" muted loop playsinline preload="auto"></video><span><small>IRB 360-class delta</small>Suction pick line</span></div>
+      <div class="vcard" style="--c: var(--crane)"><video src="media/crane_forecast.mp4" poster="media/crane_forecast.jpg" muted loop playsinline preload="auto"></video><span><small>Overhead crane</small>Crane Sway</span></div>
+      <div class="vcard" style="--c: var(--drone)"><video src="media/drone_world.mp4" poster="media/drone_world.jpg" muted loop playsinline preload="auto"></video><span><small>Radar tracking</small>Intruder drone</span></div>
+      <div class="vcard" style="--c: var(--fly)"><video src="../docs/media/fly.mp4" poster="../docs/media/fly.jpg" muted loop playsinline preload="auto"></video><span><small>MuJoCo flybody</small>Fruit fly</span></div>
+    </div>
+  </section>
+
+  <!-- 2 · the idea -->
+  <section class="slide" aria-label="The idea">
+    <p class="kicker">01 · The idea</p>
+    <h2>Write the robot's log as a table. <span class="grad">TabPFN reads it as examples.</span></h2>
+    <div class="flow">
+      <div class="st"><b>Sensors + outcomes</b><span>what the machine already measures</span></div>
+      <div class="ar">→</div>
+      <div class="st"><b>One row per moment</b><span>the past rows are the context</span></div>
+      <div class="ar">→</div>
+      <div class="st model"><b>TabPFN, pretrained</b><span>no training loop: adapting means adding rows</span></div>
+      <div class="ar">→</div>
+      <div class="st"><b>Prediction + range</b><span>a full distribution, not a point</span></div>
+      <div class="ar">→</div>
+      <div class="st"><b>Decision</b><span>speed, anti-sway, alarm, controls</span></div>
+    </div>
+    <table class="tbl">
+      <thead><tr><th>Machine</th><th>One row is</th><th>TabPFN predicts</th><th>So the machine</th></tr></thead>
+      <tbody>
+        <tr><td><span class="dot" style="--c: var(--pick)"></span>Suction pick line</td><td>one pick: weight, size, temperature, cup age, vacuum at touch</td><td>the drop risk at each of 9 speeds</td><td>takes the fastest speed worth its risk</td></tr>
+        <tr><td><span class="dot" style="--c: var(--crane)"></span>Crane Sway</td><td>0.1 s of the crane: rope angle, encoders, load cell, planned move</td><td>where the load will be 1 s later, with a range</td><td>chooses the anti-sway setting per load</td></tr>
+        <tr><td><span class="dot" style="--c: var(--drone)"></span>Intruder drone</td><td>one radar reading: 16 numbers, 10 times a second</td><td>where the drone will be in 1 s, and a breach within 2 s</td><td>corrects the IMM tracker, raises the alarm</td></tr>
+        <tr><td><span class="dot" style="--c: var(--fly)"></span>Fruit fly</td><td>0.2 ms of flight: 104 senses of a trained RL pilot</td><td>the pilot's 12 controls</td><td>flies the fly in closed loop</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 3 · results -->
+  <section class="slide" aria-label="Results">
+    <p class="kicker">02 · Results</p>
+    <h2>Four machines, one model, <span class="grad">no training.</span></h2>
+    <div class="grid4">
+      <div class="res" style="--c: var(--pick)">
+        <video src="../docs/media/shift_split.mp4" poster="../docs/media/shift_split.jpg" muted loop playsinline preload="metadata"></video>
+        <div><h3><small>Suction pick line</small>Speed for every pick</h3>
+          <p class="num"><b>1 vs 31 drops</b><span>one 120-pick shift, against the fast fixed recipe</span></p>
+          <p class="num"><b>152.6 picks/min</b><span>vs 145.7 cautious (0 drops), 122.7 fast</span></p></div>
+      </div>
+      <div class="res" style="--c: var(--crane)">
+        <video src="../docs/media/crane_split.mp4" poster="../docs/media/crane_split.jpg" muted loop playsinline preload="metadata"></video>
+        <div><h3><small>Crane Sway</small>Sees the swing coming</h3>
+          <p class="num"><b>5× closer</b><span>than physics, 1 s ahead, real lab crane (0.10 vs 0.50 cm)</span></p>
+          <p class="num"><b>−35 % time</b><span>on 12 new loads, vs anti-sway set for the wrong sling</span></p></div>
+      </div>
+      <div class="res" style="--c: var(--drone)">
+        <video src="media/drone_compare.mp4" poster="media/drone_compare.jpg" muted loop playsinline preload="metadata"></video>
+        <div><h3><small>Intruder drone</small>Where it will be in 1 s</h3>
+          <p class="num"><b>−10 % error</b><span>IMM 1.80 m → IMM + TabPFN 1.62 m, on a new pilot</span></p>
+          <p class="num"><b>−8 % alone</b><span>TabPFN by itself: 1.67 m</span></p></div>
+      </div>
+      <div class="res" style="--c: var(--fly)">
+        <video src="media/fly_scurve.mp4" poster="media/fly_scurve.jpg" muted loop playsinline preload="metadata"></video>
+        <div><h3><small>Fruit fly</small>Flies by imitation</h3>
+          <p class="num"><b>0.10 mm</b><span>off the S-curve; the trained RL pilot itself: 0.09 mm</span></p>
+          <p class="num"><b>−44 % error</b><span>on a 20 % heavier fly, after 16 example flights</span></p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 · speed and limits -->
+  <section class="slide" aria-label="Speed and limits">
+    <p class="kicker">03 · Honest limits</p>
+    <h2>The accuracy is there. <span class="grad">Speed decides where it fits.</span></h2>
+    <div class="two">
+      <div class="panel">
+        <h3>Time per decision vs the machine's budget</h3>
+        <p class="sub">log scale, 0.1 ms to 1 s · the black line is the budget</p>
+        <div class="lat" style="--c: var(--pick)">
+          <div class="lbl"><b>Suction pick line</b><em class="ok">2.35 ms ✓ fits</em></div>
+          <div class="track"><div class="fill" style="width: 34.3%"></div><div class="budget" style="left: 63.6%" data-l="35 ms seal"></div></div>
+          <div class="note">median, JAX on an H100 (max 3.53 ms): decided before the cup has sealed</div>
+        </div>
+        <div class="lat" style="--c: var(--drone)">
+          <div class="lbl"><b>Intruder drone</b><em class="no">252 ms ✗ too slow</em></div>
+          <div class="track"><div class="fill" style="width: 85%"></div><div class="budget" style="left: 75%" data-l="100 ms radar"></div></div>
+          <div class="note">live, it corrects the IMM every 0.3 s and the gain shrinks from 10 % to 4 %</div>
+        </div>
+        <div class="lat" style="--c: var(--fly)">
+          <div class="lbl"><b>Fruit fly</b><em class="no">31–114 ms ✗</em></div>
+          <div class="track"><div class="fill" style="width: 76.4%; background: linear-gradient(90deg, var(--fly) 81%, color-mix(in oklab, var(--fly) 40%, white) 81%)"></div><div class="budget" style="left: 7.5%" data-l="0.2 ms step"></div></div>
+          <div class="note">flown in slowed-down simulated time, not real time</div>
+        </div>
+        <div class="axis"><span>0.1 ms</span><span>1 ms</span><span>10 ms</span><span>100 ms</span><span>1 s</span></div>
+        <div class="jax"><b>Our JAX port</b> of TabPFN: 3.7 ms instead of 30.9 ms (PyTorch, laptop GPU), same answers: 0 of 3,825 decisions differ.</div>
+      </div>
+      <div class="breaks">
+        <video src="media/fly_turnfail.mp4" poster="media/fly_turnfail.jpg" muted loop playsinline preload="metadata"></video>
+        <p class="cap"><b>Where it breaks:</b> a sudden 80° turn. TabPFN is 5 mm off 83 ms later and the fly falls. Sudden turns are lost within 30–80 ms at every context size, up to 1M rows.</p>
+        <ul class="limits">
+          <li style="--c: var(--crane)"><b>Crane:</b> the −35 % is against anti-sway set for the wrong sling. With the right sling typed in, industry anti-sway is as good.</li>
+          <li style="--c: var(--pick)"><b>Pick line:</b> it drops the first unseen heavy bar, then slows every one after. A fixed 40 % chosen in hindsight does slightly better (155.6/min).</li>
+          <li style="--c: var(--drone)"><b>Drone:</b> the alarm is a tie: the IMM catches 100 % of breaches, IMM + TabPFN 97 %.</li>
+          <li style="--c: var(--ink-3)"><b>Everything except the lab crane is simulation.</b></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · takeaway -->
+  <section class="slide end" aria-label="Takeaway">
+    <p class="kicker">04 · Takeaway</p>
+    <h2>A robot's own log <span class="grad">is enough.</span></h2>
+    <div class="takes">
+      <div class="take"><span class="n">01</span><h3>It adapts by adding rows</h3><p>The crane's error drops <b>3×</b> after 5 s of a new load. A 20 % heavier fly: <b>−44 % error</b> after 16 example flights. The pick line slows down after a <b>single drop</b>.</p></div>
+      <div class="take"><span class="n">02</span><h3>It knows when it is unsure</h3><p>Calibration error <b>1.1 %</b> over 2,700 picks, against 4.0 % for boosted trees. Every forecast comes with a range, so decisions can price the risk.</p></div>
+      <div class="take"><span class="n">03</span><h3>Speed is the frontier</h3><p>Our JAX port decides a pick in <b>2.35 ms</b>, inside the 35 ms seal window. The same speed-up is what the drone and the fly need next.</p></div>
+    </div>
+    <div class="band">
+      <div><b>4</b><span>machines: a pick line, a crane, a drone tracker, a fruit fly</span></div>
+      <div><b>1</b><span>pretrained model, TabPFN, the same for all four</span></div>
+      <div><b>0</b><span>training runs or fine-tunes of TabPFN: adapting means adding rows</span></div>
+    </div>
+    <div class="links">
+      <img src="media/qr-repo.svg" alt="QR code linking to the GitHub repository">
+      <div class="t"><b>Code, data, four full reports</b><code>github.com/Jaseelkt007/priorlab_berlin_hack</code></div>
+      <div class="right">TabPFN by Prior Labs<br>HackLab #2 · Berlin · 21–22 Nov 2026</div>
+    </div>
+  </section>
+
+  <div class="chrome" aria-hidden="true"><span>One table. Four machines.</span><span class="bar"><i></i></span><span id="count">1 / 5</span></div>
+</div>
+</div>
+
+<div class="hint">← → to move · F for full screen</div>
+<div class="ctrl">
+  <a href="index.html">Website</a>
+  <button type="button" id="prev" aria-label="Previous slide">←</button>
+  <button type="button" id="next" aria-label="Next slide">→</button>
+  <button type="button" id="full" aria-label="Full screen">⛶</button>
+</div>
+
+<script src="assets/deck.js"></script>
+</body>
+</html>

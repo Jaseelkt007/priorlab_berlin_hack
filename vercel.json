@@ -1,0 +1,6 @@
+{
+  "redirects": [
+    { "source": "/", "destination": "/site/", "permanent": false },
+    { "source": "/pitch", "destination": "/site/deck.html", "permanent": false }
+  ]
+}

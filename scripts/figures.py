@@ -1,8 +1,7 @@
-"""Result figures (PNG) for the README and slides, from the evaluation outputs.
+"""Result figures (PNG) for the README and slides: learning curve, net value vs drop cost, drop-rate heatmap.
 Usage: .venv/bin/python scripts/figures.py [--eval data/eval] [--lc data/eval/learning_curve.csv] [--log a.csv,b.csv]
 """
 import argparse
-import re
 from pathlib import Path
 
 import matplotlib
@@ -22,48 +21,6 @@ plt.rcParams.update({"figure.facecolor": SURF, "axes.facecolor": SURF, "axes.edg
                      "xtick.color": INK2, "ytick.color": INK2, "text.color": INK, "font.size": 10,
                      "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.color": GRID,
                      "grid.linewidth": 0.6, "legend.frameon": False})
-
-
-def family(name: str) -> str:
-    if name.startswith("tabpfn"):
-        return "tabpfn"
-    if name.startswith("fixed"):
-        return "fixed+1" if "margin" in name else "fixed"
-    return name.split("(")[0]
-
-
-def frontier(summary: pd.DataFrame, out: Path, rule: str = "Each line: risk targets 2, 5, 10 %."):
-    sc = [s for s in ["wear", "humid", "new", "batch", "all"] if s in set(summary["scenario"])]
-    titles = {"wear": "Cup wears out (300k → 1.05M cycles)", "humid": "Humid afternoon (RH 40 → 80 %)",
-              "new": "New product, never logged", "batch": "New film batch mid-run", "all": "All streams"}
-    fig, axes = plt.subplots(1, len(sc), figsize=(4.2 * len(sc), 3.9), sharey=False)
-    for ax, s in zip(np.atleast_1d(axes), sc):
-        d = summary[summary["scenario"] == s].copy()
-        d["fam"] = d["policy"].map(family)
-        d["level"] = d["policy"].str.extract(r"(?:target|cost)=([0-9.]+)").astype(float)
-        for fam, (col, lab) in SERIES.items():
-            g = d[d["fam"] == fam].sort_values(["drop_rate", "good_per_min"])
-            if g.empty:
-                continue
-            ax.errorbar(100 * g["drop_rate"], g["good_per_min"],
-                        xerr=[100 * (g["drop_rate"] - g["dr_lo"]), 100 * (g["dr_hi"] - g["drop_rate"])],
-                        yerr=[g["good_per_min"] - g["gpm_lo"], g["gpm_hi"] - g["good_per_min"]],
-                        color=col, lw=2, marker="o", ms=6, elinewidth=0.8, capsize=0, label=lab,
-                        mec=SURF, mew=1.5, zorder=3 if fam == "tabpfn" else 2)
-        o = d[d["fam"] == "oracle"]
-        if len(o):
-            ax.scatter(100 * o["drop_rate"], o["good_per_min"], marker="*", s=140, color=INK, zorder=4,
-                       label="Oracle (knows the outcome)")
-        ax.set_title(titles[s], fontsize=10.5, color=INK, loc="left")
-        ax.set_xlabel("drop rate (%)")
-    np.atleast_1d(axes)[0].set_ylabel("good picks per minute")
-    h, l = np.atleast_1d(axes)[0].get_legend_handles_labels()
-    fig.legend(h, l, loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.01))
-    fig.suptitle(f"Good picks per minute vs drop rate. {rule} Whiskers: 95 % bootstrap CI.", x=0.01, ha="left",
-                 fontsize=11)
-    fig.tight_layout(rect=(0, 0.16, 1, 0.94))
-    fig.savefig(out, dpi=160)
-    plt.close(fig)
 
 
 def learning(lc: pd.DataFrame, out: Path, target: str = "0.05"):
@@ -113,6 +70,36 @@ def heatmap(log: pd.DataFrame, out: Path):
     plt.close(fig)
 
 
+def _net(g, c):
+    h = (~g["dropped"].astype(bool)).to_numpy(float)
+    return 60 * (h - c * (1 - h)).sum() / g["cycle_s"].sum()
+
+
+def value_vs_cost(panels, out: Path):
+    """Net value per minute (held picks minus cost x drops, per minute) against the cost of a drop, all streams pooled.
+    panels: [(title, [(label, colour, dashed, runs DataFrame with a cost column), ...]), ...]."""
+    fig, axes = plt.subplots(1, len(panels), figsize=(6.2 * len(panels), 4.2), sharey=True)
+    for ax, (title, series) in zip(np.atleast_1d(axes), panels):
+        for lab, col, dash, R in series:
+            cs = sorted(R["cost"].dropna().unique())
+            v = [_net(R[R["cost"] == c], c) for c in cs]
+            ax.plot(cs, v, color=col, lw=2.2, ls="--" if dash else "-", marker="o", ms=5, mec=SURF, mew=1.2, label=lab)
+        ax.set_xscale("log")
+        ax.set_xticks([1, 3, 10, 30, 100], ["1", "3", "10", "30", "100"])
+        ax.minorticks_off()
+        ax.set_ylim(0, 170)
+        ax.set_xlabel("cost of one drop (in picks)")
+        ax.set_title(title, loc="left", fontsize=10.5)
+        ax.text(0.99, 0.02, "lines leaving the bottom go below zero", transform=ax.transAxes, ha="right",
+                fontsize=8, color=INK2)
+    np.atleast_1d(axes)[0].set_ylabel("net value per minute\n(good picks − cost × drops)")
+    h, l = np.atleast_1d(axes)[0].get_legend_handles_labels()
+    fig.legend(h, l, loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.01))
+    fig.tight_layout(rect=(0, 0.12, 1, 1))
+    fig.savefig(out, dpi=160)
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--eval", default="data/eval")
@@ -122,15 +109,28 @@ if __name__ == "__main__":
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    s = Path(a.eval) / "summary_main.csv"
-    if s.exists():
-        frontier(pd.read_csv(s), out / "frontier_targets.png")
-    s = Path(a.eval) / "summary_cost.csv"
-    if s.exists():
-        frontier(pd.read_csv(s), out / "frontier.png",
-                 "Each line: one policy as the cost of a drop goes from 1 to 100 picks.")
     if Path(a.lc).exists():
         learning(pd.read_csv(a.lc), out / "learning_curve.png")
+    small, full = Path("data/eval_small"), Path(a.eval)
+    if (small / "runs_cost_safe.csv").exists() and (full / "runs_cost_safe.csv").exists():
+        def fam_runs(R, prefix, extra=None):
+            x = R[R["policy"].str.startswith(prefix)]
+            return x if extra is None else x[x["policy"].str.contains(extra, regex=False)]
+        S, F = pd.read_csv(small / "runs_cost_safe.csv"), pd.read_csv(full / "runs_cost_safe.csv")
+        M = pd.read_csv(small / "runs_margin.csv") if (small / "runs_margin.csv").exists() else None
+        sm = [("TabPFN (log in context)", SERIES["tabpfn"][0], False, fam_runs(S, "tabpfn")),
+              ("Recipe tuned on the log", SERIES["fixed"][0], False, fam_runs(S, "fixed"))]
+        if M is not None:
+            sm += [("Recipe, 1 step slower", SERIES["fixed+1"][0], True, M[M["policy"].str.contains("margin 1")]),
+                   ("Recipe, 2 steps slower", "#6250d6", True, M[M["policy"].str.contains("margin 2")])]
+        sm += [("Logistic regression", SERIES["logistic"][0], False, fam_runs(S, "logistic")),
+               ("Gradient-boosted trees", SERIES["gbdt"][0], False, fam_runs(S, "gbdt"))]
+        fl = [("TabPFN (log in context)", SERIES["tabpfn"][0], False, fam_runs(F, "tabpfn")),
+              ("Recipe tuned on the log", SERIES["fixed"][0], False, fam_runs(F, "fixed")),
+              ("Logistic regression", SERIES["logistic"][0], False, fam_runs(F, "logistic")),
+              ("Gradient-boosted trees", SERIES["gbdt"][0], False, fam_runs(F, "gbdt"))]
+        value_vs_cost([("Small commissioning log: 10 test picks per speed and product (540)", sm),
+                       ("Large commissioning log: 50 per speed and product (2,700)", fl)], out / "value_vs_cost.png")
     logs = [f for f in a.log.split(",") if Path(f).exists()]
     if logs:
         heatmap(pd.concat([pd.read_csv(f) for f in logs]), out / "drop_heatmap.png")

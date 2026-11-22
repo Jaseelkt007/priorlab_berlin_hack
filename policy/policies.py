@@ -84,20 +84,25 @@ class RiskPolicy(Policy):
     Exploration (optional): with probability eps, try one setting above the choice when its predicted risk is below
     explore_max (the line can learn that a setting is safe only by using it).
     frozen: never add the stream's picks (the commissioning log only), to isolate in-context adaptation.
+    safe_step: safe-set expansion (as in SafeOpt, and as engineers ramp up a new product): never more than one setting
+    above the fastest setting this product has already been seen to hold in the log (the slowest setting if none).
+    Probabilities far outside the logged speeds are extrapolations; this bounds what one wrong extrapolation costs.
     budget: maximum log rows; beyond it, evict_log() keeps every drop, the most recent picks and an even thinning of
     older held picks per product × alpha."""
 
     def __init__(self, target: float | None = None, refit_every: int = 5, eps: float = 0.0,
                  explore_max: float | None = None, seed: int = 0, frozen: bool = False, budget: int | None = None,
-                 cost: float | None = None):
+                 cost: float | None = None, safe_step: bool = False):
         self.target, self.cost, self.refit_every, self.eps = target, cost, refit_every, eps
+        self.safe_step = safe_step
         self.explore_max = explore_max if explore_max is not None else (2 * target if target is not None else 0.05)
         self.rng = np.random.default_rng(seed)
         self.frozen, self.budget = frozen, budget
         self.n_since = 0
 
     def rule(self) -> str:
-        return f"cost={self.cost:g}" if self.cost is not None else f"target={self.target:g}"
+        r = f"cost={self.cost:g}" if self.cost is not None else f"target={self.target:g}"
+        return r + (", safe-step" if self.safe_step else "")
 
     # model hooks ---------------------------------------------------------------
     def _fit(self, X: np.ndarray, y: np.ndarray) -> None:
@@ -124,10 +129,17 @@ class RiskPolicy(Policy):
         X = cand[X_COLS].to_numpy(float)
         p = np.full(len(X), self.const) if self.const is not None else self._proba(X)
         al = cand["alpha"].to_numpy(float)
+        allowed = np.ones(len(al), bool)
+        if self.safe_step:
+            prod = cand["product"].iloc[0]
+            held = self.log.loc[(self.log["product"] == prod) & ~self.log["dropped"].astype(bool), "alpha"]
+            top = float(held.max()) if len(held) else float(al.min()) - 0.1
+            allowed = al <= top + 0.1 + 1e-9
         if self.cost is not None:      # best expected value per second; the cycle time is planned before the move
-            i = int(np.argmax(value_rate(p, cand["cycle_s"].to_numpy(float), self.cost)))
+            v = value_rate(p, cand["cycle_s"].to_numpy(float), self.cost)
+            i = int(np.argmax(np.where(allowed, v, -np.inf)))
         else:
-            ok = np.flatnonzero(p <= self.target)
+            ok = np.flatnonzero((p <= self.target) & allowed)
             i = ok[np.argmax(al[ok])] if len(ok) else int(np.argmin(al))  # nothing qualifies: the slowest setting
         explored = False
         if self.eps > 0 and self.rng.uniform() < self.eps:

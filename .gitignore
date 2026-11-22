@@ -8,5 +8,5 @@ third_party/
 .venv-jax/
 jax_tabpfn/golden/
 *.safetensors
-data/
-logs/
+/data/
+/logs/

@@ -508,7 +508,9 @@ def render_clip(job: dict) -> dict:
         poses["prod_size"].append(m.geom_size[m.geom("prod").id].copy())
         poses["items"].append(items)
         # sidecar row
-        gl = scn.camera[0]
+        # the mono render uses the AVERAGE of the scene's stereo pair (camera[0]/[1] are ipd = 68 mm apart);
+        # projecting with camera[0] (the left eye) put x off by up to ~700 px at 4K (showcase/fix_sidecars.py)
+        gl = mujoco.mjv_averageCamera(scn.camera[0], scn.camera[1])
         g = m.geom("prod").id
         cpos = d.site_xpos[m.site("cupc").id]
         ppos, pmat, psz = d.geom_xpos[g], d.geom_xmat[g].reshape(3, 3), m.geom_size[g]

@@ -1,0 +1,88 @@
+{
+ "controller": "TabPFN, 32768 context steps",
+ "context_steps": 32768,
+ "segments": [
+  {
+   "path": "tour",
+   "flew_ms": 876.8,
+   "planned_ms": 4000.0,
+   "ended": "more than 5 mm off",
+   "drift_mean_mm": 0.282,
+   "drift_max_mm": 5.017,
+   "drift_at_mm": {
+    "20ms": 0.165,
+    "50ms": 0.176,
+    "100ms": 0.147,
+    "200ms": 0.105,
+    "500ms": 0.125
+   },
+   "ms_per_step": 153.6
+  },
+  {
+   "path": "S-curve",
+   "flew_ms": 2000.8,
+   "planned_ms": 2000.0,
+   "ended": "path end",
+   "drift_mean_mm": 0.099,
+   "drift_max_mm": 0.231,
+   "drift_at_mm": {
+    "20ms": 0.133,
+    "50ms": 0.149,
+    "100ms": 0.126,
+    "200ms": 0.114,
+    "500ms": 0.129,
+    "1000ms": 0.096
+   },
+   "ms_per_step": 136.9
+  },
+  {
+   "path": "tight curve",
+   "flew_ms": 1000.8,
+   "planned_ms": 1000.0,
+   "ended": "path end",
+   "drift_mean_mm": 0.162,
+   "drift_max_mm": 0.246,
+   "drift_at_mm": {
+    "20ms": 0.118,
+    "50ms": 0.219,
+    "100ms": 0.149,
+    "200ms": 0.151,
+    "500ms": 0.167,
+    "1000ms": 0.169
+   },
+   "ms_per_step": 160.9
+  },
+  {
+   "path": "sudden turn, then smooth",
+   "flew_ms": 222.0,
+   "planned_ms": 1500.0,
+   "ended": "more than 5 mm off",
+   "drift_mean_mm": 0.826,
+   "drift_max_mm": 5.031,
+   "drift_at_mm": {
+    "20ms": 0.095,
+    "50ms": 0.147,
+    "100ms": 0.119,
+    "200ms": 2.279
+   },
+   "ms_per_step": 95.8
+  },
+  {
+   "path": "smooth, then sudden turn",
+   "flew_ms": 682.8,
+   "planned_ms": 1500.0,
+   "ended": "more than 5 mm off",
+   "drift_mean_mm": 0.346,
+   "drift_max_mm": 5.013,
+   "drift_at_mm": {
+    "20ms": 0.133,
+    "50ms": 0.149,
+    "100ms": 0.126,
+    "200ms": 0.114,
+    "500ms": 0.128
+   },
+   "ms_per_step": 85.1
+  }
+ ],
+ "wall_s": 3260
+}

@@ -1,64 +1,76 @@
 <title>TabPFN Fruit Fly</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
-/* Layout: white report, 1040px column; each section = short heading + one diagram or chart + a one-line caption. Single light theme by design. */
+/* Layout: white technical report; a sticky contents bar, then numbered chapters. Each chapter: "In simple words" box, then the technical detail as diagrams, charts and tables. Single light theme by design. */
 :root {
   color-scheme: light;
-  --bg: #ffffff;
-  --panel: #f7f8fa;
-  --ink: #0f172a;
-  --ink-2: #475569;
-  --ink-3: #94a3b8;
-  --line: #e2e8f0;
-  --line-2: #cbd5e1;
-  --tab: #2563eb;      /* TabPFN */
-  --tab-soft: #dbe7fd;
-  --pol: #0f766e;      /* the trained policy */
-  --pol-soft: #d5efec;
-  --alt: #ea580c;      /* comparison baseline (trees) */
-  --bad: #dc2626; --bad-soft: #fde4e4;
-  --good: #15803d; --good-soft: #dcf3e3;
-  --warn: #b45309; --warn-soft: #fbeed5;
+  --bg: #ffffff; --panel: #f7f8fa; --ink: #0f172a; --ink-2: #475569; --ink-3: #94a3b8; --line: #e2e8f0; --line-2: #cbd5e1;
+  --pol: #0f766e; --pol-soft: #d5efec;   /* RL policy */
+  --tab: #2563eb; --tab-soft: #dbe7fd;   /* TabPFN */
+  --sim: #7c3aed; --sim-soft: #ece4fd;   /* physics */
+  --alt: #ea580c; --alt-soft: #fde8d9;   /* baselines / target column */
+  --good: #15803d; --good-soft: #dcf3e3; --bad: #dc2626; --bad-soft: #fde4e4; --warn: #b45309; --warn-soft: #fbeed5;
   --f-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
 }
-body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--f-sans); }
-.wrap { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 44px 64px; display: grid; gap: 60px; }
-h1, h2 { margin: 0; text-wrap: balance; letter-spacing: -0.015em; }
-h1 { font-size: clamp(1.9rem, 4.4vw, 2.7rem); font-weight: 700; line-height: 1.1; }
-h2 { font-size: 1.35rem; font-weight: 650; line-height: 1.2; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--f-sans); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 72px; display: grid; gap: 72px; }
+nav.toc { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: rgba(255,255,255,.96); border-bottom: 1px solid var(--line); }
+nav.toc .in { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 10px; display: flex; gap: 6px 18px; overflow-x: auto; white-space: nowrap; font: 500 12.5px var(--f-mono); }
+nav.toc a { color: var(--ink-2); text-decoration: none; }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--tab); }
+a:focus-visible { outline: 2px solid var(--tab); outline-offset: 2px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; letter-spacing: -0.015em; }
+h1 { font-size: clamp(2rem, 4.6vw, 2.9rem); font-weight: 700; line-height: 1.08; }
+h2 { font-size: 1.6rem; font-weight: 700; line-height: 1.2; }
+h3 { font-size: 1.08rem; font-weight: 650; line-height: 1.3; }
 p { margin: 0; }
 .kicker { font: 500 12px/1.2 var(--f-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
-.sec { display: grid; gap: 18px; }
-.sec > header { display: grid; gap: 6px; max-width: 72ch; }
-.sub { color: var(--ink-2); max-width: 72ch; }
-.mono { font-family: var(--f-mono); }
+.chap { display: grid; gap: 22px; scroll-margin-top: 56px; }
+.chap > header { display: grid; gap: 8px; }
+.chap > header .num { font: 600 13px var(--f-mono); color: var(--tab); }
+.sub { display: grid; gap: 12px; }
+.text { max-width: 76ch; color: var(--ink-2); }
+.text b { color: var(--ink); }
+.simple { background: var(--panel); border-radius: 12px; padding: 16px 18px; display: grid; gap: 6px; max-width: 86ch; }
+.simple .kicker { color: var(--tab); }
+.simple p { color: var(--ink); font-size: 15.5px; }
 
-.hero { display: grid; gap: 16px; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
-.hero .sub { font-size: 1.05rem; }
+.hero { display: grid; gap: 20px; padding-top: 44px; }
+.hero .lede { font-size: 1.1rem; color: var(--ink-2); max-width: 74ch; }
 .meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 13px; color: var(--ink-2); }
 .meta b { color: var(--ink); font-weight: 600; }
-.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.stat { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 4px; min-width: 0; }
-.stat .v { font: 600 1.7rem/1.1 var(--f-sans); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
-.stat .l { font-size: 13px; color: var(--ink-2); }
-.stat .tag { font: 500 11px/1 var(--f-mono); text-transform: uppercase; letter-spacing: .06em; }
-.tag.good { color: var(--good); } .tag.bad { color: var(--bad); } .tag.info { color: var(--tab); }
-@media (max-width: 820px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tile { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; min-width: 0; }
+.tile .t { font: 500 11px/1.2 var(--f-mono); text-transform: uppercase; letter-spacing: .06em; }
+.tile .v { font: 650 1.75rem/1.1 var(--f-sans); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.tile .l { font-size: 13px; color: var(--ink-2); }
+.t.good { color: var(--good); } .t.bad { color: var(--bad); } .t.info { color: var(--tab); } .t.warn { color: var(--warn); }
+@media (max-width: 860px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
-figure { margin: 0; display: grid; gap: 10px; min-width: 0; }
-figure.panel { border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
-figcaption { font-size: 13px; color: var(--ink-2); max-width: 80ch; }
-figcaption b { color: var(--ink); font-weight: 600; }
+.gallery { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.shot { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.shot img { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); display: block; aspect-ratio: 4 / 3; object-fit: cover; }
+.shot figcaption { font-size: 12.5px; color: var(--ink-2); }
+.shot figcaption b { color: var(--ink); }
+@media (max-width: 860px) { .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+figure.panel { margin: 0; border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 10px; min-width: 0; }
+figure.panel > figcaption { font-size: 13px; color: var(--ink-2); max-width: 86ch; }
+figure.panel > figcaption b { color: var(--ink); }
+.ftitle { font-weight: 600; font-size: 14px; }
 .scroll { overflow-x: auto; }
 svg { display: block; max-width: 100%; height: auto; }
 svg text { font-family: var(--f-sans); fill: var(--ink); }
 svg .m { font-family: var(--f-mono); }
 svg .t2 { fill: var(--ink-2); } svg .t3 { fill: var(--ink-3); }
-.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-@media (max-width: 820px) { .grid2 { grid-template-columns: 1fr; } }
+.g2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.g3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 860px) { .g2, .g3 { grid-template-columns: 1fr; } }
+
 .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--ink-2); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
@@ -68,525 +80,620 @@ svg .t2 { fill: var(--ink-2); } svg .t3 { fill: var(--ink-3); }
 .chart .gl { stroke: var(--line); }
 .tip { position: absolute; pointer-events: none; background: var(--ink); color: #fff; font: 12px/1.4 var(--f-mono); padding: 6px 8px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); z-index: 2; }
 
-.passes { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
-.pass { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 4px; min-width: 0; font-size: 13px; }
-.pass .n { font: 600 13px var(--f-mono); }
-.pass .d { color: var(--ink-2); }
-.pass .s { font: 500 11px/1 var(--f-mono); text-transform: uppercase; letter-spacing: .05em; }
-.pass.new { border-color: var(--tab); background: var(--tab-soft); }
-@media (max-width: 820px) { .passes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 460px) { .passes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.tw { border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 500 11px/1.3 var(--f-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); background: var(--panel); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--f-mono); font-size: 13px; white-space: nowrap; }
+td.k { font-weight: 600; white-space: nowrap; }
+.ok { color: var(--good); font-weight: 600; } .no { color: var(--bad); font-weight: 600; } .mid { color: var(--warn); font-weight: 600; }
 
-.next { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.card { border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 6px; align-content: start; min-width: 0; font-size: 13.5px; color: var(--ink-2); }
-.card b { color: var(--ink); font-size: 14px; }
-@media (max-width: 820px) { .next { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 460px) { .next { grid-template-columns: 1fr; } }
-.specs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.spec { padding: 12px 16px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); display: grid; gap: 2px; min-width: 0; }
-.spec .k { font: 500 11px/1.3 var(--f-mono); text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); }
-.spec .v { font: 600 15px/1.3 var(--f-sans); font-variant-numeric: tabular-nums; }
-.spec .n { font-size: 12.5px; color: var(--ink-2); }
-.specgroup { font: 600 12px/1 var(--f-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--tab); padding: 12px 16px 8px; grid-column: 1 / -1; background: var(--panel); border-bottom: 1px solid var(--line); }
-@media (max-width: 820px) { .specs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 460px) { .specs { grid-template-columns: 1fr; } }
-.tw { border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
-.tw table { margin: 0; }
-.matrix th, .matrix td { padding: 10px 12px; vertical-align: top; font-size: 13px; color: var(--ink-2); }
-.matrix td:first-child { font: 600 13px var(--f-mono); color: var(--tab); white-space: nowrap; }
-.matrix td.q { font-weight: 600; color: var(--ink); min-width: 170px; }
-.cons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.con { border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 6px; align-content: start; min-width: 0; font-size: 13px; color: var(--ink-2); }
-.con .h { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
-.con b { color: var(--ink); font-size: 14px; }
-.con .x { font: 600 13px var(--f-mono); color: var(--bad); white-space: nowrap; }
-.con .how { color: var(--ink); border-top: 1px dashed var(--line-2); padding-top: 6px; }
-@media (max-width: 820px) { .cons { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 460px) { .cons { grid-template-columns: 1fr; } }
-.goal { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
-@media (max-width: 820px) { .goal { grid-template-columns: 1fr; } }
-.goal ul { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; color: var(--ink-2); font-size: 14px; }
-.goal ul b { color: var(--ink); }
-details { font-size: 13px; color: var(--ink-2); }
-summary { cursor: pointer; font: 500 12px var(--f-mono); color: var(--ink-3); }
-summary:focus-visible { outline: 2px solid var(--tab); outline-offset: 2px; }
-table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; margin-top: 10px; }
-th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); }
-th { font: 500 11px var(--f-mono); text-transform: uppercase; color: var(--ink-3); }
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.card { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; min-width: 0; font-size: 13.5px; color: var(--ink-2); }
+.card .h { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.card b { color: var(--ink); font-size: 14.5px; }
+.card .x { font: 600 12.5px var(--f-mono); white-space: nowrap; }
+.card .fix { color: var(--ink); border-top: 1px dashed var(--line-2); padding-top: 6px; }
+@media (max-width: 860px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .cards { grid-template-columns: 1fr; } }
+.pill { display: inline-block; font: 600 11px/1 var(--f-mono); letter-spacing: .04em; padding: 4px 8px; border-radius: 999px; white-space: nowrap; }
+.pill.hi { background: var(--good-soft); color: var(--good); } .pill.md { background: var(--warn-soft); color: var(--warn); } .pill.lo { background: var(--panel); color: var(--ink-2); }
+dl.gloss { display: grid; grid-template-columns: 180px 1fr; gap: 8px 18px; margin: 0; font-size: 14px; }
+dl.gloss dt { font-weight: 600; } dl.gloss dd { margin: 0; color: var(--ink-2); }
+@media (max-width: 560px) { dl.gloss { grid-template-columns: 1fr; } dl.gloss dd { margin-bottom: 8px; } }
 footer { color: var(--ink-3); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 14px; }
 </style>
 
+<nav class="toc" aria-label="Contents"><div class="in">
+  <a href="#summary">Summary</a><a href="#priorlabs">Prior Labs &amp; TabPFN</a><a href="#fly">The fruit fly</a><a href="#build">Our implementation</a><a href="#results">Results</a><a href="#limits">Limitations</a><a href="#next">Improvements</a><a href="#glossary">Glossary</a>
+</div></nav>
+
 <div class="wrap">
 
-<header class="hero">
-  <div class="kicker">HackLab #2 Berlin · Prior Labs track · TabPFN for spatial awareness</div>
+<!-- ============ SUMMARY ============ -->
+<section class="chap hero" id="summary">
+  <div class="kicker">HackLab #2 Berlin · Prior Labs track "TabPFN for spatial awareness" · 21–22 Nov 2026</div>
   <h1>Can a table fly a fruit fly?</h1>
-  <p class="sub">TabPFN learns from a table of simulated fly flight, with no training. It predicts where the fly goes better than trained models. Flying the fly itself breaks down, and we have traced it to the wing actions.</p>
-  <div class="meta"><span>Status <b>Sat 21 Nov, 23:05 CET</b></span><span>Deadline <b>Sun 22 Nov, 16:30</b></span><span>Branch <b class="mono">flybody_Priorlabs</b></span></div>
-  <div class="stats">
-    <div class="stat"><span class="tag good">Predict · exp A</span><span class="v">2.1×</span><span class="l">lower error than trees, 1 wingbeat ahead</span></div>
-    <div class="stat"><span class="tag good">Adapt · exp B</span><span class="v">−42%</span><span class="l">heavy-fly error after adding 16 example flights</span></div>
-    <div class="stat"><span class="tag bad">Control · exp D–F</span><span class="v">~60 ms</span><span class="l">before TabPFN's fly falls (policy: full 1 s)</span></div>
-    <div class="stat"><span class="tag info">Diagnosis · exp G</span><span class="v">1.0 s</span><span class="l">full flight when the policy flies only the wings, 0.12 mm off</span></div>
+  <p class="lede">We recorded a trained AI flying a simulated fruit fly, turned every 0.2 ms of flight into a row of a table, and asked TabPFN, a model that learns from examples it is shown rather than from training, to predict where the fly goes and to fly it.</p>
+  <div class="meta"><span>Status <b>Sun 22 Nov, 00:45 CET</b></span><span>Deadline <b>Sun 16:30</b></span><span>Repo <b class="mono">Jaseelkt007/priorlab_berlin_hack</b> · branch <b>flybody_Priorlabs</b></span></div>
+  <div class="tiles">
+    <div class="tile"><span class="t good">Predicting position</span><span class="v">2.2×</span><span class="l">lower error than gradient-boosted trees, one wingbeat ahead</span></div>
+    <div class="tile"><span class="t good">Adapting to a new body</span><span class="v">−44%</span><span class="l">error on a 20% heavier fly after adding 16 example flights</span></div>
+    <div class="tile"><span class="t info">Flying, big context</span><span class="v">0.10 mm</span><span class="l">S-curve flown by TabPFN alone with 393k–1M rows, as precise as the policy</span></div>
+    <div class="tile"><span class="t bad">Still fails</span><span class="v">80° turns</span><span class="l">loses the path within ~30 ms of a sudden turn</span></div>
   </div>
-</header>
-
-<!-- 0. Project -->
-<section class="sec">
-  <header><div class="kicker">Project</div><h2>The question and what we hand in</h2></header>
-  <div class="goal">
-    <figure class="panel">
-      <ul>
-        <li><b>Track:</b> Prior Labs, "TabPFN for spatial awareness": use in-context learning to predict where things are, where they go and what happens next.</li>
-        <li><b>Our angle:</b> a simulated fruit fly, a fast and unstable flyer. Every 0.2 ms sensor tick is a table row; past flight is the context.</li>
-        <li><b>Inspired by</b> DuckPFN, which walked a robot duck with TabPFN at 50 Hz from 57k context rows.</li>
-        <li><b>The tests that matter:</b> held-out flights, a changed body, and paths no fly ever flew.</li>
-      </ul>
-    </figure>
-    <figure class="panel">
-      <ul>
-        <li><b>Deliverables:</b> a 3-minute video with a person on camera, slides for a 5-minute pitch, a public GitHub repo with docs.</li>
-        <li><b>Deadline:</b> Sun 22 Nov 2026, 16:30 CET. Live pitches at 18:00.</li>
-        <li><b>Prize:</b> €750. No published rubric; we aim for a working demo, real use of in-context learning, and a spatial story that reads fast.</li>
-      </ul>
-    </figure>
+  <div class="gallery">
+    <figure class="shot"><img src="img/policy_tour.jpg" alt="The trained policy flying the fly along the dotted path" width="640" height="480"><figcaption><b>The teacher.</b> Trained RL policy on the 4 s tour, 0.09 mm off.</figcaption></figure>
+    <figure class="shot"><img src="img/tabpfn_scurve.jpg" alt="TabPFN flying the S-curve" width="640" height="480"><figcaption><b>TabPFN, S-curve.</b> All 12 actions from a table; full 2 s.</figcaption></figure>
+    <figure class="shot"><img src="img/tabpfn_tight.jpg" alt="TabPFN flying the tight curve" width="640" height="480"><figcaption><b>TabPFN, tight curve.</b> 360°/s turn for the full 1 s.</figcaption></figure>
+    <figure class="shot"><img src="img/tabpfn_turn_fail.jpg" alt="TabPFN at a sudden turn just before losing the path" width="640" height="480"><figcaption><b>Where it breaks.</b> At a sudden 80° turn; 40 ms later it is 5 mm off.</figcaption></figure>
   </div>
+  <div class="simple"><span class="kicker">The whole project in four sentences</span>
+    <p>An expert pilot (a neural network trained by reinforcement learning) flies a virtual fruit fly, and we write down everything it senses and does. We give a sample of those notes to TabPFN as examples. TabPFN then reads the fly's live senses and, by analogy with the examples, says what to do next, 5,000 times per simulated second. It predicts the fly's future position better than trained models, and with enough examples it flies smooth curves on its own, but sudden sharp turns still beat it.</p></div>
 </section>
 
-<!-- 1. The loop -->
-<section class="sec">
-  <header><div class="kicker">How it works</div><h2>One simulator, two controllers, one table</h2></header>
-  <figure class="panel">
-    <div class="scroll">
-    <svg viewBox="0 0 980 300" role="img" aria-label="The trained policy flies the fly in MuJoCo and every control step is logged as a table row; TabPFN reads those rows as context and can replace the policy in the loop.">
-      <defs>
-        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker>
-        <marker id="ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker>
-        <marker id="aht" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#0f766e"/></marker>
-      </defs>
-      <!-- policy -->
-      <rect x="20" y="40" width="200" height="86" rx="10" fill="#d5efec" stroke="#0f766e"/>
-      <text x="120" y="72" text-anchor="middle" font-weight="600">Trained policy</text>
-      <text x="120" y="92" text-anchor="middle" class="t2" font-size="12">flybody, Nature 2025</text>
-      <text x="120" y="110" text-anchor="middle" class="m t2" font-size="11">104 inputs → 12 actions</text>
-      <!-- sim -->
-      <rect x="390" y="40" width="200" height="86" rx="10" fill="#f7f8fa" stroke="#94a3b8"/>
-      <text x="490" y="72" text-anchor="middle" font-weight="600">MuJoCo fly</text>
-      <text x="490" y="92" text-anchor="middle" class="t2" font-size="12">follows a ghost path</text>
-      <text x="490" y="110" text-anchor="middle" class="m t2" font-size="11">step = 0.2 ms (5 kHz)</text>
-      <!-- table -->
-      <rect x="760" y="40" width="200" height="86" rx="10" fill="#fff" stroke="#94a3b8"/>
-      <text x="860" y="64" text-anchor="middle" font-weight="600">Flight table</text>
-      <g fill="#e2e8f0"><rect x="784" y="76" width="152" height="8" rx="2"/><rect x="784" y="88" width="152" height="8" rx="2"/><rect x="784" y="100" width="152" height="8" rx="2"/></g>
-      <text x="860" y="122" text-anchor="middle" class="m t2" font-size="11">1.5M rows, 6 passes</text>
-      <!-- arrows top -->
-      <line x1="222" y1="70" x2="386" y2="70" stroke="#0f766e" stroke-width="2" marker-end="url(#aht)"/>
-      <text x="304" y="60" text-anchor="middle" font-size="12" fill="#0f766e">12 actions</text>
-      <line x1="388" y1="100" x2="224" y2="100" stroke="#475569" stroke-width="1.5" marker-end="url(#ah)"/>
-      <text x="304" y="118" text-anchor="middle" font-size="12" class="t2">104 sensors</text>
-      <line x1="592" y1="83" x2="756" y2="83" stroke="#475569" stroke-width="1.5" marker-end="url(#ah)"/>
-      <text x="674" y="73" text-anchor="middle" font-size="12" class="t2">log every step</text>
-      <!-- tabpfn -->
-      <rect x="390" y="196" width="200" height="86" rx="10" fill="#dbe7fd" stroke="#2563eb"/>
-      <text x="490" y="228" text-anchor="middle" font-weight="600">TabPFN 3.5</text>
-      <text x="490" y="248" text-anchor="middle" class="t2" font-size="12">in-context, no training</text>
-      <text x="490" y="266" text-anchor="middle" class="m t2" font-size="11">fit once, cached</text>
-      <path d="M860,128 V239 H594" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#ahb)"/>
-      <text x="868" y="190" font-size="12" fill="#2563eb">rows as context</text>
-      <path d="M388,239 H120 V130" fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#ahb)"/>
-      <text x="128" y="190" font-size="12" fill="#2563eb">closed loop: replaces the policy</text>
-      <line x1="490" y1="194" x2="490" y2="130" stroke="#2563eb" stroke-width="2" marker-end="url(#ahb)"/>
-      <text x="498" y="166" font-size="12" fill="#2563eb">predicts position (A, B) or actions (C–G)</text>
-    </svg>
-    </div>
-    <figcaption><b>Offline</b>, TabPFN predicts from the table. <b>Closed loop</b> (dashed), its 12 actions go back into the simulator in place of the policy's, every 0.2 ms.</figcaption>
-  </figure>
+<!-- ============ PRIOR LABS & TABPFN ============ -->
+<section class="chap" id="priorlabs">
+  <header><span class="num">01</span><h2>Prior Labs and TabPFN</h2></header>
+  <div class="simple"><span class="kicker">In simple words</span>
+    <p>Most AI models must be trained on your data before they can predict anything. TabPFN is different: it was trained once, on millions of made-up tables, to become very good at one skill: look at a table of examples, then fill in the missing answers for new rows. You hand it your table and it answers straight away. Prior Labs is the company that builds it.</p></div>
 
-  <figure class="panel">
-    <div class="scroll">
-    <svg viewBox="0 0 980 190" role="img" aria-label="Each recorded control step becomes 12 table rows, one per action: the 104 sensor values, an action ID, and that action's value as the target.">
-      <text x="20" y="22" class="m t3" font-size="11">ONE CONTROL STEP</text>
-      <rect x="20" y="34" width="250" height="34" rx="6" fill="#f7f8fa" stroke="#cbd5e1"/>
-      <text x="145" y="56" text-anchor="middle" font-size="13">104 sensors  +  12 actions</text>
-      <path d="M272,51 C320,51 320,100 360,100" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ah)"/>
-      <text x="380" y="22" class="m t3" font-size="11">BECOMES 12 CONTEXT ROWS</text>
-      <g font-size="12">
-        <rect x="380" y="34" width="380" height="22" fill="#f7f8fa"/><rect x="760" y="34" width="70" height="22" fill="#eef2f7"/><rect x="830" y="34" width="130" height="22" fill="#dbe7fd"/>
-        <text x="570" y="49" text-anchor="middle" class="m t2" font-size="11">obs₁ … obs₁₀₄</text><text x="795" y="49" text-anchor="middle" class="m t2" font-size="11">action ID</text><text x="895" y="49" text-anchor="middle" class="m" font-size="11" fill="#2563eb">target y</text>
-        <g class="m" font-size="11">
-          <rect x="380" y="60" width="580" height="22" fill="#fff" stroke="#e2e8f0"/><text x="570" y="75" text-anchor="middle" class="t2">same 104 values</text><text x="795" y="75" text-anchor="middle">0</text><text x="895" y="75" text-anchor="middle">head_abduct</text>
-          <rect x="380" y="84" width="580" height="22" fill="#fff" stroke="#e2e8f0"/><text x="570" y="99" text-anchor="middle" class="t2">same 104 values</text><text x="795" y="99" text-anchor="middle">1</text><text x="895" y="99" text-anchor="middle">head_twist</text>
-          <text x="570" y="124" text-anchor="middle" class="t3">⋮</text><text x="795" y="124" text-anchor="middle" class="t3">⋮</text>
-          <rect x="380" y="132" width="580" height="22" fill="#fff" stroke="#e2e8f0"/><text x="570" y="147" text-anchor="middle" class="t2">same 104 values</text><text x="795" y="147" text-anchor="middle">11</text><text x="895" y="147" text-anchor="middle">beat_freq</text>
-        </g>
-      </g>
-      <text x="20" y="100" font-size="12" class="t2">256 steps → 3,072 rows (GTX 1050)</text>
-      <text x="20" y="120" font-size="12" class="t2">512 steps → 6,144 rows (4 GB GPU)</text>
-      <text x="20" y="140" font-size="12" fill="#2563eb">H100 80 GB → 400k+ rows (next)</text>
-      <text x="380" y="178" font-size="12" class="t2">One query per decision: the live 104 sensors × 12 action IDs → 12 predicted actions.</text>
-    </svg>
-    </div>
-  </figure>
-</section>
-
-<!-- 1b. Methodology -->
-<section class="sec">
-  <header><div class="kicker">Methodology</div><h2>Seven experiments, from prediction to full control</h2>
-    <p class="sub">Every experiment holds out the same 27 flight pairs (a flight and its mirror image stay on the same side), about 20% of each flight type, so nothing from a test flight reaches the context.</p></header>
-  <div class="tw">
-    <table class="matrix">
-      <thead><tr><th>Exp</th><th>Question</th><th>Context</th><th>Target</th><th>Compared with</th><th>Status</th></tr></thead>
-      <tbody>
-        <tr><td>A</td><td class="q">Where will the fly be in 1, 3, 10 wingbeats?</td><td>~8k wingbeat rows, 85 inputs: sensors, actions, wing phase, last beat's motion</td><td>forward, sideways, up (mm) and turn (°), 10/50/90% quantiles</td><td>gradient-boosted trees, constant velocity, last beat</td><td><span class="tag info">rerunning</span></td></tr>
-        <tr><td>B</td><td class="q">Can it adapt to a weak wing or a heavier body?</td><td>clean flights + 0, 4, 16 or all changed-fly flights</td><td>as A, 1 wingbeat ahead</td><td>trees, retrained per context</td><td><span class="tag info">after pass 5</span></td></tr>
-        <tr><td>C</td><td class="q">Can it copy the policy offline?</td><td>100 to 8,000 steps × 12 actions</td><td>the policy's 12 actions (R²)</td><td>trees, 2-layer MLP</td><td><span class="tag info">rerunning</span></td></tr>
-        <tr><td>D</td><td class="q">Can it fly recorded held-out flights?</td><td>256–512 random recorded steps</td><td>12 actions, closed loop</td><td>the policy on the same flights</td><td><span class="tag bad">falls</span></td></tr>
-        <tr><td>E</td><td class="q">Do sudden turns break it?</td><td>as D</td><td>12 actions on synthetic 1 s paths</td><td>smooth, saccade, curve paths</td><td><span class="tag bad">fails on every shape</span></td></tr>
-        <tr><td>F</td><td class="q">Does adding its own mistakes help (DAgger)?</td><td>half recorded, half its own states labelled by the policy</td><td>12 actions, 4 rounds</td><td>round 0</td><td><span class="tag bad">no lasting gain</span></td></tr>
-        <tr><td>G</td><td class="q">Which actions break the flight?</td><td>256 clean steps</td><td>some action groups; the policy flies the rest</td><td>TabPFN on all 12</td><td><span class="tag good">wings found</span></td></tr>
-      </tbody>
-    </table>
-  </div>
-</section>
-
-<!-- 2. Offline -->
-<section class="sec">
-  <header><div class="kicker">Prediction · offline</div><h2>Where will the fly be? TabPFN is more accurate and better calibrated</h2></header>
-  <div class="grid2">
+  <div class="sub">
+    <h3>How TabPFN differs from a normal model</h3>
     <figure class="panel">
-      <div class="legend"><span><i style="background:var(--tab)"></i>TabPFN</span><span><i style="background:var(--alt)"></i>Gradient-boosted trees</span></div>
-      <div class="chart" id="chA"></div>
-      <figcaption><b>Error vs a constant-velocity guess</b> (lower is better), 27 held-out flight pairs.</figcaption>
-    </figure>
-    <figure class="panel">
-      <div class="legend"><span><i style="background:var(--tab)"></i>TabPFN</span><span><i style="background:var(--alt)"></i>Gradient-boosted trees</span><span><i style="background:var(--ink-3);height:2px"></i>target 80%</span></div>
-      <div class="chart" id="chCov"></div>
-      <figcaption><b>How often the 80% range holds the truth.</b> TabPFN stays near 80%; trees are overconfident.</figcaption>
-    </figure>
-  </div>
-  <figure class="panel">
-    <div class="legend"><span><i style="background:var(--tab)"></i>TabPFN, rows added to context</span><span><i style="background:var(--alt)"></i>Trees, retrained each time</span></div>
-    <div class="chart" id="chB"></div>
-    <figcaption><b>A 20% heavier fly.</b> Forward-movement error (mm) as heavy-fly flights join a clean-fly context. Change the rows, change the behaviour.</figcaption>
-  </figure>
-</section>
-
-<!-- 3. Closed loop -->
-<section class="sec">
-  <header><div class="kicker">Control · closed loop</div><h2>Flying the fly: TabPFN steers the full second once the policy flies the wings</h2></header>
-  <figure class="panel">
-    <div class="legend"><span><i style="background:var(--line-2)"></i>First data (wrong wing labels)</span><span><i style="background:var(--tab)"></i>Corrected data</span><span><i style="background:var(--pol)"></i>Policy flies the wings</span></div>
-    <div class="chart" id="chSurv"></div>
-    <figcaption><b>Flight time before falling</b> on synthetic 1 s paths (axis cut at 320 ms). The trained policy alone flies every path for the full 1,000 ms within 0.12 mm; the hybrid matches it.</figcaption>
-  </figure>
-
-  <figure class="panel">
-    <div class="scroll">
-    <svg viewBox="0 0 980 260" role="img" aria-label="Split test: each row hands some action groups to the policy. Only handing over the wings keeps the fly up.">
-      <text x="20" y="24" class="m t3" font-size="11">WHO CONTROLS EACH ACTION GROUP</text>
-      <g font-size="12" font-weight="600" text-anchor="middle">
-        <text x="330" y="24">Head (3)</text><text x="450" y="24">Wings (6)</text><text x="570" y="24">Abdomen (2)</text><text x="690" y="24">Beat freq (1)</text>
-      </g>
-      <text x="850" y="24" text-anchor="middle" font-size="12" font-weight="600">Result</text>
-      <g id="splitRows"></g>
-    </svg>
-    </div>
-    <figcaption>Blue cells are TabPFN, green cells are the policy. Handing over head or beat frequency helps a little; <b>handing over the wings flies the full second</b>, as accurately as the policy alone.</figcaption>
-  </figure>
-
-  <div class="grid2">
-    <figure class="panel">
-      <div class="legend"><span><i style="background:var(--tab)"></i>Ahead</span><span><i style="background:var(--alt)"></i>Left</span><span><i style="background:var(--pol)"></i>Up</span><span><i style="background:var(--ink-3)"></i>Policy</span></div>
-      <div class="chart" id="chDrift"></div>
-      <figcaption><b>Fly minus ghost (mm)</b>, TabPFN in full control. It runs ahead first, then drifts right and sinks.</figcaption>
-    </figure>
-    <figure class="panel">
-      <svg viewBox="0 0 460 290" role="img" aria-label="Distance from the ghost covered by the context: clean data stays within 1.7 mm, the new strong-noise pass reaches 11 mm, TabPFN's flight reaches 7 mm.">
-        <text x="20" y="24" class="m t3" font-size="11">DISTANCE FROM GHOST (mm)</text>
-        <g class="m t3" font-size="10" text-anchor="middle">
-          <text x="40" y="270">0</text><text x="120" y="270">2</text><text x="200" y="270">4</text><text x="280" y="270">6</text><text x="360" y="270">8</text><text x="440" y="270">10</text>
-        </g>
-        <g stroke="#e2e8f0"><line x1="40" x2="40" y1="40" y2="256"/><line x1="120" x2="120" y1="40" y2="256"/><line x1="200" x2="200" y1="40" y2="256"/><line x1="280" x2="280" y1="40" y2="256"/><line x1="360" x2="360" y1="40" y2="256"/><line x1="440" x2="440" y1="40" y2="256"/></g>
-        <!-- 4 mm per 160 px -> 40 px per mm -->
-        <text x="40" y="54" font-size="12">Clean + noisy passes 1–3</text>
-        <rect x="40" y="62" width="68" height="16" rx="3" fill="#94a3b8"/><rect x="108" y="66" width="200" height="8" rx="2" fill="#e2e8f0"/>
-        <text x="314" y="75" font-size="11" class="t2">99% ≤ 1.7, max 7.7</text>
-        <text x="40" y="112" font-size="12">Strong-noise pass 6 (new)</text>
-        <rect x="40" y="120" width="98" height="16" rx="3" fill="#2563eb"/><rect x="138" y="124" width="302" height="8" rx="2" fill="#dbe7fd"/>
-        <text x="40" y="152" font-size="11" class="t2">95% ≤ 2.5, max 11</text>
-        <text x="40" y="186" font-size="12">TabPFN's own flight</text>
-        <rect x="40" y="194" width="68" height="16" rx="3" fill="#fde4e4"/><rect x="108" y="194" width="186" height="16" rx="3" fill="#dc2626"/>
-        <text x="40" y="228" font-size="11" class="t2">half its steps beyond 1.7, up to 7.4</text>
-        <line x1="108" x2="108" y1="40" y2="256" stroke="#475569" stroke-dasharray="3 3"/>
-        <text x="112" y="250" font-size="10" class="m t2">1.7 mm</text>
+      <div class="scroll">
+      <svg viewBox="0 0 1000 250" role="img" aria-label="A normal model is trained on your data with gradient steps before it predicts; TabPFN reads your data as context and predicts in one forward pass.">
+        <defs>
+          <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker>
+          <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker>
+          <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#0f766e"/></marker>
+          <marker id="av" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#7c3aed"/></marker>
+          <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#ea580c"/></marker>
+        </defs>
+        <text x="20" y="28" class="m t3" font-size="11">USUAL MODEL (TREES, NEURAL NETWORK)</text>
+        <rect x="20" y="40" width="160" height="56" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="100" y="73" text-anchor="middle">your table</text>
+        <rect x="260" y="40" width="210" height="56" rx="8" fill="#fde8d9" stroke="#ea580c"/><text x="365" y="65" text-anchor="middle" font-weight="600">training loop</text><text x="365" y="84" text-anchor="middle" font-size="12" class="t2">thousands of gradient steps</text>
+        <rect x="550" y="40" width="160" height="56" rx="8" fill="#fff" stroke="#ea580c"/><text x="630" y="73" text-anchor="middle">fitted model</text>
+        <rect x="790" y="40" width="190" height="56" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="885" y="73" text-anchor="middle">prediction</text>
+        <path d="M182,68 H256" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/><path d="M472,68 H546" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/><path d="M712,68 H786" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/>
+        <text x="20" y="150" class="m" font-size="11" fill="#2563eb">TABPFN (IN-CONTEXT LEARNING)</text>
+        <rect x="20" y="162" width="160" height="56" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="100" y="195" text-anchor="middle">your table</text>
+        <rect x="260" y="162" width="450" height="56" rx="8" fill="#dbe7fd" stroke="#2563eb"/><text x="485" y="187" text-anchor="middle" font-weight="600">one forward pass of a pre-trained transformer</text><text x="485" y="206" text-anchor="middle" font-size="12" class="t2">your rows are the "context"; no weights change</text>
+        <rect x="790" y="162" width="190" height="56" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="885" y="186" text-anchor="middle">prediction</text><text x="885" y="204" text-anchor="middle" font-size="12" class="t2">+ full uncertainty</text>
+        <path d="M182,190 H256" stroke="#2563eb" stroke-width="2" marker-end="url(#ab)"/><path d="M712,190 H786" stroke="#2563eb" stroke-width="2" marker-end="url(#ab)"/>
       </svg>
-      <figcaption><b>The context never showed a recovery</b> from where TabPFN ends up. Pass 6 adds those rows; dark bars are where most steps fall.</figcaption>
+      </div>
+      <figcaption>Change the rows and you change the behaviour: the key idea in Prior Labs' brief, <b>"robots run on tables"</b>.</figcaption>
+    </figure>
+  </div>
+
+  <div class="g2">
+    <div class="sub">
+      <h3>The model we use</h3>
+      <div class="tw"><table>
+        <tr><th>Item</th><th>Value</th></tr>
+        <tr><td class="k">Version</td><td>TabPFN 3.5 <b>Fast</b> (84M parameters), run locally; the full 3.5 has 220M</td></tr>
+        <tr><td class="k">Pre-training</td><td>millions of synthetic tables (prior-data fitted network, "PFN")</td></tr>
+        <tr><td class="k">Limits</td><td>up to <b>1M context rows</b>, 20k columns</td></tr>
+        <tr><td class="k">Output</td><td>a full distribution per prediction (we use the mean, or quantiles)</td></tr>
+        <tr><td class="k">Speed trick</td><td><span class="m">fit_with_cache</span>: the context is encoded once, each query only adds the new rows</td></tr>
+        <tr><td class="k">Cloud API</td><td>3.5 Plus via <span class="m">tabpfn-client</span>, used for our offline experiments</td></tr>
+        <tr><td class="k">Licence</td><td>open weights, non-commercial</td></tr>
+      </table></div>
+    </div>
+    <figure class="panel">
+      <span class="ftitle">Inside TabPFN 3.5 (one call)</span>
+      <svg viewBox="0 0 470 300" role="img" aria-label="TabPFN 3.5 has four stages: cell embedding, per-column embedder, per-row aggregator, and an in-context transformer where test rows attend to training rows.">
+        <g font-size="12.5">
+          <rect x="20" y="10" width="430" height="46" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="36" y="31" font-weight="600">1 · Cell embedding</text><text x="36" y="48" font-size="11.5" class="t2">each value → Fourier features + rank within its column</text>
+          <rect x="20" y="76" width="430" height="46" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="36" y="97" font-weight="600">2 · Per-column embedder</text><text x="36" y="114" font-size="11.5" class="t2">learns each column's distribution from all rows</text>
+          <rect x="20" y="142" width="430" height="46" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="36" y="163" font-weight="600">3 · Per-row aggregator</text><text x="36" y="180" font-size="11.5" class="t2">columns attend to each other; each row → 8 tokens</text>
+          <rect x="20" y="208" width="430" height="46" rx="8" fill="#dbe7fd" stroke="#2563eb"/><text x="36" y="229" font-weight="600">4 · In-context transformer (24 layers)</text><text x="36" y="246" font-size="11.5" class="t2">query rows attend to context rows → distribution over y</text>
+          <g stroke="#475569" stroke-width="1.5"><path d="M235,58 V72" marker-end="url(#a)"/><path d="M235,124 V138" marker-end="url(#a)"/><path d="M235,190 V204" marker-end="url(#a)"/></g>
+          <text x="235" y="284" text-anchor="middle" font-size="11.5" class="t2">"Learning" happens in step 4 as attention, not as weight updates.</text>
+        </g>
+      </svg>
     </figure>
   </div>
 </section>
 
-<!-- 4. Bug -->
-<section class="sec">
-  <header><div class="kicker">Bug found and fixed</div><h2>The wing labels included the wingbeat pattern</h2></header>
-  <figure class="panel">
-    <div class="scroll">
-    <svg viewBox="0 0 980 230" role="img" aria-label="Before: env.step added the wingbeat pattern to the stored action array in place, so the stored wing target was wrong. After: a copy is passed, and the stored action is the policy's own.">
-      <text x="20" y="26" class="m" font-size="11" fill="#dc2626">BEFORE</text>
-      <rect x="20" y="38" width="170" height="52" rx="8" fill="#d5efec" stroke="#0f766e"/><text x="105" y="69" text-anchor="middle" font-size="13">policy action</text>
-      <rect x="290" y="38" width="230" height="52" rx="8" fill="#fde4e4" stroke="#dc2626"/><text x="405" y="60" text-anchor="middle" font-size="13">env.step(action)</text><text x="405" y="78" text-anchor="middle" class="m" font-size="11" fill="#dc2626">wings += wingbeat pattern</text>
-      <rect x="620" y="38" width="340" height="52" rx="8" fill="#fff" stroke="#dc2626"/><text x="790" y="60" text-anchor="middle" font-size="13">stored target = policy + pattern</text><text x="790" y="78" text-anchor="middle" class="m t2" font-size="11">clean pass; noisy passes stored the true value</text>
-      <line x1="192" y1="64" x2="286" y2="64" stroke="#475569" stroke-width="1.5" marker-end="url(#ah)"/><text x="239" y="56" text-anchor="middle" font-size="11" class="t2">same array</text>
-      <line x1="522" y1="64" x2="616" y2="64" stroke="#dc2626" stroke-width="1.5" marker-end="url(#ah)"/><text x="569" y="56" text-anchor="middle" font-size="11" fill="#dc2626">edited in place</text>
-
-      <text x="20" y="140" class="m" font-size="11" fill="#15803d">AFTER</text>
-      <rect x="20" y="152" width="170" height="52" rx="8" fill="#d5efec" stroke="#0f766e"/><text x="105" y="183" text-anchor="middle" font-size="13">policy action</text>
-      <rect x="290" y="152" width="230" height="52" rx="8" fill="#f7f8fa" stroke="#94a3b8"/><text x="405" y="174" text-anchor="middle" font-size="13">env.step(action.copy())</text><text x="405" y="192" text-anchor="middle" class="m t2" font-size="11">edits only the copy</text>
-      <rect x="620" y="152" width="340" height="52" rx="8" fill="#dcf3e3" stroke="#15803d"/><text x="790" y="174" text-anchor="middle" font-size="13">stored target = policy's own action</text><text x="790" y="192" text-anchor="middle" class="m t2" font-size="11">checked: error 0.000 on all 12</text>
-      <line x1="192" y1="178" x2="286" y2="178" stroke="#475569" stroke-width="1.5" marker-end="url(#ah)"/>
-      <path d="M105,206 V220 H790 V208" fill="none" stroke="#15803d" stroke-width="1.5" marker-end="url(#ah)"/><text x="450" y="216" text-anchor="middle" font-size="11" fill="#15803d">original kept</text>
-    </svg>
-    </div>
-    <figcaption>The context mixed two meanings for every wing target. This invalidated experiment C and the previous-action runs; all six passes were re-collected tonight.</figcaption>
-  </figure>
-</section>
-
-<!-- 5. Loop rate -->
-<section class="sec">
-  <header><div class="kicker">Loop rate</div><h2>One TabPFN decision takes 500–1,350× the control step</h2></header>
-  <figure class="panel">
-    <div class="scroll">
-    <svg viewBox="0 0 980 170" role="img" aria-label="Log-scale time per decision: the fly needs 0.2 ms; DuckPFN ran at 20 ms; our TabPFN takes 97 to 270 ms.">
-      <!-- log10 scale: 0.1 ms at x=60, 1000 ms at x=940 -> 220 px per decade -->
-      <line x1="60" x2="940" y1="110" y2="110" stroke="#cbd5e1" stroke-width="2"/>
-      <g class="m t3" font-size="11" text-anchor="middle">
-        <text x="60" y="134">0.1 ms</text><text x="280" y="134">1 ms</text><text x="500" y="134">10 ms</text><text x="720" y="134">100 ms</text><text x="940" y="134">1 s</text>
-      </g>
-      <g stroke="#cbd5e1"><line x1="60" x2="60" y1="104" y2="116"/><line x1="280" x2="280" y1="104" y2="116"/><line x1="500" x2="500" y1="104" y2="116"/><line x1="720" x2="720" y1="104" y2="116"/><line x1="940" x2="940" y1="104" y2="116"/></g>
-      <!-- 0.2 ms: 60+220*log10(2)=126 ; 20ms: 500+220*0.301=566 ; 97ms: 720-220*0.013=717 ; 270ms: 720+220*0.431=815 -->
-      <circle cx="126" cy="110" r="7" fill="#0f766e"/><text x="126" y="88" text-anchor="middle" font-size="12" font-weight="600">0.2 ms</text><text x="126" y="72" text-anchor="middle" font-size="12" class="t2">fly's control step</text>
-      <circle cx="566" cy="110" r="7" fill="#94a3b8"/><text x="566" y="88" text-anchor="middle" font-size="12" font-weight="600">20 ms</text><text x="566" y="72" text-anchor="middle" font-size="12" class="t2">DuckPFN (50 Hz)</text>
-      <rect x="717" y="103" width="98" height="14" rx="7" fill="#2563eb"/><text x="766" y="88" text-anchor="middle" font-size="12" font-weight="600">97–270 ms</text><text x="766" y="72" text-anchor="middle" font-size="12" class="t2">our TabPFN, per decision</text>
-      <path d="M134,150 H710" stroke="#dc2626" stroke-width="1.5" marker-end="url(#ah)" marker-start="url(#ah)"/><text x="422" y="164" text-anchor="middle" font-size="11" fill="#dc2626">the simulator waits for every prediction</text>
-    </svg>
-    </div>
-    <figcaption>So the closed-loop runs answer <b>"would these decisions keep the fly up?"</b>, not "can it run live?". A realistic live design runs TabPFN at about 50 Hz on top of a fast controller.</figcaption>
-  </figure>
-</section>
-
-<!-- 5b. Parameters -->
-<section class="sec">
-  <header><div class="kicker">Parameters</div><h2>The numbers everything runs on</h2></header>
-  <div class="specs">
-    <div class="specgroup">Simulation</div>
-    <div class="spec"><span class="k">Control step</span><span class="v">0.2 ms</span><span class="n">5 kHz; physics at 0.05 ms</span></div>
-    <div class="spec"><span class="k">Wingbeat</span><span class="v">~218 Hz</span><span class="n">about 23 control steps per beat</span></div>
-    <div class="spec"><span class="k">Policy</span><span class="v">104 → 12</span><span class="n">DMPO actor, ~165k parameters</span></div>
-    <div class="spec"><span class="k">Recorded flights</span><span class="v">272</span><span class="n">92 evasions, 44 saccades, each mirrored; 53–575 ms</span></div>
-    <div class="spec"><span class="k">Synthetic paths</span><span class="v">12 cm/s · 0.7 cm high</span><span class="n">body pitch −47.5°; turn 90°/s or 360°/s</span></div>
-    <div class="spec"><span class="k">Fall condition</span><span class="v">height &lt; 0.2 cm</span><span class="n">distance to the ghost does not end a run</span></div>
-    <div class="specgroup">Data</div>
-    <div class="spec"><span class="k">Passes</span><span class="v">6 × 272 flights</span><span class="n">about 1.54M rows in total</span></div>
-    <div class="spec"><span class="k">Action noise</span><span class="v">0.5× and 2.0×</span><span class="n">of the policy's own spread; 2.5× crashes most flights</span></div>
-    <div class="spec"><span class="k">Changed bodies</span><span class="v">wing × 0.7 · mass × 1.2</span><span class="n">left-wing actuator gain; every body mass</span></div>
-    <div class="spec"><span class="k">Columns per row</span><span class="v">104 + 12 + 33</span><span class="n">sensors, actions, true body state, plus ghost pose</span></div>
-    <div class="spec"><span class="k">Held out</span><span class="v">27 pairs</span><span class="n">about 20% of each flight type, same split everywhere</span></div>
-    <div class="spec"><span class="k">Wingbeat files</span><span class="v">every 23rd step</span><span class="n">about 11k rows per pass, for A and B</span></div>
-    <div class="specgroup">TabPFN</div>
-    <div class="spec"><span class="k">Model</span><span class="v">TabPFN 3.5 Fast</span><span class="n">local, 1 estimator, context fitted once and cached</span></div>
-    <div class="spec"><span class="k">Controller table</span><span class="v">105 columns</span><span class="n">104 sensors + categorical action ID; target standardised per action</span></div>
-    <div class="spec"><span class="k">Context</span><span class="v">256 / 512 steps</span><span class="n">3,072 / 6,144 rows; H100 sweep next</span></div>
-    <div class="spec"><span class="k">Offline (A–C)</span><span class="v">TabPFN API</span><span class="n">8k+ rows; 10/50/90% quantiles</span></div>
-    <div class="spec"><span class="k">Decision time</span><span class="v">97–270 ms</span><span class="n">4 GB card at 512 steps; GTX 1050 at 256</span></div>
-    <div class="spec"><span class="k">Baselines</span><span class="v">trees, MLP</span><span class="n">HistGradientBoosting; MLP with 256-256 hidden units</span></div>
+<!-- ============ FRUIT FLY ============ -->
+<section class="chap" id="fly">
+  <header><span class="num">02</span><h2>The fruit fly, real and simulated</h2></header>
+  <div class="simple"><span class="kicker">In simple words</span>
+    <p>The fruit fly (Drosophila) is a tiny, very agile flyer: its wings beat about 200 times a second and it can swerve 80° in a few hundredths of a second. Scientists built a detailed virtual copy of its body and trained an AI pilot to copy recorded real flights. That pilot is our teacher, and the virtual fly is our robot.</p></div>
+  <div class="g3">
+    <div class="card"><div class="h"><b>Real fly</b><span class="x" style="color:var(--pol)">Drosophila</span></div>~2.5 mm long. Wingbeat about 200–220 Hz. "Saccades": quick 80° turns with peak turn rates near 3,000°/s.</div>
+    <div class="card"><div class="h"><b>flybody</b><span class="x" style="color:var(--sim)">MuJoCo</span></div>Anatomically detailed fly model from Janelia and Google DeepMind (Vaxenburg et al., Nature 2025), simulated in the MuJoCo physics engine.</div>
+    <div class="card"><div class="h"><b>Trained flight policy</b><span class="x" style="color:var(--pol)">RL, ~165k params</span></div>A neural network trained with reinforcement learning to follow 272 real recorded flights. It reads 104 sensor values and outputs 12 actions every 0.2 ms.</div>
   </div>
-</section>
 
-<!-- 5c. Constraints -->
-<section class="sec">
-  <header><div class="kicker">Constraints</div><h2>What limited us, and how we worked around it</h2></header>
-  <div class="cons">
-    <div class="con"><div class="h"><b>GPU memory</b><span class="x">3 GB</span></div>The GTX 1050 fits only 256 context steps; 512 runs out of memory.<span class="how">A Nebius H100 (80 GB) for the big-context sweep.</span></div>
-    <div class="con"><div class="h"><b>Loop rate</b><span class="x">0.2 ms</span></div>The fly needs a decision every 0.2 ms; TabPFN takes 97–270 ms.<span class="how">The simulator waits; we measure decision quality, not real time.</span></div>
-    <div class="con"><div class="h"><b>API limits</b><span class="x">~60 / min</span></div>The cloud API allows about 60 predictions a minute and about 5M tokens a day.<span class="how">The API is used only for offline A–C, with results cached; control runs locally.</span></div>
-    <div class="con"><div class="h"><b>Data coverage</b><span class="x">1.7 mm</span></div>99% of recorded steps stay within 1.7 mm of the ghost, so the context never shows a recovery.<span class="how">New strong-noise pass 6, drifting up to 11 mm.</span></div>
-    <div class="con"><div class="h"><b>Time</b><span class="x">~29 h</span></div>Hacking started Sat 11:00; the hard deadline is Sun 16:30.<span class="how">Quick fixes are logged in DEBT.md; the demo path is proven first.</span></div>
-    <div class="con"><div class="h"><b>Public repo</b><span class="x">no secrets</span></div>The repo goes public at submission; data and model weights have their own licences.<span class="how">The token lives in a git-ignored .env; data and third-party code are git-ignored.</span></div>
-  </div>
-</section>
-
-<!-- 5d. Technology -->
-<section class="sec">
-  <header><div class="kicker">Technology</div><h2>The stack, layer by layer</h2></header>
-  <figure class="panel">
-    <div class="scroll">
-    <svg viewBox="0 0 980 330" role="img" aria-label="Technology stack from compute up to outputs: hardware, simulation and policy, data, models, outputs.">
-      <g font-size="12">
-        <g class="m t3" font-size="11">
-          <text x="20" y="41">OUTPUT</text><text x="20" y="101">MODELS</text><text x="20" y="161">DATA</text><text x="20" y="221">SIMULATION</text><text x="20" y="281">COMPUTE</text>
+  <div class="g2">
+    <figure class="panel">
+      <span class="ftitle">What the fly senses (104 inputs) and controls (12 actions)</span>
+      <div class="scroll">
+      <svg viewBox="0 0 470 330" role="img" aria-label="Inputs: body motion sensors, joint angles and speeds, and the target ghost's position and orientation for the next 1 ms. Outputs: head, wings, abdomen, and wingbeat frequency.">
+        <text x="10" y="18" class="m t3" font-size="11">SENSES · 104</text>
+        <g font-size="12">
+          <rect x="10" y="28" width="200" height="30" rx="6" fill="#ece4fd"/><text x="20" y="48">accelerometer, gyro</text><text x="200" y="48" text-anchor="end" class="m t2">6</text>
+          <rect x="10" y="62" width="200" height="30" rx="6" fill="#ece4fd"/><text x="20" y="82">joint angles</text><text x="200" y="82" text-anchor="end" class="m t2">25</text>
+          <rect x="10" y="96" width="200" height="30" rx="6" fill="#ece4fd"/><text x="20" y="116">joint speeds</text><text x="200" y="116" text-anchor="end" class="m t2">25</text>
+          <rect x="10" y="130" width="200" height="30" rx="6" fill="#ece4fd"/><text x="20" y="150">velocity, "up" direction</text><text x="200" y="150" text-anchor="end" class="m t2">6</text>
+          <rect x="10" y="164" width="200" height="48" rx="6" fill="#fde8d9"/><text x="20" y="184">target (ghost) offset and</text><text x="20" y="202">rotation, now + 5 steps</text><text x="200" y="193" text-anchor="end" class="m t2">42</text>
+          <text x="10" y="236" font-size="11.5" class="t2">The ghost is the path to follow,</text><text x="10" y="252" font-size="11.5" class="t2">seen up to 1 ms ahead.</text>
         </g>
-        <rect x="140" y="18" width="260" height="36" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="270" y="41" text-anchor="middle">MuJoCo live viewer · MP4 videos</text>
-        <rect x="410" y="18" width="260" height="36" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="540" y="41" text-anchor="middle">matplotlib plots · JSON results</text>
-        <rect x="680" y="18" width="280" height="36" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="820" y="41" text-anchor="middle">This page · slides · video</text>
-        <rect x="140" y="78" width="260" height="36" rx="8" fill="#dbe7fd" stroke="#2563eb"/><text x="270" y="101" text-anchor="middle">tabpfn 3.5 Fast (local, PyTorch CUDA)</text>
-        <rect x="410" y="78" width="260" height="36" rx="8" fill="#dbe7fd" stroke="#2563eb"/><text x="540" y="101" text-anchor="middle">tabpfn-client (Prior Labs API)</text>
-        <rect x="680" y="78" width="280" height="36" rx="8" fill="#fff" stroke="#ea580c"/><text x="820" y="101" text-anchor="middle">scikit-learn trees + MLP baselines</text>
-        <rect x="140" y="138" width="530" height="36" rx="8" fill="#fff" stroke="#94a3b8"/><text x="405" y="161" text-anchor="middle">NumPy .npz tables, 6 passes · meta.json column names · 8 CPU workers</text>
-        <rect x="680" y="138" width="280" height="36" rx="8" fill="#fff" stroke="#94a3b8"/><text x="820" y="161" text-anchor="middle">Janelia figshare: policy + 272 flights</text>
-        <rect x="140" y="198" width="260" height="36" rx="8" fill="#d5efec" stroke="#0f766e"/><text x="270" y="221" text-anchor="middle">flybody fruit fly (TuragaLab)</text>
-        <rect x="410" y="198" width="260" height="36" rx="8" fill="#d5efec" stroke="#0f766e"/><text x="540" y="221" text-anchor="middle">MuJoCo + dm_control</text>
-        <rect x="680" y="198" width="280" height="36" rx="8" fill="#d5efec" stroke="#0f766e"/><text x="820" y="221" text-anchor="middle">TensorFlow 2.8 policy (SavedModel)</text>
-        <rect x="140" y="258" width="260" height="36" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="270" y="281" text-anchor="middle">Laptop: 8 CPU cores, GTX 1050 3 GB</text>
-        <rect x="410" y="258" width="260" height="36" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="540" y="281" text-anchor="middle">Team PCs: RTX 4050 6 GB, GTX 1650</text>
-        <rect x="680" y="258" width="280" height="36" rx="8" fill="#dbe7fd" stroke="#2563eb"/><text x="820" y="281" text-anchor="middle">Nebius H100 80 GB (cloud)</text>
-        <text x="140" y="318" class="t2" font-size="12">Environments: conda "flybody" (Python 3.10: simulation + local TabPFN) · uv (Python 3.12: offline experiments)</text>
-      </g>
+        <path d="M214,120 H256" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/>
+        <text x="260" y="18" class="m t3" font-size="11">CONTROLS · 12</text>
+        <g font-size="12">
+          <rect x="260" y="28" width="200" height="30" rx="6" fill="#d5efec"/><text x="270" y="48">head</text><text x="450" y="48" text-anchor="end" class="m t2">3</text>
+          <rect x="260" y="62" width="200" height="66" rx="6" fill="#d5efec" stroke="#0f766e"/><text x="270" y="82" font-weight="600">wings: yaw, roll, pitch</text><text x="270" y="100">left and right</text><text x="450" y="91" text-anchor="end" class="m t2">6</text>
+          <rect x="260" y="132" width="200" height="30" rx="6" fill="#d5efec"/><text x="270" y="152">abdomen</text><text x="450" y="152" text-anchor="end" class="m t2">2</text>
+          <rect x="260" y="166" width="200" height="30" rx="6" fill="#d5efec"/><text x="270" y="186">wingbeat frequency</text><text x="450" y="186" text-anchor="end" class="m t2">1</text>
+          <text x="260" y="222" font-size="11.5" class="t2">The 6 wing actions shift a built-in</text><text x="260" y="238" font-size="11.5" class="t2">wingbeat pattern generator; they do</text><text x="260" y="254" font-size="11.5" class="t2">most of the steering.</text>
+        </g>
+      </svg>
+      </div>
+    </figure>
+    <figure class="panel">
+      <span class="ftitle">The ghost: the target to follow</span>
+      <svg viewBox="0 0 470 330" role="img" aria-label="The ghost is a see-through copy of the fly moved along the reference path with no physics; the real fly is simulated; the distance between them is the tracking error.">
+        <path d="M30,280 C120,260 170,140 260,130 S400,60 450,40" fill="none" stroke="#06b6d4" stroke-width="3" stroke-dasharray="1 9" stroke-linecap="round"/>
+        <circle cx="262" cy="129" r="16" fill="none" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4 3"/>
+        <text x="282" y="112" font-size="12.5" font-weight="600">ghost</text><text x="282" y="128" font-size="11.5" class="t2">moved on rails, no physics</text>
+        <circle cx="240" cy="160" r="14" fill="#fb923c" stroke="#c2410c" stroke-width="1.5"/>
+        <text x="150" y="196" font-size="12.5" font-weight="600">real fly</text><text x="150" y="212" font-size="11.5" class="t2">fully simulated</text>
+        <path d="M248,150 L256,140" stroke="#dc2626" stroke-width="2"/>
+        <text x="300" y="168" font-size="12" fill="#dc2626" font-weight="600">distance to ghost</text><text x="300" y="184" font-size="11.5" class="t2">= tracking error (mm)</text>
+        <text x="30" y="306" font-size="11.5" class="t2">Cyan dots: where the ghost will be (1 dot per 2 ms).</text>
+        <text x="30" y="322" font-size="11.5" class="t2">Path source: a real recorded fly, or our synthetic paths.</text>
+      </svg>
+    </figure>
+  </div>
+</section>
+
+<!-- ============ IMPLEMENTATION ============ -->
+<section class="chap" id="build">
+  <header><span class="num">03</span><h2>Our implementation</h2></header>
+  <div class="simple"><span class="kicker">In simple words</span>
+    <p>Step 1: let the expert pilot fly every recorded path many times, sometimes with its hands shaking (noise) or with a weaker wing or heavier body, and log every moment. Step 2: turn those logs into a big table. Step 3: give TabPFN a slice of that table and ask it either "where will the fly be?" or "what should the fly do now?". Step 4: for flying, feed TabPFN's answer back into the simulator and repeat.</p></div>
+
+  <figure class="panel">
+    <span class="ftitle">The full pipeline</span>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 300" role="img" aria-label="Pipeline: the policy flies the MuJoCo fly over six passes; every step is logged into a 1.5 million row table; samples become TabPFN context for offline prediction or closed-loop control.">
+      <rect x="20" y="30" width="170" height="78" rx="10" fill="#d5efec" stroke="#0f766e"/><text x="105" y="62" text-anchor="middle" font-weight="600">RL policy</text><text x="105" y="82" text-anchor="middle" font-size="12" class="t2">the teacher</text>
+      <rect x="20" y="170" width="170" height="78" rx="10" fill="#ece4fd" stroke="#7c3aed"/><text x="105" y="202" text-anchor="middle" font-weight="600">MuJoCo fly</text><text x="105" y="222" text-anchor="middle" font-size="12" class="t2">272 paths × 6 passes</text>
+      <path d="M90,110 V166" stroke="#0f766e" stroke-width="2" marker-end="url(#ag)"/><path d="M120,166 V110" stroke="#7c3aed" stroke-width="2" marker-end="url(#av)"/>
+      <path d="M192,209 H266" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/><text x="229" y="200" text-anchor="middle" font-size="11.5" class="t2">log</text>
+      <rect x="270" y="150" width="220" height="118" rx="10" fill="#fff" stroke="#94a3b8"/><text x="380" y="176" text-anchor="middle" font-weight="600">Flight table</text>
+      <g fill="#e2e8f0"><rect x="290" y="188" width="180" height="9" rx="2"/><rect x="290" y="201" width="180" height="9" rx="2"/><rect x="290" y="214" width="180" height="9" rx="2"/></g>
+      <text x="380" y="246" text-anchor="middle" font-size="12" class="t2">1.54M steps · 104 senses,</text><text x="380" y="262" text-anchor="middle" font-size="12" class="t2">12 actions, true body state</text>
+      <path d="M492,180 C560,180 560,80 610,80" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#ab)"/>
+      <path d="M492,236 C560,236 560,230 610,230" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#ab)"/>
+      <rect x="614" y="40" width="190" height="80" rx="10" fill="#dbe7fd" stroke="#2563eb"/><text x="709" y="68" text-anchor="middle" font-weight="600">Offline prediction</text><text x="709" y="88" text-anchor="middle" font-size="12" class="t2">A · B · C</text><text x="709" y="104" text-anchor="middle" font-size="11.5" class="t2">TabPFN API, ~8k rows</text>
+      <rect x="614" y="190" width="190" height="80" rx="10" fill="#dbe7fd" stroke="#2563eb"/><text x="709" y="218" text-anchor="middle" font-weight="600">Closed-loop control</text><text x="709" y="238" text-anchor="middle" font-size="12" class="t2">D · E · F · G · showreel</text><text x="709" y="254" text-anchor="middle" font-size="11.5" class="t2">local, up to 1M rows</text>
+      <path d="M806,80 H846" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/><text x="850" y="76" font-size="12">future position</text><text x="850" y="92" font-size="11.5" class="t2">vs trees, const. velocity</text>
+      <path d="M806,230 H846" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/><text x="850" y="226" font-size="12">12 actions</text><text x="850" y="242" font-size="11.5" class="t2">fed back into MuJoCo</text>
+      <path d="M709,272 V290 H105 V252" fill="none" stroke="#2563eb" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#ab)"/>
     </svg>
     </div>
-    <figcaption>Green is the teacher and its world, blue is TabPFN, orange is what we compare against.</figcaption>
   </figure>
-</section>
 
-<!-- 6. Data -->
-<section class="sec">
-  <header><div class="kicker">Data</div><h2>Six passes over 272 recorded flights, re-collected</h2></header>
-  <div class="passes">
-    <div class="pass"><span class="n">1 · clean</span><span class="d">policy as is</span><span class="s tag good">done · 260k</span></div>
-    <div class="pass"><span class="n">2 · noise</span><span class="d">0.5 × spread</span><span class="s tag good">done · 260k</span></div>
-    <div class="pass"><span class="n">3 · noise</span><span class="d">0.5 ×, seed 2</span><span class="s tag good">done · 262k</span></div>
-    <div class="pass new"><span class="n">6 · strong</span><span class="d">2.0 × spread</span><span class="s tag good">done · 238k</span></div>
-    <div class="pass"><span class="n">4 · weak wing</span><span class="d">left wing × 0.7</span><span class="s" style="color:var(--warn)">running</span></div>
-    <div class="pass"><span class="n">5 · heavy</span><span class="d">mass × 1.2</span><span class="s" style="color:var(--warn)">queued</span></div>
+  <div class="sub">
+    <h3>The data: six passes over every recorded flight</h3>
+    <p class="text">Each pass flies all 272 recorded paths (92 evasions and 44 saccades, each also mirrored), logging every 0.2 ms step. The noisy passes make the fly wobble so the policy shows how it recovers.</p>
+    <div class="tw"><table>
+      <tr><th>Pass</th><th>Change</th><th>Purpose</th><th>Steps</th><th>Distance to ghost (mean · 95% · max)</th></tr>
+      <tr><td class="k">1 clean</td><td>none</td><td>prediction, copying the policy</td><td class="n">260,001</td><td class="n">0.33 · 0.79 · 7.7 mm</td></tr>
+      <tr><td class="k">2 noise</td><td>action noise 0.5 × policy's spread</td><td>controller context</td><td class="n">259,997</td><td class="n">0.34 · 0.82 · 9.1 mm</td></tr>
+      <tr><td class="k">3 noise</td><td>same, another seed</td><td>controller context</td><td class="n">262,485</td><td class="n">0.34 · 0.81 · 8.8 mm</td></tr>
+      <tr><td class="k">6 strong noise</td><td>action noise 2.0 ×</td><td>recovery examples</td><td class="n">237,637</td><td class="n">1.13 · 4.06 · 27.9 mm</td></tr>
+      <tr><td class="k">4 weak wing</td><td>left wing strength × 0.7</td><td>adaptation (B)</td><td class="n">259,409</td><td class="n">0.55 · 1.56 · 26.2 mm</td></tr>
+      <tr><td class="k">5 heavy</td><td>body mass × 1.2</td><td>adaptation (B)</td><td class="n">262,418</td><td class="n">0.36 · 0.90 · 10.1 mm</td></tr>
+    </table></div>
+  </div>
+
+  <div class="sub">
+    <h3>How a flying decision is made</h3>
+    <p class="text">TabPFN predicts <b>one column</b>. Each recorded step becomes 12 rows (one per action), all with the same 104 senses and a different <b>action_id</b>. At decision time we ask 12 rows: the live senses with action_id 0 to 11. The 12 answers are the actions MuJoCo applies for the next 0.2 ms.</p>
+    <figure class="panel">
+      <div class="scroll">
+      <svg viewBox="0 0 1000 220" role="img" aria-label="Decision loop: live senses are copied into 12 rows with action ids 0 to 11; TabPFN fills the target column using the cached context; the 12 actions drive MuJoCo for 0.2 ms; repeat.">
+        <rect x="20" y="70" width="150" height="70" rx="10" fill="#ece4fd" stroke="#7c3aed"/><text x="95" y="100" text-anchor="middle" font-weight="600">live senses</text><text x="95" y="120" text-anchor="middle" font-size="12" class="t2">104 values</text>
+        <path d="M172,105 H206" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/>
+        <g font-size="11" class="m">
+          <rect x="210" y="20" width="180" height="20" fill="#f7f8fa"/><rect x="390" y="20" width="70" height="20" fill="#eef2f7"/><rect x="460" y="20" width="50" height="20" fill="#fde8d9"/>
+          <text x="300" y="34" text-anchor="middle" class="t2">same 104</text><text x="425" y="34" text-anchor="middle" class="t2">act_id</text><text x="485" y="34" text-anchor="middle" fill="#ea580c">y</text>
+          <g fill="#fff" stroke="#e2e8f0"><rect x="210" y="44" width="300" height="20"/><rect x="210" y="68" width="300" height="20"/><rect x="210" y="118" width="300" height="20"/></g>
+          <text x="425" y="58" text-anchor="middle" fill="#2563eb">0</text><text x="485" y="58" text-anchor="middle" fill="#ea580c">?</text>
+          <text x="425" y="82" text-anchor="middle" fill="#2563eb">1</text><text x="485" y="82" text-anchor="middle" fill="#ea580c">?</text>
+          <text x="425" y="106" text-anchor="middle" class="t3">⋮</text>
+          <text x="425" y="132" text-anchor="middle" fill="#2563eb">11</text><text x="485" y="132" text-anchor="middle" fill="#ea580c">?</text>
+        </g>
+        <text x="360" y="162" text-anchor="middle" font-size="12" class="t2">12 query rows</text>
+        <path d="M512,90 H546" stroke="#2563eb" stroke-width="2" marker-end="url(#ab)"/>
+        <rect x="550" y="50" width="170" height="80" rx="10" fill="#dbe7fd" stroke="#2563eb"/><text x="635" y="80" text-anchor="middle" font-weight="600">TabPFN</text><text x="635" y="100" text-anchor="middle" font-size="12" class="t2">+ cached context</text><text x="635" y="116" text-anchor="middle" font-size="12" class="t2">31–114 ms (H100)</text>
+        <path d="M722,90 H756" stroke="#ea580c" stroke-width="2" marker-end="url(#ao)"/>
+        <rect x="760" y="50" width="100" height="80" rx="10" fill="#fde8d9" stroke="#ea580c"/><text x="810" y="85" text-anchor="middle" font-weight="600">12</text><text x="810" y="103" text-anchor="middle" font-size="12">actions</text>
+        <path d="M862,90 H896" stroke="#7c3aed" stroke-width="2" marker-end="url(#av)"/>
+        <rect x="900" y="50" width="90" height="80" rx="10" fill="#ece4fd" stroke="#7c3aed"/><text x="945" y="85" text-anchor="middle" font-weight="600">MuJoCo</text><text x="945" y="103" text-anchor="middle" font-size="12" class="t2">+0.2 ms</text>
+        <path d="M945,132 V200 H95 V144" fill="none" stroke="#475569" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#a)"/>
+        <text x="520" y="194" text-anchor="middle" font-size="12" class="t2">repeat: 5,000 decisions per second of flight (the simulator waits for each one)</text>
+      </svg>
+      </div>
+      <figcaption>The context is a random sample of steps from passes 1, 2, 3 and 6, fitted once before the flight and never changed during it. A more visual walk-through is in the companion page "How TabPFN Flies the Fly".</figcaption>
+    </figure>
+  </div>
+
+  <div class="g2">
+    <div class="sub">
+      <h3>Seven experiments</h3>
+      <div class="tw"><table>
+        <tr><th>Exp</th><th>Question</th><th>Mode</th></tr>
+        <tr><td class="k">A</td><td>Where will the fly be in 1, 3, 10 wingbeats?</td><td>offline</td></tr>
+        <tr><td class="k">B</td><td>Adapt to a weak wing or heavier body by adding rows?</td><td>offline</td></tr>
+        <tr><td class="k">C</td><td>Copy the policy's actions offline, by context size</td><td>offline</td></tr>
+        <tr><td class="k">D</td><td>Fly recorded held-out flights</td><td>closed loop</td></tr>
+        <tr><td class="k">E</td><td>Do path shapes and sudden turns matter?</td><td>closed loop</td></tr>
+        <tr><td class="k">F</td><td>Does adding its own mistakes (DAgger) help?</td><td>closed loop</td></tr>
+        <tr><td class="k">G</td><td>Which actions break the flight?</td><td>closed loop</td></tr>
+      </table></div>
+      <p class="text" style="font-size:13px">All hold out the same 27 flight pairs (~20%), so no test flight appears in any context.</p>
+    </div>
+    <div class="sub">
+      <h3>Compute and tools</h3>
+      <div class="tw"><table>
+        <tr><th>Layer</th><th>What we used</th></tr>
+        <tr><td class="k">Simulation</td><td>flybody + MuJoCo + dm_control; policy in TensorFlow 2.8</td></tr>
+        <tr><td class="k">Models</td><td>tabpfn 10.2 (local, PyTorch CUDA), tabpfn-client (API), scikit-learn baselines</td></tr>
+        <tr><td class="k">Data</td><td>NumPy tables, 8 parallel CPU workers per pass</td></tr>
+        <tr><td class="k">Hardware</td><td>laptop GTX 1050 (3 GB); <b>Nebius H100 80 GB</b> for big contexts</td></tr>
+        <tr><td class="k">Remote demo</td><td>viewer on a laptop, TabPFN on the H100 over an SSH tunnel</td></tr>
+        <tr><td class="k">Outputs</td><td>labelled MP4 showreels, JSON results, this page</td></tr>
+      </table></div>
+    </div>
   </div>
 </section>
 
-<!-- 7. Next -->
-<section class="sec">
-  <header><div class="kicker">Next</div><h2>Tonight</h2></header>
-  <div class="next">
-    <div class="card"><b>H100 context sweep</b>1k → 32k+ steps on 80 GB, with the recovery-rich pass 6.</div>
-    <div class="card"><b>Fix the wings</b>Does a big, recovery-rich context fly the wings? Fallback demo: TabPFN steers, policy flaps.</div>
-    <div class="card"><b>Rerun A, B, C</b>On the corrected data; C was invalid before.</div>
-    <div class="card"><b>Pitch</b>3-minute video, 5-minute slides, README.</div>
+<!-- ============ RESULTS ============ -->
+<section class="chap" id="results">
+  <header><span class="num">04</span><h2>Results</h2></header>
+  <div class="simple"><span class="kicker">In simple words</span>
+    <p>As a <b>forecaster</b>, TabPFN is excellent: more accurate than trained models and honest about its uncertainty, and it adapts to a changed body just by being shown a few examples. As a <b>pilot</b>, it needs a lot of examples: with 3k rows it crashes in 0.06 s; with 400k–1M rows it flies smooth curves as precisely as the trained policy (0.10 mm), but every context size still loses the path at sudden sharp turns.</p></div>
+
+  <div class="sub">
+    <h3>4a · Predicting the future position (experiment A)</h3>
+    <div class="g2">
+      <figure class="panel">
+        <div class="legend"><span><i style="background:var(--tab)"></i>TabPFN</span><span><i style="background:var(--alt)"></i>Gradient-boosted trees</span></div>
+        <div class="chart" id="chA"></div>
+        <figcaption><b>Error relative to "keep the same velocity"</b> (lower is better), mean over forward, sideways, up and turn. 27 held-out flight pairs.</figcaption>
+      </figure>
+      <figure class="panel">
+        <div class="legend"><span><i style="background:var(--tab)"></i>TabPFN</span><span><i style="background:var(--alt)"></i>Gradient-boosted trees</span><span><i style="background:var(--ink-3);height:2px"></i>ideal 80%</span></div>
+        <div class="chart" id="chCov"></div>
+        <figcaption><b>Calibration:</b> how often the 80% prediction range contains the truth. TabPFN stays near 80%; trees are over-confident.</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <div class="sub">
+    <h3>4b · Adapting to a changed body without training (experiment B)</h3>
+    <figure class="panel">
+      <div class="legend"><span><i style="background:var(--tab)"></i>TabPFN, heavy fly</span><span><i style="background:var(--alt)"></i>Trees, heavy fly (retrained)</span><span><i style="background:#93c5fd"></i>TabPFN, weak wing</span><span><i style="background:#fdba74"></i>Trees, weak wing</span></div>
+      <div class="chart" id="chB"></div>
+      <figcaption><b>Forward-movement error (mm)</b> on held-out flights of the changed fly, as changed-fly flights are added to a clean-fly context. For the heavy fly TabPFN's 80% range coverage rises from 53% to 80% with 16 flights.</figcaption>
+    </figure>
+  </div>
+
+  <div class="sub">
+    <h3>4c · Copying the policy's actions offline (experiment C)</h3>
+    <div class="g2">
+      <figure class="panel">
+        <div class="legend"><span><i style="background:var(--tab)"></i>TabPFN</span><span><i style="background:var(--alt)"></i>Trees</span><span><i style="background:var(--ink-3)"></i>Neural network (MLP)</span></div>
+        <div class="chart" id="chC"></div>
+        <figcaption><b>R² of the 12 actions</b> on held-out flights (1 = perfect) by context size. TabPFN leads from 500 steps up.</figcaption>
+      </figure>
+      <figure class="panel">
+        <span class="ftitle">Why good offline scores are not enough to fly</span>
+        <svg viewBox="0 0 470 250" role="img" aria-label="Small errors per decision compound over thousands of decisions in closed loop.">
+          <text x="10" y="22" font-size="12.5" class="t2">Offline: each prediction is scored alone.</text>
+          <g fill="#dbe7fd" stroke="#2563eb"><rect x="10" y="34" width="40" height="22" rx="4"/><rect x="60" y="34" width="40" height="22" rx="4"/><rect x="110" y="34" width="40" height="22" rx="4"/><rect x="160" y="34" width="40" height="22" rx="4"/></g>
+          <text x="214" y="50" font-size="12" class="t2">R² 0.86 → looks fine</text>
+          <text x="10" y="96" font-size="12.5" class="t2">Closed loop: each error moves the fly, so the next</text>
+          <text x="10" y="112" font-size="12.5" class="t2">question is about a slightly unfamiliar state.</text>
+          <path d="M20,200 C120,198 200,190 280,170 S400,110 450,60" fill="none" stroke="#dc2626" stroke-width="2.5"/>
+          <path d="M20,200 H450" stroke="#0f766e" stroke-width="2" stroke-dasharray="5 4"/>
+          <text x="450" y="216" text-anchor="end" font-size="11.5" fill="#0f766e">policy: stays on path</text>
+          <text x="300" y="104" font-size="11.5" fill="#dc2626">errors compound</text>
+          <text x="20" y="236" font-size="11" class="m t3">0</text><text x="440" y="236" font-size="11" class="m t3">5,000 decisions (1 s)</text>
+        </svg>
+      </figure>
+    </div>
+  </div>
+
+  <div class="sub">
+    <h3>4d · Flying the fly (experiments D–G and the showreel)</h3>
+    <figure class="panel">
+      <div class="legend"><span><i style="background:var(--line-2)"></i>256 steps, laptop</span><span><i style="background:var(--tab)"></i>16,384 steps, H100</span><span><i style="background:var(--pol)"></i>Trained policy</span></div>
+      <div class="chart" id="chFly"></div>
+      <figcaption><b>Flight time before losing the path</b> (or the full path length) by path type. TabPFN controls all 12 actions with no help. Bigger context turns 0.06 s into full smooth flights.</figcaption>
+    </figure>
+    <div class="g2">
+      <figure class="panel">
+        <div class="legend"><span><i style="background:var(--tab)"></i>Time per decision</span></div>
+        <div class="chart" id="chLat"></div>
+        <figcaption><b>Decision time vs context size</b> on the H100 (12 query rows). Up to 1M rows fits in 40 GB. Real time would need 0.2 ms.</figcaption>
+      </figure>
+      <figure class="panel">
+        <span class="ftitle">Who controls which actions (split test, 256 steps)</span>
+        <div class="scroll">
+        <svg viewBox="0 0 470 230" role="img" aria-label="Handing only the wings to the policy lets the 256-step TabPFN fly the full second; handing head or beat frequency does not.">
+          <g font-size="11.5" font-weight="600" text-anchor="middle"><text x="175" y="18">Head</text><text x="245" y="18">Wings</text><text x="315" y="18">Abdomen</text><text x="385" y="18">Beat</text></g>
+          <g id="split"></g>
+        </svg>
+        </div>
+        <figcaption>Blue = TabPFN, green = policy. The <b>wings</b> are the hard part; the other 6 actions TabPFN can fly even with a small context.</figcaption>
+      </figure>
+    </div>
+    <div class="tw"><table>
+      <tr><th>Path</th><th>Length</th><th>Policy</th><th>TabPFN, 256 steps</th><th>TabPFN, 16,384 steps</th><th>Mean distance to ghost (16k)</th></tr>
+      <tr><td class="k">S-curve (left then right)</td><td class="n">2.0 s</td><td class="ok">full</td><td class="no">~0.06 s</td><td class="ok">full 2.0 s</td><td class="n">0.20 mm</td></tr>
+      <tr><td class="k">Tight curve, 360°/s</td><td class="n">1.0 s</td><td class="ok">full</td><td class="no">0.06 s</td><td class="ok">full 1.0 s</td><td class="n">0.28 mm</td></tr>
+      <tr><td class="k">Smooth, then sudden turn</td><td class="n">1.5 s</td><td class="ok">full</td><td class="no">–</td><td class="mid">0.63 s (turn at 0.60)</td><td class="n">0.37 mm</td></tr>
+      <tr><td class="k">Sudden turn, then smooth</td><td class="n">1.5 s</td><td class="ok">full</td><td class="no">–</td><td class="no">0.18 s (turn at 0.15)</td><td class="n">0.64 mm</td></tr>
+      <tr><td class="k">Tour (every turn type)</td><td class="n">4.0 s</td><td class="ok">full</td><td class="no">–</td><td class="mid">0.83 s (turn at 0.80)</td><td class="n">0.34 mm</td></tr>
+    </table></div>
+  </div>
+
+  <div class="sub" id="sweep">
+    <h3>4e · Context-size sweep: how much context does flying need?</h3>
+    <p class="text">The same five paths, flown once each by TabPFN controlling all 12 actions, with four context sizes from <b>49k to 1M rows</b> (4,096 to 83,333 recorded steps). Every run is on video; the distance to the ghost is logged at every 0.2 ms step.</p>
+    <figure class="panel">
+      <span class="ftitle">Every path × every context size</span>
+      <div class="scroll"><svg id="swMatrix" viewBox="0 0 1000 330" role="img" aria-label="Matrix of paths by context size: S-curve flown fully by all sizes; tight curve from 16k up; the tour and both sudden-turn paths lost at the sudden turn by every size."></svg></div>
+      <figcaption>Green: flew the whole path (mean distance shown). Red: lost the path (more than 5 mm off) at the time shown, always within ~30–80 ms of a sudden turn.</figcaption>
+    </figure>
+    <div class="g3">
+      <figure class="shot"><img src="img/sweep_4k_tight.jpg" alt="4k context on the tight curve at 600 ms, drifting off the ghost" width="640" height="480"><figcaption><b>49k rows, tight curve, 600 ms:</b> 1.58 mm off and sliding away; lost at 624 ms.</figcaption></figure>
+      <figure class="shot"><img src="img/sweep_32k_tight.jpg" alt="32k context on the tight curve at 600 ms, on the ghost" width="640" height="480"><figcaption><b>393k rows, same moment:</b> 0.17 mm off, on the ghost; flies the full second.</figcaption></figure>
+      <figure class="shot"><img src="img/sweep_83k_scurve.jpg" alt="1M row context on the S-curve" width="640" height="480"><figcaption><b>1M rows, S-curve:</b> 0.10 mm mean over 2 s, matching the trained policy (0.09 mm).</figcaption></figure>
+    </div>
+    <div class="g2">
+      <figure class="panel">
+        <div class="legend"><span><i style="background:#2563eb"></i>S-curve</span><span><i style="background:#0f766e"></i>Tight curve</span><span><i style="background:var(--ink-3);height:2px"></i>Policy (dashed)</span></div>
+        <div class="chart" id="swAcc"></div>
+        <figcaption><b>Accuracy on smooth paths improves with context.</b> Mean distance to the ghost; 4k loses the tight curve, so its point is partial.</figcaption>
+      </figure>
+      <figure class="panel">
+        <div class="legend"><span><i style="background:#93c5fd"></i>Tour</span><span><i style="background:#2563eb"></i>Sudden turn → smooth</span><span><i style="background:#1e3a8a"></i>Smooth → sudden turn</span></div>
+        <div class="chart" id="swTurn"></div>
+        <figcaption><b>How long it survives after a sudden turn.</b> More context buys ~50 ms more, never a recovery.</figcaption>
+      </figure>
+    </div>
+    <div class="g2">
+      <figure class="panel">
+        <div class="legend" id="swLeg1"></div>
+        <div class="chart" id="swTight"></div>
+        <figcaption><b>Tight curve, distance over time.</b> 4k drifts from ~400 ms and is lost at 624 ms; 16k and up stay under 0.5 mm for the full second.</figcaption>
+      </figure>
+      <figure class="panel">
+        <div class="legend" id="swLeg2"></div>
+        <div class="chart" id="swSud"></div>
+        <figcaption><b>Smooth, then sudden turn at 600 ms.</b> All sizes fly the smooth part equally well, then all blow up within ~80 ms of the turn.</figcaption>
+      </figure>
+    </div>
+    <div class="tw"><table>
+      <tr><th>Context</th><th>Rows</th><th>Decision time*</th><th>S-curve 2 s</th><th>Tight curve 1 s</th><th>Tour 4 s</th><th>Sudden → smooth</th><th>Smooth → sudden</th></tr>
+      <tr><td class="k">4,096</td><td class="n">49k</td><td class="n">31 ms</td><td class="ok">full · 0.14 mm</td><td class="no">624 ms</td><td class="no">827 ms</td><td class="no">182 ms</td><td class="no">627 ms</td></tr>
+      <tr><td class="k">16,384</td><td class="n">197k</td><td class="n">42 ms</td><td class="ok">full · 0.20 mm</td><td class="ok">full · 0.28 mm</td><td class="no">829 ms</td><td class="no">178 ms</td><td class="no">627 ms</td></tr>
+      <tr><td class="k">32,768</td><td class="n">393k</td><td class="n">55 ms</td><td class="ok">full · 0.10 mm</td><td class="ok">full · 0.16 mm</td><td class="no">877 ms</td><td class="no">222 ms</td><td class="no">683 ms</td></tr>
+      <tr><td class="k">83,333</td><td class="n">1M</td><td class="n">114 ms</td><td class="ok">full · 0.10 mm</td><td class="ok">full · 0.18 mm</td><td class="no">873 ms</td><td class="no">228 ms</td><td class="no">677 ms</td></tr>
+      <tr><td class="k">Policy</td><td class="n">–</td><td class="n">–</td><td class="ok">full · 0.09 mm</td><td class="ok">full · 0.12 mm</td><td class="ok">full · 0.15 mm</td><td class="n">–</td><td class="n">–</td></tr>
+    </table></div>
+    <p class="text" style="font-size:13px">*Alone on the H100, from the decision-time test; during the sweep runs shared the GPU and were slower. Sudden turns sit at 0.15 s, 0.60 s and 0.80 s (tour). One deterministic run per cell. Videos: results/sweep/tabpfn_ctx&lt;N&gt;.mp4.</p>
+    <div class="simple"><span class="kicker">What the sweep says</span>
+      <p><b>Smooth flight is a data-quantity problem, and it is solved:</b> from about 400k rows TabPFN flies curves as precisely as the policy. <b>Sudden turns are not a quantity problem:</b> 20× more rows only delays the failure by ~50 ms. The fix has to be <b>which</b> rows are shown (more saccade examples, or rows retrieved for the current moment) or a longer look ahead at the path.</p></div>
+  </div>
+
+  <div class="sub">
+    <h3>4f · A bug we found and fixed</h3>
+    <figure class="panel">
+      <div class="scroll">
+      <svg viewBox="0 0 1000 120" role="img" aria-label="The simulator edited the stored action in place, adding the wingbeat pattern to the wing labels; passing a copy fixed it.">
+        <rect x="20" y="30" width="170" height="52" rx="8" fill="#d5efec" stroke="#0f766e"/><text x="105" y="61" text-anchor="middle">policy's action</text>
+        <rect x="290" y="30" width="250" height="52" rx="8" fill="#fde4e4" stroke="#dc2626"/><text x="415" y="52" text-anchor="middle">simulator step</text><text x="415" y="70" text-anchor="middle" class="m" font-size="11" fill="#dc2626">wings += wingbeat pattern (in place)</text>
+        <rect x="640" y="30" width="340" height="52" rx="8" fill="#fff" stroke="#dc2626"/><text x="810" y="52" text-anchor="middle">stored label was policy + pattern</text><text x="810" y="70" text-anchor="middle" class="m" font-size="11" fill="#15803d">fix: pass a copy; all 6 passes re-collected</text>
+        <path d="M192,56 H286" stroke="#475569" stroke-width="1.6" marker-end="url(#a)"/><path d="M542,56 H636" stroke="#dc2626" stroke-width="1.6" marker-end="url(#a)"/>
+      </svg>
+      </div>
+      <figcaption>The first dataset mixed two meanings for the wing labels. Found by re-running the policy on stored inputs; after the fix the labels match exactly. All results on this page use the corrected data.</figcaption>
+    </figure>
   </div>
 </section>
 
-<details>
-  <summary>Data behind the charts</summary>
-  <div id="tables"></div>
-</details>
+<!-- ============ LIMITATIONS ============ -->
+<section class="chap" id="limits">
+  <header><span class="num">05</span><h2>Limitations</h2></header>
+  <div class="simple"><span class="kicker">In simple words</span>
+    <p>TabPFN is too slow to fly a real fly in real time, it only knows what its examples show (and sharp turns are rare in them), and everything here is in simulation with a perfect target to follow.</p></div>
+  <div class="cards">
+    <div class="card"><div class="h"><b>Too slow for real time</b><span class="x" style="color:var(--bad)">31–114 ms</span></div>A decision needs 0.2 ms; TabPFN takes 150–570× longer. The simulator waits, so we measure decision quality, not live control.</div>
+    <div class="card"><div class="h"><b>Sudden turns</b><span class="x" style="color:var(--bad)">30–80 ms</span></div>Every path with an 80° saccade is lost within 30–80 ms of the turn, even with 1M rows. Fast turns are a small share of the random context.</div>
+    <div class="card"><div class="h"><b>Fixed, random context</b><span class="x" style="color:var(--warn)">no retrieval</span></div>The same random rows serve every moment of the flight, relevant or not.</div>
+    <div class="card"><div class="h"><b>Only as good as the teacher</b><span class="x" style="color:var(--warn)">imitation</span></div>TabPFN copies the RL policy; it cannot fly better than the policy or beyond what the examples show.</div>
+    <div class="card"><div class="h"><b>Few runs per setting</b><span class="x" style="color:var(--warn)">1 seed</span></div>Closed-loop numbers come from single deterministic runs; flight times would vary with other contexts or seeds.</div>
+    <div class="card"><div class="h"><b>Simulation only</b><span class="x" style="color:var(--warn)">sim2real</span></div>A perfect ghost target and noise-free sensors; no real fly or robot.</div>
+    <div class="card"><div class="h"><b>Mean only</b><span class="x" style="color:var(--ink-3)">unused</span></div>TabPFN gives a full distribution, but the controller uses only its mean, ignoring its own uncertainty.</div>
+    <div class="card"><div class="h"><b>Heavy compute</b><span class="x" style="color:var(--ink-3)">H100</span></div>The context that works (197k rows) needs a data-centre GPU; a laptop fits only 3k rows.</div>
+    <div class="card"><div class="h"><b>Hackathon time</b><span class="x" style="color:var(--ink-3)">~29 h</span></div>Several ideas below were planned but not yet run.</div>
+  </div>
+</section>
 
-<footer>github.com/Jaseelkt007/priorlab_berlin_hack · results/exp_a–exp_e · docs/data/collection-plan.md</footer>
+<!-- ============ IMPROVEMENTS ============ -->
+<section class="chap" id="next">
+  <header><span class="num">06</span><h2>How it can be improved</h2></header>
+  <div class="simple"><span class="kicker">In simple words</span>
+    <p>Show TabPFN more of the right examples (especially sharp turns), let it decide less often, use its own uncertainty, and make it faster, then try it on a real robot.</p></div>
+  <div class="tw"><table>
+    <tr><th>Idea</th><th>What it means</th><th>Fixes</th><th>Expected impact</th><th>Effort</th></tr>
+    <tr><td class="k">Over-sample turns</td><td>Fill a large share of the context with saccade rows</td><td>sudden turns</td><td><span class="pill hi">high</span></td><td>low</td></tr>
+    <tr><td class="k">Retrieve rows per moment</td><td>Pick the most similar recorded states every few ms (Prior Labs' "choose the rows you show")</td><td>fixed context, turns</td><td><span class="pill hi">high</span></td><td>medium</td></tr>
+    <tr><td class="k">1M-row context</td><td><b>Tested:</b> smooth paths as precise as the policy; sudden turns only ~50 ms better</td><td>smooth accuracy</td><td><span class="pill lo">done</span></td><td>low</td></tr>
+    <tr><td class="k">Decide less often</td><td>One decision per wingbeat (~4.6 ms), holding the action between</td><td>speed (23× fewer calls)</td><td><span class="pill md">medium</span></td><td>medium</td></tr>
+    <tr><td class="k">Use the uncertainty</td><td>Fall back to a safe controller, or warn, when the prediction spread is wide</td><td>safety</td><td><span class="pill md">medium</span></td><td>low</td></tr>
+    <tr><td class="k">Plan with candidates</td><td>Score several candidate actions by predicted drift; pick the best (as DuckPFN chose postures)</td><td>turns, robustness</td><td><span class="pill md">medium</span></td><td>medium</td></tr>
+    <tr><td class="k">Fewer columns</td><td>Keep ~40 informative inputs instead of 104</td><td>speed, laptop GPUs</td><td><span class="pill lo">low–medium</span></td><td>low</td></tr>
+    <tr><td class="k">Faster inference</td><td>torch.compile, int8 cache, batching; or distil TabPFN into a small network</td><td>real time</td><td><span class="pill md">medium</span></td><td>medium</td></tr>
+    <tr><td class="k">DAgger at scale</td><td>Add TabPFN's own mistakes, labelled by the policy, to a big context</td><td>recovery</td><td><span class="pill md">medium</span></td><td>medium</td></tr>
+    <tr><td class="k">Real robot</td><td>Same table approach on a drone or legged robot at 20–50 Hz</td><td>sim only</td><td><span class="pill hi">high</span></td><td>high</td></tr>
+  </table></div>
+</section>
+
+<!-- ============ GLOSSARY ============ -->
+<section class="chap" id="glossary">
+  <header><span class="num">07</span><h2>Glossary</h2></header>
+  <dl class="gloss">
+    <dt>TabPFN</dt><dd>Tabular Prior-data Fitted Network: a transformer pre-trained on synthetic tables that predicts missing values for new rows from example rows, with no training.</dd>
+    <dt>In-context learning</dt><dd>Learning from examples given at prediction time (the "context"), instead of by changing model weights.</dd>
+    <dt>Context</dt><dd>The example rows TabPFN reads. For flying: 3k to 1M rows recorded from the RL policy.</dd>
+    <dt>RL policy</dt><dd>A neural network trained by reinforcement learning (trial and reward) to fly the fly. Our teacher.</dd>
+    <dt>MuJoCo</dt><dd>A physics engine for robots and bodies; it moves the virtual fly in 0.05 ms steps.</dd>
+    <dt>Ghost</dt><dd>A see-through copy of the fly moved along the target path with no physics; the fly tries to stay on it.</dd>
+    <dt>Saccade</dt><dd>A fly's sudden fast turn, about 80° in a few hundredths of a second.</dd>
+    <dt>Closed loop</dt><dd>The controller's output changes the world, and the changed world is its next input.</dd>
+    <dt>R²</dt><dd>How much of the variation a prediction explains: 1 is perfect, 0 is no better than the average.</dd>
+    <dt>Calibration / 80% range</dt><dd>A well-calibrated model's 80% range contains the true value 80% of the time.</dd>
+    <dt>DAgger</dt><dd>Dataset Aggregation: add the states the learner itself visits, labelled by the expert, to its training (here: context) data.</dd>
+  </dl>
+</section>
+
+<footer>Code: collect/ (data, controller, showreel, remote brain) · experiments/ (A–C) · results/ · Videos: results/showreel/policy.mp4 and tabpfn_ctx16384.mp4 · Companion page: How TabPFN Flies the Fly</footer>
 </div>
 
 <script>
-const C = { tab: "#2563eb", alt: "#ea580c", pol: "#0f766e", old: "#cbd5e1", ink3: "#94a3b8", line: "#e2e8f0" };
-const A = {
-  1:  { mae: [[.009,.019,.094],[.008,.018,.037],[.011,.019,.040],[1.803,2.325,6.516]], cov: [[.84,.68],[.89,.67],[.88,.69],[.85,.72]] },
-  3:  { mae: [[.070,.097,.311],[.054,.101,.179],[.085,.107,.166],[7.908,8.709,19.281]], cov: [[.80,.66],[.89,.68],[.80,.66],[.82,.69]] },
-  10: { mae: [[1.084,1.065,1.458],[.928,1.003,1.594],[.833,.791,.981],[22.477,23.569,56.921]], cov: [[.73,.57],[.85,.71],[.73,.63],[.78,.69]] },
+const C = { tab: "#2563eb", alt: "#ea580c", pol: "#0f766e", old: "#cbd5e1", ink3: "#94a3b8", line: "#e2e8f0", tabL: "#93c5fd", altL: "#fdba74" };
+const A = { // per horizon: [tabpfn, trees, const-vel] MAE for forward, sideways, up, turn; and 80% coverage [tabpfn, trees]
+  1:  { mae: [[.009,.020,.102],[.008,.018,.041],[.010,.018,.041],[1.792,2.460,7.307]], cov: [[.86,.68],[.90,.68],[.90,.71],[.86,.70]] },
+  3:  { mae: [[.071,.099,.331],[.053,.098,.190],[.080,.100,.166],[8.254,8.931,22.298]], cov: [[.80,.65],[.88,.66],[.82,.68],[.78,.68]] },
+  10: { mae: [[1.138,1.146,1.531],[.964,1.073,1.651],[.762,.784,.956],[21.932,23.323,65.198]], cov: [[.72,.58],[.83,.71],[.75,.64],[.79,.71]] },
 };
-const B = [["clean only", .157, .144], ["+4 flights", .122, .146], ["+16 flights", .091, .139], ["+all heavy", .072, .115], ["heavy only", .077, .113]];
-const SURV = [
-  { name: "Smooth path, 512 steps", ms: 136, k: "old" },
-  { name: "DAgger, best round", ms: 115, k: "old" },
-  { name: "Curve, 256 steps", ms: 71, k: "old" },
-  { name: "+ previous action", ms: 55, k: "old" },
-  { name: "+ action change", ms: 34, k: "old" },
-  { name: "Curve, corrected clean data", ms: 61, k: "new" },
-  { name: "Policy flies beat freq", ms: 74, k: "new" },
-  { name: "Policy flies head", ms: 77, k: "new" },
-  { name: "Policy flies wings", ms: 1000, k: "wings", more: true },
-];
-const SPLIT = [ // groups handed to the policy, result
-  { pol: [], res: "61 ms · falls", bad: true },
-  { pol: ["beat"], res: "74 ms · falls", bad: true },
-  { pol: ["head"], res: "77 ms · falls", bad: true },
-  { pol: ["head", "beat"], res: "63 ms · falls", bad: true },
-  { pol: ["wings"], res: "full 1 s · 0.12 mm", bad: false },
-];
-const DRIFT = [[0.03,-0.0,-0.02],[0.09,-0.01,-0.03],[0.12,-0.01,-0.05],[0.14,-0.02,-0.06],[0.13,-0.02,-0.06],[0.17,-0.03,-0.08],[0.23,-0.04,-0.1],[0.26,-0.05,-0.12],[0.26,-0.06,-0.12],[0.27,-0.06,-0.12],[0.33,-0.08,-0.13],[0.38,-0.09,-0.16],[0.39,-0.1,-0.17],[0.39,-0.12,-0.17],[0.43,-0.13,-0.18],[0.49,-0.15,-0.2],[0.52,-0.17,-0.22],[0.52,-0.19,-0.22],[0.54,-0.21,-0.23],[0.6,-0.23,-0.25],[0.65,-0.26,-0.27],[0.68,-0.28,-0.29],[0.7,-0.3,-0.29],[0.74,-0.32,-0.32],[0.81,-0.35,-0.36],[0.86,-0.38,-0.39],[0.9,-0.4,-0.41],[0.93,-0.43,-0.42],[1.0,-0.46,-0.47],[1.08,-0.5,-0.53],[1.14,-0.53,-0.58],[1.18,-0.56,-0.6],[1.25,-0.59,-0.65],[1.34,-0.63,-0.74],[1.42,-0.67,-0.81],[1.49,-0.71,-0.86],[1.57,-0.75,-0.91],[1.66,-0.79,-1.01],[1.76,-0.84,-1.12],[1.85,-0.89,-1.22],[1.95,-0.93,-1.29],[2.05,-0.98,-1.38],[2.16,-1.04,-1.54],[2.26,-1.09,-1.68],[2.37,-1.15,-1.8],[2.5,-1.2,-1.91],[2.61,-1.26,-2.07],[2.72,-1.33,-2.27],[2.84,-1.39,-2.44],[2.98,-1.46,-2.6],[3.11,-1.52,-2.78],[3.22,-1.6,-3.02],[3.34,-1.67,-3.24],[3.48,-1.74,-3.46],[3.63,-1.82,-3.68],[3.76,-1.9,-3.93],[3.86,-1.98,-4.21],[3.98,-2.06,-4.49],[4.13,-2.14,-4.76],[4.28,-2.22,-5.05],[4.37,-2.31,-5.37]];
-const POL = [0.03,0.08,0.12,0.14,0.12,0.14,0.19,0.21,0.18,0.18,0.21,0.23,0.22,0.18,0.2,0.22,0.22,0.18,0.17,0.19,0.19,0.16,0.13,0.14,0.16,0.15,0.11,0.11,0.12,0.13,0.11,0.1,0.1,0.11,0.11,0.1,0.11,0.11,0.12,0.12,0.11,0.11,0.12,0.12,0.11,0.11,0.11,0.12,0.11,0.1,0.1,0.12,0.12,0.1,0.1,0.12,0.13,0.11,0.1,0.11,0.13,0.14];
+const BL = ["clean only", "+4 flights", "+16 flights", "+all", "changed only"];
+const B = { heavyT: [.162,.119,.091,.069,.071], heavyG: [.145,.146,.134,.105,.110], wingT: [.078,.069,.065,.056,.057], wingG: [.097,.095,.091,.082,.085] };
+const CC = { steps: [100, 500, 2000, 8000], tab: [.195,.692,.807,.857], gbt: [.396,.622,.771,.843], mlp: [.086,.252,.654,.810] };
+const LAT = [[4096, 49, 30.8], [16384, 197, 41.8], [32768, 393, 55.4], [83333, 1000, 113.7]];
+const FLY = [ // path, length ms, small-context ms, big-context ms
+  ["S-curve", 2000, 60, 2000], ["Tight curve", 1000, 61, 1000], ["Smooth → sudden turn", 1500, null, 630], ["Sudden turn → smooth", 1500, null, 178], ["Tour (4 s)", 4000, null, 829] ];
+const SPLIT = [[[], "61 ms", 0], [["beat"], "74 ms", 0], [["head"], "77 ms", 0], [["head", "beat"], "63 ms", 0], [["wings"], "full 1 s", 1]];
 
 const NS = "http://www.w3.org/2000/svg";
 const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
-function el(tag, at, p) { const e = document.createElementNS(NS, tag); for (const k in at) e.setAttribute(k, at[k]); if (p) p.appendChild(e); return e; }
-function txt(p, x, y, s, at = {}) { const t = el("text", { x, y, ...at }, p); t.textContent = s; return t; }
+function el(t, a, p) { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; }
+function txt(p, x, y, s, a = {}) { const t = el("text", { x, y, ...a }, p); t.textContent = s; return t; }
 function host(id, W, H, label) { const h = document.getElementById(id), s = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": label }); h.appendChild(s); const tip = document.createElement("div"); tip.className = "tip"; tip.hidden = true; h.appendChild(tip); return { s, tip, W }; }
 function tipAt(c, x, y, s) { const k = c.s.getBoundingClientRect().width / c.W; c.tip.textContent = s; c.tip.style.left = x * k + "px"; c.tip.style.top = y * k + "px"; c.tip.hidden = false; }
-function hover(c, node, x, y, s) { node.addEventListener("pointerenter", () => tipAt(c, x, y, s)); node.addEventListener("pointerleave", () => c.tip.hidden = true); }
-function vbar(p, x, y, w, h, fill) { const r = Math.min(4, w / 2, h); return el("path", { d: `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`, fill }, p); }
-function hbar(p, x, y, w, h, fill) { const r = Math.min(4, h / 2, w); return el("path", { d: `M${x},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h - r}Q${x + w},${y + h} ${x + w - r},${y + h}H${x}Z`, fill }, p); }
+function hover(c, n, x, y, s) { n.addEventListener("pointerenter", () => tipAt(c, x, y, s)); n.addEventListener("pointerleave", () => c.tip.hidden = true); }
+function vbar(p, x, y, w, h, f) { const r = Math.min(4, w / 2, h); return el("path", { d: `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`, fill: f }, p); }
+function hbar(p, x, y, w, h, f) { const r = Math.min(4, h / 2, Math.max(w, 0)); return el("path", { d: `M${x},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h - r}Q${x + w},${y + h} ${x + w - r},${y + h}H${x}Z`, fill: f }, p); }
 
 function grouped(id, label, groups, max, ticks, fmt, ref) {
-  const W = 460, H = 230, L = 40, R = 6, T = 14, Bm = 28, c = host(id, W, H, label), y = v => T + (H - T - Bm) * (1 - v / max);
+  const W = 480, H = 240, L = 42, R = 6, T = 16, Bm = 28, c = host(id, W, H, label), y = v => T + (H - T - Bm) * (1 - v / max);
   ticks.forEach(t => { el("line", { x1: L, x2: W - R, y1: y(t), y2: y(t), class: "gl" }, c.s); txt(c.s, L - 6, y(t) + 4, fmt(t), { "text-anchor": "end" }); });
   if (ref != null) el("line", { x1: L, x2: W - R, y1: y(ref), y2: y(ref), stroke: C.ink3, "stroke-dasharray": "4 3", "stroke-width": 1.5 }, c.s);
-  const gw = (W - L - R) / groups.length, bw = 32;
+  const gw = (W - L - R) / groups.length, bw = 34;
   groups.forEach((g, i) => { const cx = L + gw * (i + .5); txt(c.s, cx, H - 8, g.label, { "text-anchor": "middle", class: "lbl" });
     g.vals.forEach((v, j) => { const x = cx - bw - 1 + j * (bw + 2); vbar(c.s, x, y(v), bw, y(0) - y(v), j ? C.alt : C.tab);
       txt(c.s, x + bw / 2, y(v) - 5, fmt(v), { "text-anchor": "middle", class: "lbl" });
       hover(c, el("rect", { x: x - 1, y: T, width: bw + 2, height: y(0) - T, fill: "transparent" }, c.s), x + bw / 2, y(v), `${g.label} · ${j ? "trees" : "TabPFN"} ${fmt(v)}`); }); });
 }
 const HZ = [1, 3, 10], hl = h => `${h} wingbeat${h > 1 ? "s" : ""}`;
-grouped("chA", "Error relative to constant velocity by horizon", HZ.map(h => ({ label: hl(h), vals: [0, 1].map(j => mean(A[h].mae.map(r => r[j] / r[2]))) })), 1, [0, .25, .5, .75, 1], v => v.toFixed(2));
-grouped("chCov", "Coverage of the 80% range by horizon", HZ.map(h => ({ label: hl(h), vals: [0, 1].map(j => mean(A[h].cov.map(r => r[j]))) })), 1, [0, .2, .4, .6, .8, 1], v => Math.round(v * 100) + "%", .8);
+grouped("chA", "Error relative to constant velocity", HZ.map(h => ({ label: hl(h), vals: [0, 1].map(j => mean(A[h].mae.map(r => r[j] / r[2]))) })), 1, [0, .25, .5, .75, 1], v => v.toFixed(2));
+grouped("chCov", "Coverage of the 80% range", HZ.map(h => ({ label: hl(h), vals: [0, 1].map(j => mean(A[h].cov.map(r => r[j]))) })), 1, [0, .2, .4, .6, .8, 1], v => Math.round(v * 100) + "%", .8);
 
-(function () { // B
-  const W = 980, H = 220, L = 50, R = 120, T = 16, Bm = 28, c = host("chB", W, H, "Heavy-fly forward error as heavy-fly flights are added"), max = .18;
-  const x = i => L + (W - L - R) * i / (B.length - 1), y = v => T + (H - T - Bm) * (1 - v / max);
-  [0, .05, .1, .15].forEach(t => { el("line", { x1: L, x2: W - R, y1: y(t), y2: y(t), class: "gl" }, c.s); txt(c.s, L - 8, y(t) + 4, t.toFixed(2), { "text-anchor": "end" }); });
-  B.forEach((b, i) => txt(c.s, x(i), H - 8, b[0], { "text-anchor": "middle", class: "lbl" }));
-  [[1, C.tab, "TabPFN"], [2, C.alt, "Trees"]].forEach(([k, col, nm]) => {
-    el("polyline", { points: B.map((b, i) => `${x(i)},${y(b[k])}`).join(" "), fill: "none", stroke: col, "stroke-width": 2, "stroke-linejoin": "round" }, c.s);
-    B.forEach((b, i) => { el("circle", { cx: x(i), cy: y(b[k]), r: 4.5, fill: col, stroke: "#fff", "stroke-width": 2 }, c.s);
-      hover(c, el("circle", { cx: x(i), cy: y(b[k]), r: 14, fill: "transparent" }, c.s), x(i), y(b[k]), `${b[0]} · ${nm} ${b[k].toFixed(3)} mm`); });
-    const last = B[B.length - 1][k]; txt(c.s, x(B.length - 1) + 10, y(last) + 4, `${nm} ${last.toFixed(3)}`, { class: "lbl" });
-  });
+function lines(id, label, xs, series, max, ticks, fmt, W = 1000, H = 240, xlabel = i => xs[i]) {
+  const L = 50, R = 150, T = 16, Bm = 28, c = host(id, W, H, label);
+  const x = i => L + (W - L - R) * i / (xs.length - 1), y = v => T + (H - T - Bm) * (1 - v / max);
+  ticks.forEach(t => { el("line", { x1: L, x2: W - R, y1: y(t), y2: y(t), class: "gl" }, c.s); txt(c.s, L - 8, y(t) + 4, fmt(t), { "text-anchor": "end" }); });
+  xs.forEach((_, i) => txt(c.s, x(i), H - 8, xlabel(i), { "text-anchor": "middle", class: "lbl" }));
+  series.forEach(s => { el("polyline", { points: s.v.map((v, i) => `${x(i)},${y(v)}`).join(" "), fill: "none", stroke: s.c, "stroke-width": 2, "stroke-linejoin": "round", "stroke-dasharray": s.dash || "" }, c.s);
+    s.v.forEach((v, i) => { el("circle", { cx: x(i), cy: y(v), r: 4.5, fill: s.c, stroke: "#fff", "stroke-width": 2 }, c.s);
+      hover(c, el("circle", { cx: x(i), cy: y(v), r: 13, fill: "transparent" }, c.s), x(i), y(v), `${s.n} · ${xlabel(i)}: ${fmt(v)}`); });
+    const last = s.v[s.v.length - 1]; txt(c.s, x(xs.length - 1) + 10, y(last) + 4 + (s.off || 0), `${s.n} ${fmt(last)}`, { class: "lbl" }); });
+}
+lines("chB", "Changed-fly forward error as flights are added", BL, [
+  { n: "TabPFN heavy", v: B.heavyT, c: C.tab, off: 4 }, { n: "Trees heavy", v: B.heavyG, c: C.alt, off: -2 },
+  { n: "TabPFN wing", v: B.wingT, c: C.tabL, off: 6 }, { n: "Trees wing", v: B.wingG, c: C.altL, off: -4 }], .18, [0, .05, .1, .15], v => v.toFixed(3));
+lines("chC", "R2 of copied actions by context size", CC.steps, [
+  { n: "TabPFN", v: CC.tab, c: C.tab, off: -4 }, { n: "Trees", v: CC.gbt, c: C.alt, off: 6 }, { n: "MLP", v: CC.mlp, c: C.ink3, off: 14 }], 1, [0, .25, .5, .75, 1], v => v.toFixed(2), 480, 240, i => CC.steps[i].toLocaleString() + " steps");
+lines("chLat", "Decision time by context size", LAT.map(r => r[0]), [{ n: "", v: LAT.map(r => r[2]), c: C.tab }], 130, [0, 40, 80, 120], v => v.toFixed(0) + " ms", 480, 240, i => LAT[i][1] + "k rows");
+
+(function () { // flight time per path
+  const W = 1000, rowH = 54, L = 200, R = 150, T = 8, n = FLY.length, H = T + n * rowH + 28, max = 4000, c = host("chFly", W, H, "Flight time by path and context size");
+  const x = v => L + (W - L - R) * v / max;
+  [0, 1000, 2000, 3000, 4000].forEach(t => { el("line", { x1: x(t), x2: x(t), y1: T, y2: T + n * rowH, class: "gl" }, c.s); txt(c.s, x(t), H - 6, (t / 1000) + " s", { "text-anchor": "middle" }); });
+  FLY.forEach(([name, len, small, big], i) => { const y0 = T + i * rowH + 4;
+    txt(c.s, L - 10, y0 + 24, name, { "text-anchor": "end", class: "lbl", style: "font-family: Inter, sans-serif; font-size: 12.5px" });
+    hbar(c.s, L, y0, x(len) - L, 12, C.pol);
+    hbar(c.s, L, y0 + 15, Math.max(x(small || 0) - L, small ? 2 : 0), 12, C.old);
+    hbar(c.s, L, y0 + 30, x(big) - L, 12, C.tab);
+    txt(c.s, x(len) + 6, y0 + 10, `policy ${len / 1000} s`, { class: "lbl" });
+    txt(c.s, x(small || 0) + 6, y0 + 25, small ? `${small} ms` : "not run", {});
+    txt(c.s, x(big) + 6, y0 + 40, big >= len ? `${big / 1000} s · full path` : `${big} ms · lost at sudden turn`, { class: "lbl", style: big >= len ? "fill:#15803d;font-weight:600" : "fill:#dc2626" });
+    hover(c, el("rect", { x: L, y: y0 - 2, width: W - L - R, height: 46, fill: "transparent" }, c.s), x(big), y0, `${name}: TabPFN 16k ${big} ms of ${len} ms`); });
 })();
 
-(function () { // survival
-  const W = 980, rowH = 30, L = 230, R = 150, T = 6, n = SURV.length, H = T + n * rowH + 26, max = 320, c = host("chSurv", W, H, "Milliseconds of flight before falling, per run");
-  const x = v => L + (W - L - R) * Math.min(v, max) / max;
-  [0, 50, 100, 150, 200, 250, 300].forEach(t => { el("line", { x1: x(t), x2: x(t), y1: T, y2: T + n * rowH, class: "gl" }, c.s); txt(c.s, x(t), H - 6, t + " ms", { "text-anchor": "middle" }); });
-  SURV.forEach((d, i) => { const yy = T + i * rowH + 6, col = d.k === "old" ? C.old : d.k === "wings" ? C.pol : C.tab;
-    txt(c.s, L - 10, yy + 13, d.name, { "text-anchor": "end", class: "lbl" });
-    hbar(c.s, L, yy, x(d.ms) - L, rowH - 12, col);
-    if (d.more) { el("path", { d: `M${x(max) - 14},${yy - 2} l8,${rowH - 8} M${x(max) - 8},${yy - 2} l8,${rowH - 8}`, stroke: "#fff", "stroke-width": 3 }, c.s); }
-    txt(c.s, x(d.ms) + 8, yy + 13, d.more ? "1,000 ms, full path" : d.ms + " ms", { class: "lbl" });
-    hover(c, el("rect", { x: L, y: yy - 4, width: W - L - R, height: rowH, fill: "transparent" }, c.s), x(d.ms), yy, `${d.name}: ${d.more ? "full 1 s path, 0.12 mm mean, 0.16 max" : d.ms + " ms"}`); });
+const SW = {"flew":{"4096":{"tour":[827.0,4000.0,0.278,5.003],"S-curve":[2000.8,2000.0,0.138,0.512],"tight curve":[624.0,1000.0,0.456,5.034],"sudden turn, then smooth":[181.6,1500.0,0.588,5.022],"smooth, then sudden turn":[627.2,1500.0,0.329,5.043]},"16384":{"tour":[829.2,4000.0,0.334,5.005],"S-curve":[2000.8,2000.0,0.198,0.293],"tight curve":[1000.8,1000.0,0.28,0.42],"sudden turn, then smooth":[177.8,1500.0,0.625,5.018],"smooth, then sudden turn":[627.2,1500.0,0.36,5.014]},"32768":{"tour":[876.8,4000.0,0.282,5.017],"S-curve":[2000.8,2000.0,0.099,0.231],"tight curve":[1000.8,1000.0,0.162,0.246],"sudden turn, then smooth":[222.0,1500.0,0.826,5.031],"smooth, then sudden turn":[682.8,1500.0,0.346,5.013]},"83333":{"tour":[873.2,4000.0,0.269,5.013],"S-curve":[2000.8,2000.0,0.104,0.245],"tight curve":[1000.8,1000.0,0.177,0.29],"sudden turn, then smooth":[228.2,1500.0,0.763,5.015],"smooth, then sudden turn":[677.2,1500.0,0.32,5.007]}},"mean":{},"curves":{"tight curve":{"4096":[0.03,0.06,0.08,0.08,0.07,0.08,0.08,0.1,0.14,0.19,0.23,0.25,0.26,0.26,0.26,0.25,0.24,0.23,0.2,0.18,0.17,0.16,0.16,0.15,0.15,0.16,0.18,0.2,0.22,0.23,0.23,0.22,0.2,0.18,0.17,0.15,0.15,0.15,0.15,0.15,0.17,0.19,0.21,0.24,0.25,0.26,0.26,0.25,0.23,0.21,0.19,0.18,0.18,0.18,0.18,0.18,0.2,0.21,0.23,0.25,0.27,0.28,0.29,0.3,0.29,0.27,0.25,0.22,0.2,0.19,0.18,0.17,0.18,0.19,0.21,0.24,0.26,0.28,0.29,0.31,0.32,0.34,0.35,0.35,0.36,0.37,0.38,0.37,0.35,0.33,0.3,0.27,0.26,0.26,0.27,0.27,0.29,0.3,0.31,0.33,0.36,0.4,0.45,0.5,0.54,0.58,0.6,0.61,0.6,0.56,0.48,0.38,0.26,0.15,0.1,0.12,0.15,0.15,0.11,0.06,0.13,0.27,0.41,0.54,0.67,0.8,0.91,1.0,1.07,1.1,1.1,1.07,1.0,0.89,0.75,0.62,0.5,0.41,0.38,0.42,0.52,0.64,0.73,0.79,0.82,0.81,0.78,0.81,0.99,1.36,1.83,2.34,2.88,3.43,4.03,4.68],"16384":[0.05,0.17,0.25,0.3,0.3,0.28,0.25,0.22,0.21,0.23,0.25,0.26,0.27,0.27,0.28,0.29,0.31,0.33,0.36,0.39,0.41,0.4,0.37,0.33,0.27,0.22,0.17,0.14,0.14,0.13,0.14,0.16,0.18,0.2,0.21,0.22,0.25,0.28,0.3,0.32,0.33,0.32,0.32,0.3,0.29,0.27,0.24,0.22,0.21,0.21,0.22,0.24,0.27,0.3,0.32,0.35,0.38,0.39,0.4,0.4,0.4,0.39,0.36,0.31,0.25,0.19,0.16,0.16,0.17,0.18,0.19,0.2,0.23,0.26,0.29,0.31,0.35,0.38,0.4,0.39,0.37,0.33,0.28,0.23,0.2,0.19,0.18,0.18,0.2,0.22,0.24,0.27,0.29,0.32,0.35,0.38,0.39,0.4,0.38,0.34,0.3,0.26,0.23,0.2,0.18,0.17,0.19,0.21,0.23,0.25,0.27,0.3,0.34,0.36,0.39,0.39,0.39,0.37,0.35,0.32,0.28,0.23,0.19,0.17,0.18,0.2,0.21,0.23,0.24,0.27,0.3,0.33,0.35,0.37,0.39,0.4,0.39,0.36,0.32,0.26,0.21,0.19,0.18,0.18,0.19,0.21,0.23,0.25,0.28,0.3,0.33,0.37,0.4,0.41,0.41,0.38,0.34,0.29,0.25,0.21,0.19,0.18,0.17,0.19,0.21,0.23,0.25,0.28,0.31,0.34,0.37,0.39,0.4,0.39,0.37,0.34,0.3,0.27,0.23,0.19,0.18,0.19,0.21,0.22,0.24,0.26,0.28,0.31,0.34,0.37,0.38,0.39,0.39,0.37,0.34,0.3,0.25,0.2,0.18,0.18,0.19,0.2,0.21,0.23,0.26,0.29,0.31,0.34,0.37,0.39,0.41,0.4,0.37,0.33,0.28,0.23,0.2,0.18,0.19,0.19,0.2,0.23,0.25,0.27,0.3,0.33,0.37,0.39,0.4,0.4,0.38,0.34,0.29,0.25,0.22,0.2,0.18,0.17,0.19,0.21,0.23,0.25,0.28,0.31,0.34,0.37,0.39,0.39,0.38,0.36],"32768":[0.02,0.07,0.12,0.14,0.15,0.15,0.17,0.17,0.18,0.19,0.2,0.21,0.22,0.23,0.23,0.24,0.24,0.23,0.22,0.21,0.21,0.19,0.18,0.17,0.15,0.14,0.14,0.15,0.17,0.18,0.19,0.19,0.18,0.17,0.16,0.15,0.14,0.14,0.14,0.14,0.14,0.14,0.15,0.15,0.16,0.16,0.16,0.15,0.15,0.14,0.14,0.14,0.14,0.14,0.15,0.15,0.15,0.15,0.15,0.14,0.14,0.15,0.16,0.16,0.15,0.15,0.14,0.14,0.14,0.14,0.15,0.15,0.15,0.15,0.15,0.14,0.14,0.15,0.15,0.16,0.15,0.15,0.15,0.15,0.15,0.15,0.16,0.16,0.16,0.16,0.15,0.15,0.15,0.15,0.15,0.16,0.16,0.16,0.16,0.15,0.15,0.15,0.16,0.16,0.16,0.16,0.16,0.16,0.15,0.15,0.15,0.16,0.17,0.17,0.16,0.16,0.15,0.15,0.16,0.16,0.17,0.17,0.17,0.16,0.16,0.15,0.16,0.16,0.17,0.17,0.16,0.16,0.16,0.16,0.15,0.16,0.17,0.17,0.17,0.16,0.16,0.16,0.16,0.16,0.17,0.17,0.16,0.17,0.16,0.16,0.16,0.16,0.17,0.17,0.17,0.17,0.17,0.16,0.16,0.16,0.16,0.17,0.17,0.16,0.16,0.16,0.16,0.16,0.17,0.17,0.17,0.17,0.17,0.16,0.16,0.16,0.16,0.17,0.17,0.17,0.17,0.16,0.16,0.16,0.17,0.17,0.17,0.17,0.17,0.16,0.16,0.16,0.16,0.17,0.17,0.17,0.17,0.17,0.16,0.16,0.16,0.17,0.17,0.17,0.17,0.16,0.16,0.16,0.16,0.17,0.17,0.17,0.17,0.17,0.16,0.16,0.16,0.17,0.17,0.17,0.17,0.16,0.16,0.16,0.16,0.17,0.17,0.17,0.17,0.17,0.16,0.16,0.16,0.17,0.17,0.17,0.17,0.17,0.16,0.16,0.16,0.17,0.17,0.17,0.17,0.17,0.16,0.16,0.16,0.16],"83333":[0.04,0.16,0.23,0.28,0.29,0.27,0.24,0.22,0.23,0.25,0.27,0.27,0.25,0.2,0.15,0.12,0.1,0.11,0.13,0.14,0.16,0.17,0.18,0.19,0.2,0.2,0.2,0.18,0.17,0.16,0.16,0.16,0.15,0.15,0.14,0.15,0.17,0.18,0.19,0.18,0.18,0.17,0.16,0.15,0.15,0.15,0.16,0.17,0.18,0.18,0.18,0.17,0.17,0.16,0.16,0.16,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.18,0.17,0.17,0.17,0.17,0.16,0.16,0.17,0.18,0.18,0.18,0.18,0.17,0.17,0.16,0.16,0.17,0.17,0.18,0.18,0.18,0.18,0.17,0.17,0.17,0.17,0.17,0.18,0.18,0.18,0.18,0.17,0.17,0.17,0.17,0.18,0.18,0.18,0.18,0.18,0.17,0.17,0.17,0.17,0.18,0.19,0.18,0.18,0.18,0.17,0.17,0.17,0.17,0.18,0.18,0.18,0.18,0.18,0.17,0.17,0.17,0.17,0.18,0.19,0.18,0.18,0.18,0.17,0.17,0.17,0.17,0.18,0.18,0.18,0.18,0.18,0.17,0.17,0.17,0.17,0.18,0.19,0.18,0.18,0.18,0.17,0.17,0.17,0.17,0.18,0.19,0.18,0.18,0.18,0.17,0.17,0.17,0.17,0.18,0.19,0.18,0.18,0.18,0.17,0.17,0.17,0.17,0.18,0.19,0.18,0.18,0.18,0.18,0.17,0.17,0.17,0.18,0.19,0.18,0.18,0.18,0.17,0.17,0.17,0.17,0.18,0.19,0.18,0.18,0.18,0.18,0.17,0.17,0.17,0.18,0.19,0.18,0.18,0.18,0.17,0.17,0.17,0.17,0.18,0.19,0.19,0.18,0.18,0.18,0.17,0.17,0.17,0.18,0.19,0.18,0.18,0.18,0.18,0.17,0.17,0.17,0.18,0.19,0.18,0.18,0.18,0.17,0.17,0.17,0.17,0.18,0.19,0.18,0.18,0.18,0.18,0.17,0.17,0.17,0.18,0.19,0.18,0.18,0.18,0.17]},"smooth, then sudden turn":{"4096":[0.07,0.17,0.24,0.27,0.26,0.22,0.16,0.11,0.13,0.2,0.25,0.26,0.25,0.22,0.17,0.14,0.12,0.13,0.14,0.17,0.17,0.17,0.13,0.08,0.04,0.13,0.22,0.28,0.32,0.36,0.39,0.41,0.43,0.45,0.46,0.48,0.5,0.5,0.47,0.42,0.35,0.27,0.18,0.11,0.05,0.06,0.08,0.07,0.05,0.03,0.06,0.1,0.14,0.17,0.2,0.23,0.25,0.27,0.28,0.29,0.29,0.26,0.22,0.18,0.15,0.14,0.15,0.14,0.11,0.08,0.07,0.1,0.13,0.16,0.18,0.2,0.21,0.22,0.23,0.22,0.22,0.21,0.21,0.2,0.19,0.17,0.17,0.17,0.17,0.17,0.17,0.17,0.18,0.19,0.2,0.2,0.19,0.18,0.18,0.19,0.2,0.22,0.23,0.23,0.24,0.24,0.23,0.22,0.21,0.2,0.19,0.18,0.18,0.18,0.19,0.19,0.2,0.2,0.2,0.21,0.22,0.23,0.25,0.26,0.27,0.27,0.26,0.24,0.23,0.22,0.2,0.19,0.18,0.17,0.17,0.18,0.19,0.19,0.19,0.2,0.21,0.22,0.23,0.24,0.27,0.32,0.4,0.52,0.68,0.9,1.2,1.59,2.06,2.62,3.26,3.98,4.78],"16384":[0.02,0.08,0.13,0.14,0.12,0.1,0.1,0.12,0.13,0.15,0.15,0.15,0.16,0.16,0.17,0.17,0.18,0.18,0.18,0.18,0.19,0.2,0.2,0.21,0.21,0.21,0.21,0.21,0.21,0.21,0.21,0.21,0.22,0.22,0.23,0.24,0.25,0.25,0.25,0.25,0.26,0.26,0.26,0.26,0.27,0.27,0.27,0.26,0.26,0.26,0.26,0.26,0.27,0.27,0.26,0.26,0.26,0.26,0.26,0.26,0.27,0.27,0.27,0.27,0.27,0.28,0.27,0.27,0.27,0.27,0.27,0.26,0.26,0.26,0.26,0.26,0.27,0.28,0.28,0.28,0.28,0.28,0.28,0.27,0.27,0.27,0.27,0.26,0.25,0.25,0.25,0.26,0.26,0.27,0.28,0.28,0.28,0.28,0.27,0.27,0.27,0.26,0.27,0.27,0.26,0.25,0.25,0.26,0.26,0.26,0.27,0.28,0.28,0.28,0.28,0.27,0.27,0.27,0.27,0.27,0.26,0.26,0.25,0.25,0.26,0.26,0.27,0.28,0.28,0.28,0.28,0.28,0.28,0.27,0.27,0.27,0.26,0.25,0.24,0.24,0.24,0.24,0.25,0.27,0.29,0.33,0.4,0.5,0.66,0.89,1.21,1.61,2.08,2.63,3.25,3.94,4.74],"32768":[0.03,0.12,0.18,0.22,0.2,0.12,0.06,0.11,0.17,0.21,0.21,0.18,0.15,0.14,0.15,0.16,0.17,0.18,0.19,0.19,0.19,0.17,0.15,0.15,0.14,0.14,0.12,0.11,0.1,0.1,0.11,0.13,0.16,0.17,0.17,0.16,0.14,0.12,0.11,0.11,0.1,0.1,0.1,0.09,0.1,0.12,0.13,0.13,0.13,0.13,0.13,0.13,0.12,0.11,0.1,0.1,0.1,0.12,0.13,0.13,0.12,0.12,0.1,0.1,0.1,0.1,0.11,0.12,0.12,0.12,0.12,0.11,0.11,0.11,0.11,0.12,0.12,0.12,0.11,0.11,0.11,0.11,0.12,0.13,0.13,0.12,0.12,0.11,0.1,0.1,0.1,0.11,0.13,0.13,0.13,0.12,0.12,0.11,0.11,0.11,0.11,0.12,0.13,0.12,0.12,0.12,0.11,0.11,0.11,0.12,0.13,0.13,0.13,0.12,0.12,0.11,0.11,0.11,0.12,0.13,0.13,0.13,0.12,0.12,0.11,0.11,0.11,0.12,0.13,0.13,0.13,0.12,0.12,0.11,0.11,0.11,0.12,0.13,0.13,0.13,0.12,0.12,0.12,0.12,0.13,0.17,0.23,0.31,0.43,0.59,0.79,1.01,1.22,1.41,1.55,1.6,1.57,1.44,1.23,0.97,0.77,0.82,1.13,1.53,1.96,2.4,2.84,3.31,3.81,4.35,4.91],"83333":[0.05,0.1,0.12,0.12,0.1,0.05,0.06,0.1,0.13,0.14,0.12,0.11,0.11,0.13,0.14,0.15,0.14,0.12,0.1,0.08,0.06,0.06,0.06,0.06,0.07,0.08,0.09,0.09,0.09,0.1,0.1,0.1,0.11,0.12,0.12,0.12,0.11,0.11,0.1,0.1,0.1,0.1,0.11,0.1,0.1,0.1,0.09,0.09,0.09,0.1,0.11,0.12,0.12,0.12,0.11,0.11,0.1,0.1,0.1,0.11,0.12,0.12,0.12,0.11,0.1,0.1,0.1,0.1,0.11,0.12,0.12,0.12,0.11,0.11,0.11,0.11,0.11,0.12,0.13,0.12,0.12,0.12,0.11,0.11,0.1,0.11,0.12,0.13,0.12,0.12,0.12,0.11,0.11,0.11,0.11,0.12,0.13,0.13,0.13,0.12,0.12,0.11,0.11,0.11,0.12,0.13,0.13,0.12,0.12,0.11,0.11,0.11,0.11,0.12,0.13,0.13,0.12,0.12,0.11,0.11,0.11,0.11,0.12,0.13,0.13,0.13,0.12,0.12,0.11,0.11,0.11,0.12,0.13,0.13,0.13,0.12,0.12,0.11,0.11,0.11,0.12,0.13,0.13,0.14,0.14,0.16,0.21,0.29,0.42,0.6,0.81,1.05,1.28,1.46,1.55,1.51,1.33,1.03,0.69,0.52,0.76,1.18,1.65,2.13,2.61,3.09,3.57,4.07,4.58]}}};
+const SZ = ["4096", "16384", "32768", "83333"], SZL = {"4096": "4k · 49k rows", "16384": "16k · 197k rows", "32768": "32k · 393k rows", "83333": "83k · 1M rows"};
+const SZC = {"4096": "#93c5fd", "16384": "#60a5fa", "32768": "#2563eb", "83333": "#1e3a8a"};
+(function () { // matrix
+  const s = document.getElementById("swMatrix"), paths = ["S-curve", "tight curve", "tour", "sudden turn, then smooth", "smooth, then sudden turn"];
+  const names = {"S-curve": "S-curve (2 s)", "tight curve": "Tight curve (1 s)", "tour": "Tour (4 s)", "sudden turn, then smooth": "Sudden turn → smooth (1.5 s)", "smooth, then sudden turn": "Smooth → sudden turn (1.5 s)"};
+  SZ.forEach((z, j) => txt(s, 340 + j * 160, 22, SZL[z], { "text-anchor": "middle", "font-size": 12.5, "font-weight": 600 }));
+  paths.forEach((p, i) => { const y = 36 + i * 56;
+    txt(s, 250, y + 30, names[p], { "text-anchor": "end", "font-size": 12.5 });
+    SZ.forEach((z, j) => { const [flew, plan, m] = SW.flew[z][p], full = flew >= plan - 1, x = 265 + j * 160;
+      el("rect", { x, y, width: 150, height: 46, rx: 8, fill: full ? "#dcf3e3" : "#fde4e4", stroke: full ? "#15803d" : "#dc2626" }, s);
+      txt(s, x + 75, y + 20, full ? "full path" : `lost at ${Math.round(flew)} ms`, { "text-anchor": "middle", "font-size": 12.5, "font-weight": 600, fill: full ? "#15803d" : "#dc2626" });
+      txt(s, x + 75, y + 37, full ? `${m.toFixed(2)} mm mean` : `of ${plan / 1000} s`, { "text-anchor": "middle", "font-size": 11.5, class: "t2" }); }); });
 })();
+lines("swAcc", "Mean distance on smooth paths by context size", SZ, [
+  { n: "S-curve", v: SZ.map(z => SW.flew[z]["S-curve"][2]), c: "#2563eb", off: -4 },
+  { n: "Tight", v: SZ.map(z => SW.flew[z]["tight curve"][2]), c: "#0f766e", off: 8 }], .5, [0, .1, .2, .3, .4, .5], v => v.toFixed(2), 480, 240, i => SZL[SZ[i]].split(" · ")[1]);
+(function () { const c = document.querySelector("#swAcc svg");
+  [[.09, 0], [.12, 1]].forEach(([v, k]) => { const y = 16 + (240 - 16 - 28) * (1 - v / .5);
+    el("line", { x1: 50, x2: 330, y1: y, y2: y, stroke: k ? "#0f766e" : "#2563eb", "stroke-dasharray": "4 4", opacity: .7 }, c); }); })();
+(function () { // ms survived after the turn
+  const turns = { "tour": 800, "sudden turn, then smooth": 150, "smooth, then sudden turn": 600 }, cols = { "tour": "#93c5fd", "sudden turn, then smooth": "#2563eb", "smooth, then sudden turn": "#1e3a8a" };
+  const W = 480, H = 240, L = 46, R = 6, T = 16, Bm = 28, c = host("swTurn", W, H, "Milliseconds survived after the sudden turn by context size"), max = 100, y = v => T + (H - T - Bm) * (1 - v / max);
+  [0, 25, 50, 75, 100].forEach(t => { el("line", { x1: L, x2: W - R, y1: y(t), y2: y(t), class: "gl" }, c.s); txt(c.s, L - 6, y(t) + 4, t + " ms", { "text-anchor": "end" }); });
+  const gw = (W - L - R) / SZ.length, bw = 22;
+  SZ.forEach((z, i) => { const cx = L + gw * (i + .5); txt(c.s, cx, H - 8, SZL[z].split(" · ")[1], { "text-anchor": "middle", class: "lbl" });
+    Object.keys(turns).forEach((p, j) => { const v = Math.max(0, SW.flew[z][p][0] - turns[p]), x = cx - 1.5 * bw - 2 + j * (bw + 2);
+      vbar(c.s, x, y(v), bw, y(0) - y(v), cols[p]); txt(c.s, x + bw / 2, y(v) - 4, Math.round(v), { "text-anchor": "middle", class: "lbl" });
+      hover(c, el("rect", { x, y: T, width: bw, height: y(0) - T, fill: "transparent" }, c.s), x + bw / 2, y(v), `${SZL[z]} · ${p}: ${Math.round(v)} ms after the turn`); }); });
+})();
+function curves(id, legId, path, xmaxMs, ymax, turnMs) {
+  const W = 480, H = 250, L = 40, R = 10, T = 14, Bm = 26, c = host(id, W, H, "Distance to ghost over time by context size: " + path);
+  const x = ms => L + (W - L - R) * ms / xmaxMs, y = v => T + (H - T - Bm) * (1 - Math.min(v, ymax) / ymax);
+  for (let t = 0; t <= ymax; t += 1) { el("line", { x1: L, x2: W - R, y1: y(t), y2: y(t), class: "gl" }, c.s); txt(c.s, L - 6, y(t) + 4, t, { "text-anchor": "end" }); }
+  for (let ms = 0; ms <= xmaxMs; ms += xmaxMs / 5) txt(c.s, x(ms), H - 6, Math.round(ms) + " ms", { "text-anchor": "middle" });
+  if (turnMs) { el("line", { x1: x(turnMs), x2: x(turnMs), y1: T, y2: H - Bm, stroke: "#dc2626", "stroke-dasharray": "4 3" }, c.s); txt(c.s, x(turnMs) - 4, T + 22, "sudden turn", { "text-anchor": "end", style: "fill:#dc2626" }); }
+  const leg = document.getElementById(legId);
+  SZ.forEach(z => { const v = SW.curves[path][z]; // one point per 4 ms
+    el("polyline", { points: v.map((d, i) => `${x(i * 4 + 2)},${y(d)}`).join(" "), fill: "none", stroke: SZC[z], "stroke-width": 2, "stroke-linejoin": "round" }, c.s);
+    leg.insertAdjacentHTML("beforeend", `<span><i style="background:${SZC[z]}"></i>${SZL[z]}</span>`); });
+  txt(c.s, L + 6, T + 10, "mm from ghost", {});
+}
+curves("swTight", "swLeg1", "tight curve", 1000, 5, null);
+curves("swSud", "swLeg2", "smooth, then sudden turn", 700, 5, 600);
 
 (function () { // split matrix
-  const g = document.getElementById("splitRows"), cols = { head: 330, wings: 450, abdomen: 570, beat: 690 };
-  SPLIT.forEach((r, i) => { const y = 44 + i * 40;
-    txt(g, 20, y + 22, i === 0 ? "TabPFN controls all" : "Hand to policy: " + r.pol.join(" + "), { "font-size": 12, class: "t2" });
-    Object.entries(cols).forEach(([k, cx]) => { const p = r.pol.includes(k);
-      el("rect", { x: cx - 52, y, width: 104, height: 30, rx: 6, fill: p ? "#d5efec" : "#dbe7fd", stroke: p ? "#0f766e" : "#2563eb" }, g);
-      txt(g, cx, y + 19, p ? "policy" : "TabPFN", { "text-anchor": "middle", "font-size": 12, fill: p ? "#0f766e" : "#2563eb" }); });
-    el("rect", { x: 770, y, width: 160, height: 30, rx: 15, fill: r.bad ? "#fde4e4" : "#dcf3e3" }, g);
-    txt(g, 850, y + 19, r.res, { "text-anchor": "middle", "font-size": 12, "font-weight": 600, fill: r.bad ? "#dc2626" : "#15803d" }); });
-})();
-
-(function () { // drift
-  const W = 460, H = 270, L = 34, R = 52, T = 14, Bm = 26, n = DRIFT.length, c = host("chDrift", W, H, "Fly minus ghost over time: ahead, left and up");
-  const x = i => L + (W - L - R) * i / (n - 1), y = v => T + (H - T - Bm) * (1 - (v + 6) / 11);
-  [-6, -4, -2, 0, 2, 4].forEach(t => { el("line", { x1: L, x2: W - R, y1: y(t), y2: y(t), class: "gl", stroke: t === 0 ? "#cbd5e1" : C.line }, c.s); txt(c.s, L - 6, y(t) + 4, t, { "text-anchor": "end" }); });
-  [0, 20, 40, 60].forEach(ms => txt(c.s, x(Math.min(ms, n - 1)), H - 6, ms + " ms", { "text-anchor": "middle" }));
-  el("polyline", { points: POL.map((v, i) => `${x(i)},${y(v)}`).join(" "), fill: "none", stroke: C.ink3, "stroke-width": 2 }, c.s);
-  [["Ahead", C.tab], ["Left", C.alt], ["Up", C.pol]].forEach(([nm, col], k) => {
-    el("polyline", { points: DRIFT.map((r, i) => `${x(i)},${y(r[k])}`).join(" "), fill: "none", stroke: col, "stroke-width": 2, "stroke-linejoin": "round" }, c.s);
-    const v = DRIFT[n - 1][k]; el("circle", { cx: x(n - 1), cy: y(v), r: 4.5, fill: col, stroke: "#fff", "stroke-width": 2 }, c.s); txt(c.s, x(n - 1) + 8, y(v) + 4, nm, { class: "lbl" }); });
-  const cross = el("line", { y1: T, y2: H - Bm, stroke: C.ink3, visibility: "hidden" }, c.s), hit = el("rect", { x: L, y: T, width: W - L - R, height: H - T - Bm, fill: "transparent" }, c.s);
-  hit.addEventListener("pointermove", e => { const r = c.s.getBoundingClientRect(), i = Math.max(0, Math.min(n - 1, Math.round(((e.clientX - r.left) * W / r.width - L) / (W - L - R) * (n - 1))));
-    cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("visibility", "visible"); const d = DRIFT[i];
-    tipAt(c, x(i), T + 8, `${i} ms · ahead ${d[0].toFixed(2)} · left ${d[1].toFixed(2)} · up ${d[2].toFixed(2)} · policy ${POL[i].toFixed(2)}`); });
-  hit.addEventListener("pointerleave", () => { c.tip.hidden = true; cross.setAttribute("visibility", "hidden"); });
-})();
-
-(function () { // tables
-  const h = document.getElementById("tables"), mk = (hd, rows) => h.insertAdjacentHTML("beforeend", `<table><thead><tr>${hd.map(x => `<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(v => `<td>${v}</td>`).join("")}</tr>`).join("")}</tbody></table>`);
-  mk(["Horizon", "TabPFN / const-vel", "Trees / const-vel", "TabPFN 80% cover", "Trees 80% cover"], HZ.map(k => [hl(k), ...[0, 1].map(j => mean(A[k].mae.map(r => r[j] / r[2])).toFixed(2)), ...[0, 1].map(j => Math.round(mean(A[k].cov.map(r => r[j])) * 100) + "%")]));
-  mk(["Heavy-fly context", "TabPFN (mm)", "Trees (mm)"], B.map(b => [b[0], b[1].toFixed(3), b[2].toFixed(3)]));
-  mk(["Closed-loop run", "Flew (ms)", "Data"], SURV.map(d => [d.name, d.ms, d.k === "old" ? "first (wrong labels)" : "corrected"]));
+  const g = document.getElementById("split"), cols = { head: 175, wings: 245, abdomen: 315, beat: 385 };
+  SPLIT.forEach(([pol, res, ok], i) => { const y = 32 + i * 38;
+    txt(g, 10, y + 20, i === 0 ? "TabPFN all" : "policy: " + pol.join("+"), { "font-size": 11.5, class: "t2" });
+    Object.entries(cols).forEach(([k, cx]) => { const p = pol.includes(k);
+      el("rect", { x: cx - 32, y, width: 64, height: 28, rx: 6, fill: p ? "#d5efec" : "#dbe7fd", stroke: p ? "#0f766e" : "#2563eb" }, g); });
+    txt(g, 430, y + 19, res, { "text-anchor": "middle", "font-size": 11.5, "font-weight": 600, fill: ok ? "#15803d" : "#dc2626" }); });
 })();
 </script>

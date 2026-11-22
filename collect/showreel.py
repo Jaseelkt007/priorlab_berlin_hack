@@ -73,6 +73,9 @@ def main():
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--frame-every", type=int, default=10, help="control steps per video frame")
     parser.add_argument("--max-dev-mm", type=float, default=5.0, help="reset when this far from the ghost")
+    parser.add_argument("--once", action="store_true",
+                        help="fly each path type once (no video-length cap); for context-size sweeps")
+    parser.add_argument("--out", default="results/showreel", help="output folder")
     args = parser.parse_args()
 
     data = ROOT / "data"
@@ -92,18 +95,20 @@ def main():
     else:
         ctrl, name, tag = None, "Trained policy (teacher)", "policy"
 
-    out = ROOT / "results/showreel"
+    out = ROOT / args.out
     out.mkdir(parents=True, exist_ok=True)
-    need = int(args.video_seconds * args.fps)
-    frames, segments, k, t0 = [], [], 0, time.time()
-    while len(frames) < need:
+    need = float("inf") if args.once else int(args.video_seconds * args.fps)
+    frames, segments, curves, k, t0 = [], [], {}, 0, time.time()
+    while len(frames) < need and not (args.once and k >= len(REEL)):
         path = REEL[k % len(REEL)]
         qpos, qvel, _ = path_from_yaw_rate(_profile(path))
         pad = 10  # the task trims future_steps + 1 at the end
         loader.set_next_trajectory(np.vstack([qpos, np.repeat(qpos[-1:], pad, 0)]),
                                    np.vstack([qvel, np.repeat(qvel[-1:], pad, 0)]))
         timestep = env.reset()
-        drift, n, why = [], 0, "path end"
+        if ctrl is not None:
+            ctrl.reset()
+        drift, n, why, ts = [], 0, "path end", time.time()
         while timestep.step_type != 2:
             obs = timestep.observation
             if ctrl is None:
@@ -128,7 +133,11 @@ def main():
         if timestep.step_type == 2 and not env.task._reached_traj_end:
             why = "fell"
         seg = dict(path=path, flew_ms=round(n * DT * 1000, 1), planned_ms=round(len(qpos) * DT * 1000, 1),
-                   ended=why, drift_mean_mm=round(float(np.mean(drift)), 3), drift_max_mm=round(float(np.max(drift)), 3))
+                   ended=why, drift_mean_mm=round(float(np.mean(drift)), 3), drift_max_mm=round(float(np.max(drift)), 3),
+                   drift_at_mm={f"{ms}ms": round(drift[int(ms / 1000 / DT) - 1], 3)
+                                for ms in (20, 50, 100, 200, 500, 1000) if int(ms / 1000 / DT) <= len(drift)},
+                   ms_per_step=round((time.time() - ts) / n * 1000, 1))
+        curves[f"{k}_{path}"] = np.array(drift, np.float32)
         segments.append(seg)
         print(f"segment {k + 1}: {path}: flew {seg['flew_ms']:.0f}/{seg['planned_ms']:.0f} ms, {why}, "
               f"drift {seg['drift_mean_mm']:.2f}/{seg['drift_max_mm']:.2f} mm, video {len(frames) / args.fps:.0f} s, "
@@ -139,6 +148,7 @@ def main():
 
     import imageio.v2 as imageio
     imageio.mimwrite(out / f"{tag}.mp4", frames, fps=args.fps, macro_block_size=1)
+    np.savez_compressed(out / f"{tag}_drift.npz", **curves)
     (out / f"{tag}.json").write_text(json.dumps(dict(controller=name, context_steps=args.context_steps,
                                                      segments=segments, wall_s=round(time.time() - t0)), indent=1))
     print(f"wrote {out / tag}.mp4 ({len(frames) / args.fps:.0f} s of video)", flush=True)

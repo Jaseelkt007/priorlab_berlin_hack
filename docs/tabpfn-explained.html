@@ -298,6 +298,154 @@ footer { color: var(--ink-3); font-size: 12.5px; border-top: 1px solid var(--lin
   </figure>
 </section>
 
+<!-- 6b. Rows vs columns -->
+<section class="sec">
+  <header><div class="kicker">Question 7</div><h2>Why 12 rows × 1 target column, and not 1 row × 12 target columns?</h2>
+    <p class="ans">Both layouts ask the same question: given the 104 senses <b>now</b>, what are the 12 actions <b>now</b>? (Future positions are a different table, experiment A.) The difference is how the 12 answers are packed. <b>TabPFN predicts one target column per model</b>, so the "12 columns" layout really means 12 separate TabPFN models.</p></header>
+  <div class="two">
+    <figure>
+      <span class="tag could">Option 1 · 1 row, 12 target columns</span>
+      <svg viewBox="0 0 460 290" role="img" aria-label="Option 1: one row per step with 12 target columns, which TabPFN handles as 12 separate models, each with its own context and call.">
+        <g font-size="11" class="m">
+          <rect x="10" y="10" width="170" height="22" fill="#f7f8fa"/><rect x="180" y="10" width="270" height="22" fill="#fde8d9"/>
+          <text x="95" y="25" text-anchor="middle" class="t2">104 senses</text><text x="315" y="25" text-anchor="middle" fill="#ea580c">a0 a1 a2 … a11  (12 targets)</text>
+          <g fill="#fff" stroke="#e2e8f0"><rect x="10" y="36" width="440" height="20"/><rect x="10" y="60" width="440" height="20"/></g>
+          <text x="95" y="50" text-anchor="middle" class="t3">step 1</text><text x="95" y="74" text-anchor="middle" class="t3">step 2 …</text>
+        </g>
+        <text x="10" y="108" font-size="12" class="t2">TabPFN has no multi-target mode, so this becomes:</text>
+        <g font-size="11.5">
+          <rect x="10" y="120" width="100" height="42" rx="8" fill="#dbe7fd" stroke="#2563eb"/><text x="60" y="138" text-anchor="middle" font-weight="600">model 0</text><text x="60" y="154" text-anchor="middle" class="t2">a0 only</text>
+          <rect x="120" y="120" width="100" height="42" rx="8" fill="#dbe7fd" stroke="#2563eb"/><text x="170" y="138" text-anchor="middle" font-weight="600">model 1</text><text x="170" y="154" text-anchor="middle" class="t2">a1 only</text>
+          <text x="245" y="146" text-anchor="middle" class="t3">…</text>
+          <rect x="270" y="120" width="100" height="42" rx="8" fill="#dbe7fd" stroke="#2563eb"/><text x="320" y="138" text-anchor="middle" font-weight="600">model 11</text><text x="320" y="154" text-anchor="middle" class="t2">a11 only</text>
+        </g>
+        <text x="10" y="192" font-size="12.5" font-weight="600">12 contexts to fit and cache</text>
+        <text x="10" y="210" font-size="12.5" font-weight="600">12 calls per decision</text>
+        <text x="10" y="228" font-size="12.5" font-weight="600">each action sees only its own examples</text>
+        <text x="10" y="252" font-size="12" class="t2">+ every row is one recorded step, so the 1M-row</text>
+        <text x="10" y="268" font-size="12" class="t2">limit means up to 1M steps per model</text>
+      </svg>
+    </figure>
+    <figure>
+      <span class="tag now">Option 2 · 12 rows, 1 target column (what we use)</span>
+      <svg viewBox="0 0 460 290" role="img" aria-label="Option 2: each step becomes 12 rows with an action id and one target column, handled by one model with one context and one call per decision.">
+        <g font-size="11" class="m">
+          <rect x="10" y="10" width="230" height="22" fill="#f7f8fa"/><rect x="240" y="10" width="90" height="22" fill="#eef2f7"/><rect x="330" y="10" width="120" height="22" fill="#fde8d9"/>
+          <text x="125" y="25" text-anchor="middle" class="t2">104 senses</text><text x="285" y="25" text-anchor="middle" class="t2">action_id</text><text x="390" y="25" text-anchor="middle" fill="#ea580c">y</text>
+          <g fill="#fff" stroke="#e2e8f0"><rect x="10" y="36" width="440" height="20"/><rect x="10" y="60" width="440" height="20"/><rect x="10" y="98" width="440" height="20"/></g>
+          <text x="125" y="50" text-anchor="middle" class="t3">step 1</text><text x="285" y="50" text-anchor="middle" fill="#2563eb">0</text><text x="390" y="50" text-anchor="middle">a0</text>
+          <text x="125" y="74" text-anchor="middle" class="t3">step 1</text><text x="285" y="74" text-anchor="middle" fill="#2563eb">1</text><text x="390" y="74" text-anchor="middle">a1</text>
+          <text x="285" y="92" text-anchor="middle" class="t3">⋮</text>
+          <text x="125" y="112" text-anchor="middle" class="t3">step 1</text><text x="285" y="112" text-anchor="middle" fill="#2563eb">11</text><text x="390" y="112" text-anchor="middle">a11</text>
+        </g>
+        <rect x="10" y="132" width="440" height="42" rx="8" fill="#dbe7fd" stroke="#2563eb"/><text x="230" y="150" text-anchor="middle" font-weight="600" font-size="12.5">one model for all 12 actions</text><text x="230" y="166" text-anchor="middle" font-size="11.5" class="t2">action_id (categorical) says which action a row is about</text>
+        <text x="10" y="200" font-size="12.5" font-weight="600">1 context to fit and cache</text>
+        <text x="10" y="218" font-size="12.5" font-weight="600">1 call per decision (12 query rows, batched)</text>
+        <text x="10" y="236" font-size="12.5" font-weight="600">actions learn from each other's examples</text>
+        <text x="10" y="260" font-size="12" class="t2">− each step uses 12 rows, so the 1M-row limit</text>
+        <text x="10" y="276" font-size="12" class="t2">means at most ~83k recorded steps</text>
+      </svg>
+    </figure>
+  </div>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Aspect</th><th>1 row × 12 targets (12 models)</th><th>12 rows × 1 target (our choice)</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Models, caches, calls per decision</td><td>12 · 12 · 12</td><td><b>1 · 1 · 1</b></td></tr>
+        <tr><td class="k">Sharing between actions</td><td>none: wing-left never sees wing-right's examples</td><td><b>shared</b>: similar actions (left/right wing, yaw/pitch) can borrow patterns across action_id</td></tr>
+        <tr><td class="k">Recorded steps that fit in 1M rows</td><td><b>1M per model</b></td><td>~83k (each step uses 12 rows)</td></tr>
+        <tr><td class="k">Total compute per decision</td><td>about the same: 12 small attentions vs 1 big one</td><td>about the same, but one batched GPU call (less overhead)</td></tr>
+        <tr><td class="k">Risk</td><td>12 times the setup and memory bookkeeping</td><td>TabPFN must learn the action_id interaction; actions can interfere</td></tr>
+        <tr><td class="k">Predicts the 12 actions jointly?</td><td colspan="2">Neither. Both predict each action on its own (12 separate distributions). Joint prediction would need chaining, e.g. feed predicted wing-left in as an input when predicting wing-right.</td></tr>
+        <tr><td class="k">Precedent</td><td>scikit-learn's MultiOutputRegressor wrapper</td><td>DuckPFN: 4,096 steps × 14 joints = 57k rows, one joint ID column</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <figure>
+    <span class="ftitle" style="font-weight:600;font-size:14px">The intuition</span>
+    <svg viewBox="0 0 1000 150" role="img" aria-label="Intuition: the pooled table is like one expert who knows all 12 controls and can transfer what it learned between them, instead of 12 specialists who never talk.">
+      <g font-size="12.5">
+        <text x="20" y="24" class="m t3" font-size="11">12 SPECIALISTS (OPTION 1)</text>
+        <g fill="#dbe7fd" stroke="#2563eb"><circle cx="40" cy="70" r="14"/><circle cx="80" cy="70" r="14"/><circle cx="120" cy="70" r="14"/><circle cx="160" cy="70" r="14"/><circle cx="200" cy="70" r="14"/><circle cx="240" cy="70" r="14"/></g>
+        <text x="20" y="112" class="t2">each studies one control in isolation;</text><text x="20" y="130" class="t2">more examples each, nothing shared</text>
+        <text x="540" y="24" class="m" font-size="11" fill="#2563eb">ONE GENERALIST (OPTION 2)</text>
+        <circle cx="600" cy="70" r="26" fill="#dbe7fd" stroke="#2563eb" stroke-width="2"/>
+        <g stroke="#2563eb" stroke-width="1.2"><line x1="626" y1="70" x2="690" y2="50"/><line x1="626" y1="70" x2="690" y2="70"/><line x1="626" y1="70" x2="690" y2="90"/></g>
+        <text x="696" y="54" class="t2">wing left ↔ wing right (mirror images)</text><text x="696" y="74" class="t2">yaw ↔ pitch (move together)</text><text x="696" y="94" class="t2">beat frequency ↔ forward speed</text>
+        <text x="540" y="130" class="t2">fewer examples per control, but patterns carry across controls</text>
+      </g>
+    </svg>
+  </figure>
+  <p class="ans">We have not measured which layout flies better; it is a quick offline test with experiment C (copy the policy's actions) and worth running before the final pitch.</p>
+</section>
+
+<!-- 6c. One target limit, row contents -->
+<section class="sec">
+  <header><div class="kicker">Question 8</div><h2>Is "one target column" a TabPFN limit, and what exactly is in a context row?</h2>
+    <p class="ans"><b>Yes, it is a limit:</b> the TabPFN regressor predicts one target column per fitted model, with no built-in multi-target mode. That is why we add an <b>action_id</b> column and stack the 12 actions as 12 rows. Each context row holds <b>104 senses + 1 action_id as inputs, and 1 target</b>, not 12 targets. It is still fully in-context: the rows are read and attended to, never trained on.</p></header>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 330" role="img" aria-label="Each context row has 105 input columns (104 senses plus action_id) and one target y. The other 11 actions of the same step sit in sibling rows. In code, fit takes X of shape rows by 105 and y of shape rows.">
+      <defs><marker id="q8a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker></defs>
+      <!-- brace labels -->
+      <text x="20" y="22" class="m t3" font-size="11">ONE RECORDED STEP = 12 SIBLING ROWS</text>
+      <rect x="20" y="34" width="470" height="24" fill="#f7f8fa"/><rect x="490" y="34" width="110" height="24" fill="#eef2f7"/><rect x="600" y="34" width="190" height="24" fill="#fde8d9"/>
+      <g font-size="11.5" class="m"><text x="255" y="50" text-anchor="middle" class="t2">104 senses (identical in all 12 rows)</text><text x="545" y="50" text-anchor="middle" class="t2">action_id</text><text x="695" y="50" text-anchor="middle" fill="#ea580c" font-weight="600">y (one value)</text></g>
+      <g id="q8rows"></g>
+      <!-- X / y braces -->
+      <path d="M20,262 V272 H600 V262" fill="none" stroke="#2563eb" stroke-width="1.5"/><text x="310" y="292" text-anchor="middle" font-size="13" font-weight="600" fill="#2563eb">X: 105 input columns</text>
+      <path d="M600,262 V272 H790 V262" fill="none" stroke="#ea580c" stroke-width="1.5"/><text x="695" y="292" text-anchor="middle" font-size="13" font-weight="600" fill="#ea580c">y: 1 target column</text>
+      <text x="410" y="320" text-anchor="middle" class="m t2" font-size="12">fit(X, y)  ·  X shape (196,608, 105)  ·  y shape (196,608,)  ·  16,384 steps × 12 rows</text>
+      <!-- side note -->
+      <rect x="815" y="80" width="170" height="150" rx="10" fill="#fff" stroke="#cbd5e1"/>
+      <text x="900" y="104" text-anchor="middle" font-size="12.5" font-weight="600">Not in the row</text>
+      <text x="900" y="126" text-anchor="middle" font-size="11.5" class="t2">the other 11 actions</text>
+      <text x="900" y="142" text-anchor="middle" font-size="11.5" class="t2">of the same step:</text>
+      <text x="900" y="158" text-anchor="middle" font-size="11.5" class="t2">each sits in its own</text>
+      <text x="900" y="174" text-anchor="middle" font-size="11.5" class="t2">sibling row</text>
+      <text x="900" y="204" text-anchor="middle" font-size="12" class="m" fill="#dc2626">104 + 1 + 1, not 104 + 1 + 12</text>
+    </svg>
+    </div>
+    <figcaption>The 12 sibling rows share their senses and differ only in action_id and y. Read across one row: "in this state, action 5 had this value".</figcaption>
+  </figure>
+  <div class="two">
+    <figure>
+      <span class="tag now">Why it is still in-context</span>
+      <svg viewBox="0 0 460 230" role="img" aria-label="fit only encodes and caches the context rows; at each decision the query rows attend to context rows with similar senses and the same action_id and combine their y values. No weights change.">
+        <rect x="10" y="20" width="200" height="56" rx="8" fill="#f7f8fa" stroke="#cbd5e1"/><text x="110" y="44" text-anchor="middle" font-weight="600" font-size="12.5">fit = read + cache</text><text x="110" y="62" text-anchor="middle" font-size="11.5" class="t2">no weights change</text>
+        <rect x="250" y="20" width="200" height="56" rx="8" fill="#dbe7fd" stroke="#2563eb"/><text x="350" y="44" text-anchor="middle" font-weight="600" font-size="12.5">predict = attention</text><text x="350" y="62" text-anchor="middle" font-size="11.5" class="t2">query rows → context rows</text>
+        <path d="M212,48 H246" stroke="#475569" stroke-width="1.5" marker-end="url(#q8a)"/>
+        <g font-size="11.5">
+          <rect x="10" y="104" width="190" height="24" rx="4" fill="#ece4fd" stroke="#7c3aed"/><text x="105" y="120" text-anchor="middle" fill="#7c3aed">query: live senses, id 5, y = ?</text>
+          <rect x="260" y="96" width="190" height="20" rx="4" fill="#f7f8fa" stroke="#2563eb" stroke-width="2"/><text x="355" y="110" text-anchor="middle">similar senses, id 5</text>
+          <rect x="260" y="122" width="190" height="20" rx="4" fill="#f7f8fa" stroke="#2563eb" stroke-width="2"/><text x="355" y="136" text-anchor="middle">similar senses, id 5</text>
+          <rect x="260" y="148" width="190" height="20" rx="4" fill="#f7f8fa" stroke="#93c5fd"/><text x="355" y="162" text-anchor="middle" class="t2">similar senses, id 8 (mirror)</text>
+          <rect x="260" y="174" width="190" height="20" rx="4" fill="#f7f8fa" stroke="#e2e8f0"/><text x="355" y="188" text-anchor="middle" class="t3">different senses</text>
+          <g stroke="#2563eb"><line x1="202" y1="116" x2="258" y2="106" stroke-width="2.4"/><line x1="202" y1="116" x2="258" y2="132" stroke-width="2.4"/><line x1="202" y1="116" x2="258" y2="158" stroke-width="1.2" opacity=".6"/><line x1="202" y1="116" x2="258" y2="184" stroke-width=".6" opacity=".3"/></g>
+          <text x="10" y="220" class="t2">strong links: same action, similar state; weaker: related actions</text>
+        </g>
+      </svg>
+    </figure>
+    <figure>
+      <span class="tag could">A consequence: the 12 actions are predicted side by side</span>
+      <svg viewBox="0 0 460 230" role="img" aria-label="Today all 12 actions are predicted in parallel without seeing each other's predictions. Chaining would feed each predicted action into the next, making them joint, at the cost of 12 sequential calls.">
+        <text x="10" y="20" class="m t3" font-size="11">NOW: PARALLEL, 1 CALL</text>
+        <g fill="#fde8d9" stroke="#ea580c"><rect x="10" y="30" width="60" height="26" rx="5"/><rect x="80" y="30" width="60" height="26" rx="5"/><rect x="150" y="30" width="60" height="26" rx="5"/></g>
+        <g font-size="11.5" text-anchor="middle"><text x="40" y="47">wing L</text><text x="110" y="47">wing R</text><text x="180" y="47">beat</text></g>
+        <text x="225" y="47" class="t3">… each blind to the others</text>
+        <text x="10" y="96" class="m t3" font-size="11">COULD: CHAINED, 12 CALLS IN SEQUENCE</text>
+        <g fill="#fde8d9" stroke="#ea580c"><rect x="10" y="106" width="60" height="26" rx="5"/><rect x="110" y="106" width="60" height="26" rx="5"/><rect x="210" y="106" width="60" height="26" rx="5"/></g>
+        <g font-size="11.5" text-anchor="middle"><text x="40" y="123">wing L</text><text x="140" y="123">wing R</text><text x="240" y="123">beat</text></g>
+        <path d="M72,119 H106" stroke="#475569" stroke-width="1.5" marker-end="url(#q8a)"/><path d="M172,119 H206" stroke="#475569" stroke-width="1.5" marker-end="url(#q8a)"/>
+        <text x="285" y="123" class="t3">…</text>
+        <text x="10" y="164" font-size="12" class="t2">Chaining feeds each predicted action in as an input</text>
+        <text x="10" y="182" font-size="12" class="t2">for the next, so the 12 become consistent with each</text>
+        <text x="10" y="200" font-size="12" class="t2">other, but it costs 12 calls per decision instead of 1.</text>
+      </svg>
+    </figure>
+  </div>
+</section>
+
 <!-- 7. FAQ -->
 <section class="sec">
   <header><div class="kicker">In short</div><h2>Your questions, one line each</h2></header>
@@ -330,6 +478,15 @@ const VAL = [0.009, -0.804, -0.097, -0.206, -0.006, 0.021, 0.055, 0.047, -0.113,
     tx(g, 490, y + 14, "0.43  −0.17  2490  …  −0.019", { "text-anchor": "middle", class: "m t3", "font-size": 11 });
     tx(g, 755, y + 14, i, { "text-anchor": "middle", class: "m", "font-size": 11, fill: "#2563eb" });
     tx(g, 895, y + 14, `${VAL[i].toFixed(3)}  ${n}`, { "text-anchor": "middle", class: "m", "font-size": 11, fill: "#ea580c" }); });
+})();
+(function () { // question 8 sibling rows
+  const g = document.getElementById("q8rows");
+  [0, 1, 2, 3, null, 11].forEach((i, k) => { const y = 62 + k * 32;
+    if (i === null) { tx(g, 255, y + 18, "⋮", { "text-anchor": "middle", class: "t3" }); tx(g, 545, y + 18, "⋮", { "text-anchor": "middle", class: "t3" }); return; }
+    el("rect", { x: 20, y, width: 770, height: 26, fill: k % 2 ? "#fff" : "#fbfcfd", stroke: "#e2e8f0" }, g);
+    tx(g, 255, y + 17, "0.43   −0.17   2490   …   −0.019", { "text-anchor": "middle", class: "m t3", "font-size": 11.5 });
+    tx(g, 545, y + 17, i, { "text-anchor": "middle", class: "m", "font-size": 12, fill: "#2563eb", "font-weight": 600 });
+    tx(g, 695, y + 17, `${VAL[i].toFixed(3)}  ${ACT[i]}`, { "text-anchor": "middle", class: "m", "font-size": 11.5, fill: "#ea580c" }); });
 })();
 (function () { // query rows + vector
   const g = document.getElementById("rowsQ"), v = document.getElementById("vec");

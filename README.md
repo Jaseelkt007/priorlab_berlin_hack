@@ -2,6 +2,19 @@
 
 HackLab #2 Berlin, Prior Labs track **"TabPFN for spatial awareness"**: predicting what happens next to an object a robot is holding, from a table of the robot's own past picks.
 
+## Four projects, one repo
+
+Our team took TabPFN in four directions. Each project is self-contained in its own folder, with its own README and setup.
+
+| Project | Question | Where |
+|---|---|---|
+| Suction pick line | How fast can this pick be? TabPFN sets the speed of every suction pick | this page; code in `sim/`, `policy/`, `jax_tabpfn/`, `scripts/` |
+| Crane | Can a table steady a crane? | [`crane/`](crane/README.md) |
+| Drone | Where will the intruder drone be in 1 second? | [`drone/`](drone/README.md) |
+| Fruit fly | Can a table fly a fruit fly? | [`fly/`](fly/README.md) |
+
+The shared `.env` (one `TABPFN_TOKEN`) lives at the repo root; quick fixes from all four are in `DEBT.md`.
+
 ## The problem
 
 On food and pharma packaging lines, a delta robot (ABB IRB 360 FlexPicker class) picks every product with a suction cup and flies it 0.3 m in about 0.15 s, at up to 150 m/s². If the robot accelerates too hard, the product drops: scrap, a stop, or contamination.

@@ -1,5 +1,7 @@
 # Crane track: where will the load be in 1 second?
 
+**New to the project? Start with [`EXPLAINED.md`](EXPLAINED.md): the whole idea in diagrams.** Pitch slides and video script: [`PITCH.md`](PITCH.md). Slide figures: [`figures/`](figures/).
+
 Part of our Prior Labs entry ("TabPFN for spatial awareness"). Branch: `crane`.
 
 **Idea.** An overhead crane's load swings after every move. Anti-sway control cancels that swing only if it knows the pendulum, and a new load or a wrong sling entry breaks it. TabPFN reads the crane's own recent moves as a table and predicts the swing 1 s ahead with a 90% range. When a new load arrives, its rows are added to the table; nothing is retrained.
@@ -29,13 +31,13 @@ Options: `run_live.sh predict` = live forecast only; extra flags are passed thro
 
 **Real lab crane** (Nazarbayev University tower crane, see Data). Mean error at the payload 1 s ahead, on whole runs held out from the context:
 
-| Held out | Fitted pendulum | Trees | TabPFN | Physics + TabPFN |
+| Held out | Fitted pendulum | Standard ML (boosted trees) | TabPFN | Physics + TabPFN |
 |---|---|---|---|---|
 | New cable length (0.5 m) | 0.34 cm | 1.30 | 1.52 | **0.19** |
 | New payload (beam) | 0.57 | 0.48 | **0.35** | 0.36 |
 | Hoisting during travel | 0.82 | 1.20 | 0.81 | **0.78** |
 
-**Adaptation on the unseen beam:** after 5 s of the beam's own rows, TabPFN's 1-s error drops from 0.30 to 0.10 cm (3×). Its 90% range goes from holding 32% of outcomes to 91%. Trees retrained on the same rows reach 0.37 cm; the refitted pendulum 0.50 cm. Physics alone wins at +0.5 s when only the rope length changes.
+**Adaptation on the unseen beam:** after 5 s of the beam's own rows, TabPFN's 1-s error drops from 0.30 to 0.10 cm (3×). Its 90% range goes from holding 32% of outcomes to 91%. Standard machine learning (gradient-boosted trees) retrained on the same rows reach 0.37 cm; the refitted pendulum 0.50 cm. Physics alone wins at +0.5 s when only the rope length changes.
 
 **MuJoCo, full-size crane, in simulation:** a held-out 400 kg beam on 2.6 m slings, with the anti-sway set for 0.5 m:
 
@@ -96,6 +98,7 @@ MUJOCO_GL=glfw crane/.venv/bin/python crane/live_pick_place.py --auto-tune # Tab
 | `live_pick_place.py` | **live pick and place**: hoist lowers, grabs the beam (weld), lifts, travels, settles, places it in the other bay, releases, repeats; Enter start/stop, 1 auto / 2 manual; ←/→ change the anti-sway's assumed sling (wrong 0.5 m: 69.5 s cycle; right 2.0 m: 47 s) |
 | `live_crane.py` | **live** MuJoCo window: the crane shuttles between bays, TabPFN's 1-s-ahead ghost updates in real time; change rope/sling/payload/speed with keys (Up/Down, PgUp/PgDn, Home/End, Ins/Del) or by typing `rope 5` in the terminal |
 | `playground_precompute.py`, `render_clip.py` | page playground (option A, 81 precomputed runs) and any-parameter MP4 clip (option B) |
+| `make_figures.py` | slide figures in `figures/` from the saved results (no simulation needed) |
 | `data_tools/` | dataset download, the period check (measured vs. textbook pendulum), an xlsx reader |
 | `sim-check/` | Node checks of the explainer page's in-browser simulation (`node crane/sim-check/test.js 30`) |
 | `DATASETS.md`, `LESSONS.md` | dataset search and citation; the four Prior Labs lessons with links |

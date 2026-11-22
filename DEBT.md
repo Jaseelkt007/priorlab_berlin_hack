@@ -17,3 +17,6 @@ Quick fixes taken to move fast. One line each: file, what was hacked, what the r
 - policy/policies.py: in the replays the learned policies refit every 5 picks (a live line would refresh its speed map about once a second, every 2–3 picks). Real fix: refit per pick and swap the context into the JAX runtime (~20 ms).
 - jax_tabpfn/ + scripts/spike_cudagraph.py: still run on the toy log `sim/delta_toy.py`; the 3.7 ms JAX latency was measured there (same column count). Real fix: re-run the JAX parity and benchmark on `results/logs/`, then delete `sim/delta_toy.py`.
 - docs/explainer/delta-pick-line.html: the in-browser animation runs a toy physics model with a Bayesian stand-in for TabPFN (labelled on the page). Real fix: drive the page from the measured replays in `results/eval/`.
+- crane/real_data.py, data_tools/*: xlsx read with a regex over the sheet XML (no openpyxl). Real fix: openpyxl or pandas.
+- crane/mujoco_demo.py: TabPFN refit every 5 s and video rendered offline (7-8 s fits on a GTX 1650). Real fix: fit_with_cache on a faster GPU or KV-cache reuse for live control.
+- crane/exp*_real.py: one run per condition, one seed; the beam run has a single trolley move. Real fix: more runs and seeds, report spread.

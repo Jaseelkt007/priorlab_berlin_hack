@@ -21,6 +21,7 @@ the protected zone, with no training**: only example radar rows. We compare it w
 **It knows when it is unsure:** TabPFN B's 90% range holds the real position 93% of the time on pilot a and 90% on pilot b, as promised; the IMM re-tuned on the small drone only 82% (pilot a).
 
 - **Read it as one page (easiest start):** [Drone Intercept Explained](https://claude.ai/artifact/Q23Wds7UwKacrLqcZ9ujdb)
+  (a copy is in the repo: [`docs/explainer/drone-intercept.html`](docs/explainer/drone-intercept.html), open it in a browser from a clone)
 - The idea in diagrams: [`drone/EXPLAINED.md`](drone/EXPLAINED.md)
 - How to run and reproduce everything: [`drone/README.md`](drone/README.md)
 - All results, charts and caveats: [`results/README.md`](results/README.md)

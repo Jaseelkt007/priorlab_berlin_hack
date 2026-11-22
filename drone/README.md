@@ -1,6 +1,6 @@
 # Drone track: where is the intruder drone going?
 
-**New to the project? Start with [`EXPLAINED.md`](EXPLAINED.md): the whole idea in diagrams.**
+**New to the project? Read the one-page explainer: [Drone Intercept Explained](https://claude.ai/artifact/Q23Wds7UwKacrLqcZ9ujdb). In the repo: [`EXPLAINED.md`](EXPLAINED.md), the whole idea in diagrams.**
 
 ![IMM, TabPFN B and IMM + TabPFN on the same flight](../results/compare.gif)
 

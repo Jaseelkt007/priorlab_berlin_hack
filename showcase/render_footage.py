@@ -236,6 +236,19 @@ def display_items(m, d, p, picks, k, t, tl, pitch, camd):
     # base housing over the three motors (the real robot's wide top housing), rounded lid
     it.append(_item("housing", C, [0.30, 0.055], [0.0, 0.0, 0.035], eye, HOUSING))
     it.append(_item("housing", E, [0.30, 0.30, 0.05], [0.0, 0.0, 0.09], eye, HOUSING))
+    # drive section (visual only): a gearbox on each motor axis (radius r_b, z_m below the base frame, axis along the
+    # arm's hinge) and a post up to the housing, so the arms visibly attach to the body
+    from sim.delta import PHI, tdir, udir
+    r_b, z_m = DRIVE_R, DRIVE_Z
+    for ph in PHI:
+        pv = r_b * udir(ph) + np.array([0.0, 0.0, z_m])
+        hinge = tdir(ph)
+        ax = np.array([hinge[0], hinge[1], 0.0]) / np.linalg.norm(hinge[:2])
+        b1 = np.cross([0.0, 0.0, 1.0], ax)
+        R = np.stack([b1, np.cross(ax, b1), ax], axis=1)          # columns: x, y, z(= hinge axis)
+        it.append(_item("housing", C, [0.055, 0.065], pv, R, HOUSING))
+        top = np.array([pv[0], pv[1], -0.02])
+        it.append(_item("housing", C, [0.038, (top[2] - pv[2]) / 2], (top + pv) / 2, eye, HOUSING))
     it.append(_item("belt", B, [0.07, 0.6, 0.004], [X_PLACE, 0.0, Z_BELT - 0.0065], eye, BELT))
     # the suction cup on the tool flange: flat cup (the bar line's Ø25 flat cup), skirt + body + fitting
     c = d.site_xpos[m.site("cupc").id]
@@ -343,6 +356,9 @@ CAMERAS = {  # lookat (None: tracked), distance, azimuth, elevation, fovy (deg; 
     "A-wide": dict(lookat=[0.0, 0.0, -0.42], dist=4.2, az=150, el=-4, fovy=22, orbit=0.0, depth=True),
     "A-wide-orbit": dict(lookat=[0.0, 0.0, -0.42], dist=4.2, az=143, el=-4, fovy=22, orbit=14.0, depth=True),
     "B-top": dict(lookat=[0.0, 0.0, -1.0], dist=0.95, az=0.0, el=-89.9, fovy=55, orbit=0.0),
+    # A2: 3/4 mid shot, elevated, platform + cup + both belts + products; rods run out of the top of frame
+    "A2-mid": dict(lookat=[-0.07, 0.03, -0.98], dist=1.15, az=150, el=-28, fovy=30, orbit=0.0, push=0.05),
+    "A2-mid-lock": dict(lookat=[-0.07, 0.03, -0.98], dist=1.15, az=150, el=-28, fovy=30, orbit=0.0),
     # C: follows the cup (Gaussian-smoothed, sigma 40 ms): cup in the upper third, the bar in the lower third
     "C-close": dict(lookat=None, track="cup", offset=[0.0, 0.0, -0.016], sigma=0.04, dist=0.30, az=158, el=-3,
                     fovy=18, orbit=0.0, depth=True),
@@ -455,7 +471,8 @@ def render_clip(job: dict) -> dict:
             cam = mujoco.MjvCamera()                 # the camera is held at the output frame's pose
             cam.type = mujoco.mjtCamera.mjCAMERA_FREE
             cam.lookat[:] = track[f] if track is not None else camd["lookat"]
-            cam.distance, cam.azimuth, cam.elevation = camd["dist"], camd["az"] + camd["orbit"] * u, camd["el"]
+            cam.distance = camd["dist"] * (1.0 - camd.get("push", 0.0) * u)          # eased push-in
+            cam.azimuth, cam.elevation = camd["az"] + camd["orbit"] * u, camd["el"]
             cam.orthographic = int(camd.get("ortho", False))   # camera-level switch: fovy is the view height (m)
             r.update_scene(d, cam)
             scn = r.scene
@@ -592,6 +609,13 @@ def write_poses(path, m0, poses, cams, fps_sim, t0):
                        "the render (replaced by the 'cup' items)."))
 
 
+def _drive_geometry():
+    from sim.delta import DeltaParams
+    P = DeltaParams()
+    return P.r_b, P.z_m
+
+
+DRIVE_R, DRIVE_Z = _drive_geometry()   # motor axes of the simulated robot (sim.delta.DeltaParams r_b, z_m)
 POLICY_LABEL = {"tabpfn_jax": "tabpfn", "fixed": "fixed30", "fixed50": "fixed50", "recipe50": "recipe50",
                 "full100": "full100"}   # decisions key -> file label (no underscores: the name field separator)
 
@@ -675,36 +699,32 @@ def make_plan_test():
 
 
 def make_plan_full():
-    """The full batch (clip-studio's shot list S01–S04). Each sub-plan: one stream at one policy, simulated once,
+    """The full batch (clip-studio's shot list), in delivery order. Each sub-plan simulates one stream at one policy
+    once (the full 120 picks for the shift, so running counters and sim times match across clips) and renders
     several clips. S02 overrides the speed of picks 3–6 (5 is placed at 50 % and dropped at 100 % in the bank)."""
     out = "/home/nebius/delta_line/footage"
     events = [("heavy", [30, 33]), ("filmroll", [60, 63]), ("worncup", [90, 93]), ("cupchange", [110, 113])]
     shift = list(range(120))
+    ev_clips = [dict(scene="S04", label=ev, camera="D-track", picks=w, sim_fps=250) for ev, w in events]
+    long_clips = [dict(scene="S04", label="shift", camera=c, picks=[0, 119], sim_fps=60) for c in ("A-wide", "A2-mid-lock", "B-top")]
     return [
-        dict(name="tabpfn", out=out, stream="shift:bar", policy="tabpfn_jax", idxs=shift, clips=[
-            dict(scene="S01", label="hero", camera="A-wide", picks=[1, 14], sim_fps=60),
-            dict(scene="S01", label="hero", camera="A-wide-orbit", picks=[1, 14], sim_fps=60),
-            dict(scene="S01", label="hero", camera="B-top", picks=[1, 14], sim_fps=60),
-            dict(scene="S01", label="hero", camera="C-close", picks=[1, 14], sim_fps=60),
-            dict(scene="S03", label="decision", camera="C-close", pick=4, window="touch", sim_fps=1000),
-            dict(scene="S03", label="decision", camera="A-wide", pick=4, window="touch", sim_fps=1000),
-            dict(scene="S04", label="shift", camera="A-wide", picks=[0, 119], sim_fps=60),
-            dict(scene="S04", label="shift", camera="B-top", picks=[0, 119], sim_fps=60),
-        ] + [dict(scene="S04", label=ev, camera="D-track", picks=w, sim_fps=250) for ev, w in events]),
-        dict(name="fixed50", out=out, stream="shift:bar", policy="fixed50", idxs=shift, clips=[
-            dict(scene="S04", label="shift", camera="A-wide", picks=[0, 119], sim_fps=60),
-            dict(scene="S04", label="shift", camera="B-top", picks=[0, 119], sim_fps=60),
-        ] + [dict(scene="S04", label=ev, camera="D-track", picks=w, sim_fps=250) for ev, w in events]),
         dict(name="recipe50", out=out, stream="shift:bar", policy="recipe50", alpha=0.5, idxs=[3, 4, 5, 6], clips=[
             dict(scene="S02", label="problem", camera="C-close", pick=5, window="touch", sim_fps=250),
             dict(scene="S02", label="problem", camera="D-track", pick=5, window="move", sim_fps=250),
-            dict(scene="S02", label="problem", camera="E-side", pick=5, window="move", sim_fps=250),
-        ]),
+            dict(scene="S02", label="problem", camera="E-side", pick=5, window="move", sim_fps=250)]),
         dict(name="full100", out=out, stream="shift:bar", policy="full100", alpha=1.0, idxs=[3, 4, 5, 6], clips=[
             dict(scene="S02", label="problem", camera="C-close", pick=5, window="touch", sim_fps=250),
             dict(scene="S02", label="problem", camera="D-track", pick=5, window="move", sim_fps=1000),
-            dict(scene="S02", label="problem", camera="E-side", pick=5, window="move", sim_fps=1000),
-        ]),
+            dict(scene="S02", label="problem", camera="E-side", pick=5, window="move", sim_fps=1000)]),
+        dict(name="tabpfn_a", out=out, stream="shift:bar", policy="tabpfn_jax", idxs=shift, clips=[
+            dict(scene="S03", label="decision", camera="C-close", pick=4, window="touch", sim_fps=1000),
+            dict(scene="S03", label="decision", camera="A-wide", pick=4, window="touch", sim_fps=1000)] + [
+            dict(scene="S01", label="hero", camera=c, picks=[1, 14], sim_fps=60)
+            for c in ("A-wide", "A-wide-orbit", "A2-mid", "B-top", "C-close")]),
+        dict(name="tabpfn_events", out=out, stream="shift:bar", policy="tabpfn_jax", idxs=shift, clips=ev_clips),
+        dict(name="fixed50_events", out=out, stream="shift:bar", policy="fixed50", idxs=shift, clips=ev_clips),
+        dict(name="tabpfn_long", out=out, stream="shift:bar", policy="tabpfn_jax", idxs=shift, clips=long_clips),
+        dict(name="fixed50_long", out=out, stream="shift:bar", policy="fixed50", idxs=shift, clips=long_clips),
     ]
 
 
@@ -791,6 +811,9 @@ def run_plan(plan, a):
         for rres in results:
             print(f"still {rres['file'][:-4]}: written", flush=True)
         return
+    import fcntl
+    lock = open(out / ".manifest.lock", "w")
+    fcntl.flock(lock, fcntl.LOCK_EX)                 # concurrent sub-plan jobs share one manifest
     man_p = out / "manifest.json"
     man = json.loads(man_p.read_text()) if man_p.exists() else []
     commit = git_commit()
@@ -806,6 +829,8 @@ def run_plan(plan, a):
                                       "wrap seal fins", "belt rails"]))
         print(f"{rres['file']}: {rres['frames']} frames, sim {rres['sim_t0']:.3f}-{rres['sim_t1']:.3f} s", flush=True)
     man_p.write_text(json.dumps(man, indent=1, default=_num))
+    fcntl.flock(lock, fcntl.LOCK_UN)
+    lock.close()
 
 
 if __name__ == "__main__":

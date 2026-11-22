@@ -21,10 +21,10 @@
     <div class="floor"></div>
     <p class="tag"><b>TabPFN</b> learns from the examples it is shown, in one forward pass. We gave it each robot's own log and asked: <b>what happens next?</b></p>
     <div class="row">
-      <div class="vcard" style="--c: var(--pick)"><video src="../docs/media/hero.mp4" poster="../docs/media/hero.jpg" muted loop playsinline preload="auto"></video><span>Suction pick line</span></div>
-      <div class="vcard" style="--c: var(--crane)"><video src="media/crane_forecast.mp4" poster="media/crane_forecast.jpg" muted loop playsinline preload="auto"></video><span>Crane Sway</span></div>
+      <div class="vcard" style="--c: var(--pick)"><video src="../docs/media/hero.mp4" poster="../docs/media/hero.jpg" muted loop playsinline preload="auto"></video><span>Delta robot picker</span></div>
+      <div class="vcard" style="--c: var(--crane)"><video src="media/crane_forecast.mp4" poster="media/crane_forecast.jpg" muted loop playsinline preload="auto"></video><span>Crane anti-sway</span></div>
       <div class="vcard" style="--c: var(--drone)"><video src="media/drone_world.mp4" poster="media/drone_world.jpg" muted loop playsinline preload="auto"></video><span>Intruder drone</span></div>
-      <div class="vcard" style="--c: var(--fly)"><video src="../docs/media/fly.mp4" poster="../docs/media/fly.jpg" muted loop playsinline preload="auto"></video><span>Fruit fly</span></div>
+      <div class="vcard" style="--c: var(--fly)"><video src="../docs/media/fly.mp4" poster="../docs/media/fly.jpg" muted loop playsinline preload="auto"></video><span>Flybot</span></div>
     </div>
   </section>
 
@@ -42,10 +42,10 @@
     <table class="tbl">
       <thead><tr><th class="label">Machine</th><th class="label">One row is</th><th class="label">TabPFN predicts</th><th class="label">So the machine</th></tr></thead>
       <tbody>
-        <tr><td><span class="dot" style="--c: var(--pick)"></span>Suction pick line</td><td>one pick: weight, size, temperature, cup age, vacuum at touch</td><td>the drop risk at each of 9 speeds</td><td>takes the fastest speed worth its risk</td></tr>
-        <tr><td><span class="dot" style="--c: var(--crane)"></span>Crane Sway</td><td>0.1 s of crane sensors: rope angle, encoders, load cell, planned move</td><td>where the load will be in 1 s, with a range</td><td>chooses the anti-sway setting per load</td></tr>
+        <tr><td><span class="dot" style="--c: var(--pick)"></span>Delta robot picker</td><td>one pick: weight, size, temperature, cup age, vacuum at touch</td><td>the drop risk at each of 9 speeds</td><td>takes the fastest speed worth its risk</td></tr>
+        <tr><td><span class="dot" style="--c: var(--crane)"></span>Crane anti-sway</td><td>0.1 s of an overhead crane: rope angle, encoders, load cell, planned move</td><td>where the load will be in 1 s, with a range</td><td>chooses the anti-sway setting per load</td></tr>
         <tr><td><span class="dot" style="--c: var(--drone)"></span>Intruder drone</td><td>one radar reading: 16 numbers, 10 times a second</td><td>where the drone will be in 1 s; a breach within 2 s</td><td>corrects the IMM tracker, raises the alarm</td></tr>
-        <tr><td><span class="dot" style="--c: var(--fly)"></span>Fruit fly</td><td>0.2 ms of flight: the 104 senses of a trained RL pilot</td><td>the pilot's 12 controls</td><td>flies the fly in closed loop</td></tr>
+        <tr><td><span class="dot" style="--c: var(--fly)"></span>Flybot</td><td>0.2 ms of a fruit fly's flight: the 104 senses of a trained RL pilot</td><td>the pilot's 12 controls</td><td>flies the fly in closed loop</td></tr>
       </tbody>
     </table>
   </section>
@@ -57,13 +57,13 @@
     <div class="cols">
       <article class="col card" style="--c: var(--pick)">
         <video src="../docs/media/shift_split.mp4" poster="../docs/media/shift_split.jpg" muted loop playsinline preload="metadata"></video>
-        <h3>Suction pick line</h3>
+        <h3>Delta robot picker</h3>
         <div class="stat first"><b>1 vs 31</b><span>drops in one 120-pick shift, against the fast fixed recipe</span></div>
         <div class="stat"><b>152.6</b><span>good picks per minute; cautious&nbsp;145.7, fast&nbsp;122.7</span></div>
       </article>
       <article class="col card" style="--c: var(--crane)">
         <video src="media/crane_forecast.mp4" poster="media/crane_forecast.jpg" muted loop playsinline preload="metadata"></video>
-        <h3>Crane Sway</h3>
+        <h3>Crane anti-sway</h3>
         <div class="stat first"><b>5× closer</b><span>than physics, 1 s ahead, on a real lab crane</span></div>
         <div class="stat"><b>−35 %</b><span>time on 12 new loads, against anti-sway set for the wrong sling</span></div>
       </article>
@@ -75,7 +75,7 @@
       </article>
       <article class="col card" style="--c: var(--fly)">
         <video src="media/fly_scurve.mp4" poster="media/fly_scurve.jpg" muted loop playsinline preload="metadata"></video>
-        <h3>Fruit fly</h3>
+        <h3>Flybot</h3>
         <div class="stat first"><b>0.10 mm</b><span>off the S-curve; the trained RL pilot itself: 0.09&nbsp;mm</span></div>
         <div class="stat"><b>−44 %</b><span>error on a 20 % heavier fly after 16 example flights</span></div>
       </article>
@@ -91,7 +91,7 @@
         <h3>Time per decision, against the machine's budget</h3>
         <p class="sub">Log scale. The black line is the time the machine allows.</p>
         <div class="lat" style="--c: var(--pick)">
-          <div class="lbl"><b>Suction pick line</b><em class="ok">2.35 ms <small>of 35 ms</small> ✓</em></div>
+          <div class="lbl"><b>Delta robot picker</b><em class="ok">2.35 ms <small>of 35 ms</small> ✓</em></div>
           <div class="track"><div class="fill" style="width: 34.3%"></div><div class="budget" style="left: 63.6%"></div></div>
           <div class="note">JAX on an H100: decided before the cup has sealed</div>
         </div>
@@ -101,7 +101,7 @@
           <div class="note">live, the gain over the IMM shrinks from 10 % to 4 %</div>
         </div>
         <div class="lat" style="--c: var(--fly)">
-          <div class="lbl"><b>Fruit fly</b><em class="no">31–114 ms <small>of 0.2 ms</small> ✗</em></div>
+          <div class="lbl"><b>Flybot</b><em class="no">31–114 ms <small>of 0.2 ms</small> ✗</em></div>
           <div class="track"><div class="fill" style="width: 76.4%; background: linear-gradient(90deg, var(--fly) 81.5%, #fbc8a6 81.5%)"></div><div class="budget" style="left: 7.5%"></div></div>
           <div class="note">it flies in slowed-down simulated time, not real time</div>
         </div>
@@ -113,9 +113,9 @@
         <p class="sub" style="margin-bottom:0">A sudden 80° turn: TabPFN is 5 mm off 83 ms later, and the fly falls.</p>
         <video src="media/fly_turnfail.mp4" poster="media/fly_turnfail.jpg" muted loop playsinline preload="metadata"></video>
         <ul class="limits">
-          <li style="--c: var(--fly)"><b>Fruit fly:</b> sudden turns are lost within 30–80 ms at every context size, up to 1M rows.</li>
+          <li style="--c: var(--fly)"><b>Flybot:</b> sudden turns are lost within 30–80 ms at every context size, up to 1M rows.</li>
           <li style="--c: var(--crane)"><b>Crane:</b> −35 % is against the wrong sling; with the right one, industry anti-sway is as good.</li>
-          <li style="--c: var(--pick)"><b>Pick line:</b> drops the first unseen heavy bar; a fixed 40 % in hindsight does slightly better.</li>
+          <li style="--c: var(--pick)"><b>Delta picker:</b> drops the first unseen heavy bar; a fixed 40 % in hindsight does slightly better.</li>
           <li style="--c: var(--drone)"><b>Drone:</b> the alarm is a tie, 100 % vs 97 % of breaches caught. All but the lab crane is simulation.</li>
         </ul>
       </div>
@@ -129,10 +129,10 @@
     <div class="takes">
       <div class="take card"><h3><i>01</i>Adapts by adding rows</h3><p><b>3×</b> lower crane error after 5 s of a new load. <b>−44 %</b> fly error after 16 flights of a heavier fly. The pick line slows after <b>one drop</b>.</p></div>
       <div class="take card"><h3><i>02</i>Knows when it is unsure</h3><p>Calibration error <b>1.1 %</b> over 2,700 picks, against 4.0 % for boosted trees. Every forecast comes with a range.</p></div>
-      <div class="take card"><h3><i>03</i>Speed is the frontier</h3><p><b>2.35 ms</b> per pick decision with our JAX port. The drone and the fly need the same speed-up next.</p></div>
+      <div class="take card"><h3><i>03</i>Speed is the frontier</h3><p><b>2.35 ms</b> per pick decision with our JAX port. The drone and the Flybot need the same speed-up next.</p></div>
     </div>
     <div class="band">
-      <div><b>4</b><span>machines: a pick line, a crane, a drone tracker, a fruit fly</span></div>
+      <div><b>4</b><span>machines: a delta robot, an overhead crane, a drone tracker, a flybot</span></div>
       <div><b>1</b><span>pretrained model, TabPFN, the same for all four</span></div>
       <div><b>0</b><span>training runs or fine-tunes of TabPFN</span></div>
     </div>

@@ -1,0 +1,176 @@
+{
+ "mujoco": {
+  "all 12 (current)": {
+   "inputs": [
+    "off",
+    "off_m02",
+    "off_m05",
+    "doff",
+    "amp2s",
+    "x",
+    "dx",
+    "ddx",
+    "L1",
+    "payload_t",
+    "plan_dx05",
+    "plan_dx10"
+   ],
+   "playground": {
+    "err_cm": 0.95,
+    "coverage90": 0.74
+   },
+   "new_jobs": {
+    "err_cm": 0.78,
+    "coverage90": 0.85
+   }
+  },
+  "6: motion + length + push + 0.5 s history": {
+   "inputs": [
+    "off",
+    "doff",
+    "off_m05",
+    "L1",
+    "ddx",
+    "plan_acc10"
+   ],
+   "playground": {
+    "err_cm": 1.49,
+    "coverage90": 0.41
+   },
+   "new_jobs": {
+    "err_cm": 0.92,
+    "coverage90": 0.63
+   }
+  },
+  "5: motion + length + push": {
+   "inputs": [
+    "off",
+    "doff",
+    "L1",
+    "ddx",
+    "plan_acc10"
+   ],
+   "playground": {
+    "err_cm": 1.87,
+    "coverage90": 0.45
+   },
+   "new_jobs": {
+    "err_cm": 1.13,
+    "coverage90": 0.69
+   }
+  },
+  "4: motion + push (no length)": {
+   "inputs": [
+    "off",
+    "doff",
+    "ddx",
+    "plan_acc10"
+   ],
+   "playground": {
+    "err_cm": 2.0,
+    "coverage90": 0.77
+   },
+   "new_jobs": {
+    "err_cm": 1.87,
+    "coverage90": 0.76
+   }
+  },
+  "10: all minus position & speed": {
+   "inputs": [
+    "off",
+    "off_m02",
+    "off_m05",
+    "doff",
+    "amp2s",
+    "ddx",
+    "L1",
+    "payload_t",
+    "plan_dx05",
+    "plan_dx10"
+   ],
+   "playground": {
+    "err_cm": 1.25,
+    "coverage90": 0.57
+   },
+   "new_jobs": {
+    "err_cm": 0.77,
+    "coverage90": 0.84
+   }
+  }
+ },
+ "real": {
+  "all 12 (current)": {
+   "inputs": [
+    "th",
+    "th_m02",
+    "th_m05",
+    "dth",
+    "amp2s",
+    "x",
+    "dx",
+    "ddx",
+    "L",
+    "dL",
+    "plan_dx05",
+    "plan_dx10"
+   ],
+   "B_payload_beam": {
+    "err_cm": 0.35,
+    "coverage90": 0.3
+   },
+   "C_hoisting": {
+    "err_cm": 0.81,
+    "coverage90": 0.72
+   }
+  },
+  "6: motion + length + push + 0.5 s history": {
+   "inputs": [
+    "th",
+    "dth",
+    "th_m05",
+    "L",
+    "ddx",
+    "plan_acc10"
+   ],
+   "B_payload_beam": {
+    "err_cm": 0.36,
+    "coverage90": 0.18
+   },
+   "C_hoisting": {
+    "err_cm": 1.05,
+    "coverage90": 0.96
+   }
+  },
+  "5: motion + length + push": {
+   "inputs": [
+    "th",
+    "dth",
+    "L",
+    "ddx",
+    "plan_acc10"
+   ],
+   "B_payload_beam": {
+    "err_cm": 0.35,
+    "coverage90": 0.47
+   },
+   "C_hoisting": {
+    "err_cm": 1.22,
+    "coverage90": 0.92
+   }
+  }
+ },
+ "decision": {
+  "5 (current): rope, payload, period, speed, tuning error": {
+   "settle_err_s": 2.51,
+   "swing_err_cm": 3.8
+  },
+  "3: period, speed, tuning error": {
+   "settle_err_s": 2.57,
+   "swing_err_cm": 3.6
+  },
+  "2: period, tuning error": {
+   "settle_err_s": 2.51,
+   "swing_err_cm": 4.1
+  }
+ }
+}

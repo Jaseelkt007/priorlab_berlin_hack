@@ -1,0 +1,163 @@
+{
+ "summary": {
+  "industry": {
+   "total_s": 403.4,
+   "hits": 0,
+   "mean_settle_s": 19.9,
+   "mean_move_s": 13.7,
+   "moves_per_hour": 107.1
+  },
+  "slow": {
+   "total_s": 332.9,
+   "hits": 0,
+   "mean_settle_s": 1.5,
+   "mean_move_s": 26.2,
+   "moves_per_hour": 129.8
+  },
+  "tabpfn": {
+   "total_s": 260.6,
+   "hits": 0,
+   "mean_settle_s": 7.4,
+   "mean_move_s": 14.3,
+   "moves_per_hour": 165.8
+  }
+ },
+ "moves": 12,
+ "fleet_moves": 150,
+ "clearance_m": 0.45,
+ "entered_sling_m": 0.5,
+ "tabpfn_choices": [
+  {
+   "move": 1,
+   "sling_m": 2.39,
+   "frac": 1.0,
+   "tune": 0.5,
+   "pred_amp50": 0.034,
+   "pred_amp99": 0.068,
+   "actual_amp": 0.154,
+   "settle_s": 27.2,
+   "hit": false
+  },
+  {
+   "move": 2,
+   "sling_m": 2.37,
+   "frac": 0.8,
+   "tune": 0.5,
+   "pred_amp50": 0.027,
+   "pred_amp99": 0.313,
+   "actual_amp": 0.042,
+   "settle_s": 1.0,
+   "hit": false
+  },
+  {
+   "move": 3,
+   "sling_m": 1.91,
+   "frac": 0.9,
+   "tune": 0.5,
+   "pred_amp50": 0.079,
+   "pred_amp99": 0.352,
+   "actual_amp": 0.05,
+   "settle_s": 1.7,
+   "hit": false
+  },
+  {
+   "move": 4,
+   "sling_m": 2.68,
+   "frac": 1.0,
+   "tune": 0.5,
+   "pred_amp50": 0.079,
+   "pred_amp99": 0.373,
+   "actual_amp": 0.186,
+   "settle_s": 30.0,
+   "hit": false
+  },
+  {
+   "move": 5,
+   "sling_m": 2.4,
+   "frac": 0.9,
+   "tune": 1.5,
+   "pred_amp50": 0.058,
+   "pred_amp99": 0.373,
+   "actual_amp": 0.01,
+   "settle_s": 1.0,
+   "hit": false
+  },
+  {
+   "move": 6,
+   "sling_m": 2.68,
+   "frac": 0.8,
+   "tune": 1.5,
+   "pred_amp50": 0.029,
+   "pred_amp99": 0.308,
+   "actual_amp": 0.049,
+   "settle_s": 1.0,
+   "hit": false
+  },
+  {
+   "move": 7,
+   "sling_m": 2.39,
+   "frac": 1.0,
+   "tune": 1.5,
+   "pred_amp50": 0.094,
+   "pred_amp99": 0.382,
+   "actual_amp": 0.052,
+   "settle_s": 1.0,
+   "hit": false
+  },
+  {
+   "move": 8,
+   "sling_m": 1.88,
+   "frac": 1.0,
+   "tune": 1.5,
+   "pred_amp50": 0.066,
+   "pred_amp99": 0.25,
+   "actual_amp": 0.041,
+   "settle_s": 1.0,
+   "hit": false
+  },
+  {
+   "move": 9,
+   "sling_m": 2.88,
+   "frac": 1.0,
+   "tune": 1.5,
+   "pred_amp50": 0.081,
+   "pred_amp99": 0.273,
+   "actual_amp": 0.088,
+   "settle_s": 5.2,
+   "hit": false
+  },
+  {
+   "move": 10,
+   "sling_m": 2.05,
+   "frac": 1.0,
+   "tune": 1.5,
+   "pred_amp50": 0.045,
+   "pred_amp99": 0.098,
+   "actual_amp": 0.039,
+   "settle_s": 1.0,
+   "hit": false
+  },
+  {
+   "move": 11,
+   "sling_m": 1.84,
+   "frac": 1.0,
+   "tune": 1.5,
+   "pred_amp50": 0.046,
+   "pred_amp99": 0.15,
+   "actual_amp": 0.023,
+   "settle_s": 1.0,
+   "hit": false
+  },
+  {
+   "move": 12,
+   "sling_m": 2.0,
+   "frac": 1.0,
+   "tune": 0.5,
+   "pred_amp50": 0.068,
+   "pred_amp99": 0.182,
+   "actual_amp": 0.134,
+   "settle_s": 17.6,
+   "hit": false
+  }
+ ]
+}

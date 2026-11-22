@@ -1,14 +1,12 @@
 .env
 .venv/
-.venv-fly/
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
 *:Zone.Identifier
-
-# Hackathon: external code and downloaded data stay local (large, separately licensed)
-/third_party/
+third_party/
+.venv-jax/
+jax_tabpfn/golden/
+*.safetensors
 /data/
-*.mp4
-!results/showreel/tabpfn_ctx16384.mp4
-!results/sweep/tabpfn_ctx32768.mp4
+/logs/

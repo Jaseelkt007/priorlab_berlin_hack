@@ -1,0 +1,225 @@
+{
+ "dataset": "doi:10.17632/x69hyyv3zw.2 (CC BY 4.0)",
+ "ctx_rows": 3000,
+ "step1_adaptation_beam": {
+  "n_test": 681,
+  "test_t_from_s": 30,
+  "curve": [
+   {
+    "N": 0,
+    "seconds_watched": 0.0,
+    "pendulum_params": {
+     "sign": 1,
+     "delta": 0.14,
+     "zeta": 0.0
+    },
+    "+0.5s": {
+     "tabpfn_cm": 0.222,
+     "coverage90": 0.445,
+     "trees_cm": 0.34,
+     "pendulum_cm": 0.409,
+     "fit_s": 10.6,
+     "ms_per_row": 2.15
+    },
+    "+1.0s": {
+     "tabpfn_cm": 0.3,
+     "coverage90": 0.317,
+     "trees_cm": 0.45,
+     "pendulum_cm": 0.542,
+     "fit_s": 8.5,
+     "ms_per_row": 2.01
+    }
+   },
+   {
+    "N": 10,
+    "seconds_watched": 1.0,
+    "pendulum_params": {
+     "sign": 1,
+     "delta": 0.14,
+     "zeta": 0.0
+    },
+    "+0.5s": {
+     "tabpfn_cm": 0.168,
+     "coverage90": 0.483,
+     "trees_cm": 0.323,
+     "pendulum_cm": 0.409,
+     "fit_s": 7.0,
+     "ms_per_row": 2.04
+    },
+    "+1.0s": {
+     "tabpfn_cm": 0.227,
+     "coverage90": 0.49,
+     "trees_cm": 0.419,
+     "pendulum_cm": 0.542,
+     "fit_s": 6.9,
+     "ms_per_row": 2.02
+    }
+   },
+   {
+    "N": 20,
+    "seconds_watched": 2.0,
+    "pendulum_params": {
+     "sign": 1,
+     "delta": 0.34,
+     "zeta": 0.0
+    },
+    "+0.5s": {
+     "tabpfn_cm": 0.098,
+     "coverage90": 0.836,
+     "trees_cm": 0.298,
+     "pendulum_cm": 0.532,
+     "fit_s": 6.7,
+     "ms_per_row": 2.04
+    },
+    "+1.0s": {
+     "tabpfn_cm": 0.172,
+     "coverage90": 0.577,
+     "trees_cm": 0.38,
+     "pendulum_cm": 0.558,
+     "fit_s": 6.7,
+     "ms_per_row": 2.02
+    }
+   },
+   {
+    "N": 50,
+    "seconds_watched": 5.0,
+    "pendulum_params": {
+     "sign": 1,
+     "delta": 0.32,
+     "zeta": 0.05
+    },
+    "+0.5s": {
+     "tabpfn_cm": 0.064,
+     "coverage90": 0.952,
+     "trees_cm": 0.247,
+     "pendulum_cm": 0.54,
+     "fit_s": 6.7,
+     "ms_per_row": 2.06
+    },
+    "+1.0s": {
+     "tabpfn_cm": 0.096,
+     "coverage90": 0.91,
+     "trees_cm": 0.367,
+     "pendulum_cm": 0.5,
+     "fit_s": 6.7,
+     "ms_per_row": 2.02
+    }
+   },
+   {
+    "N": 100,
+    "seconds_watched": 10.0,
+    "pendulum_params": {
+     "sign": 1,
+     "delta": 0.28,
+     "zeta": 0.05
+    },
+    "+0.5s": {
+     "tabpfn_cm": 0.047,
+     "coverage90": 0.984,
+     "trees_cm": 0.23,
+     "pendulum_cm": 0.467,
+     "fit_s": 7.2,
+     "ms_per_row": 2.04
+    },
+    "+1.0s": {
+     "tabpfn_cm": 0.07,
+     "coverage90": 0.968,
+     "trees_cm": 0.284,
+     "pendulum_cm": 0.431,
+     "fit_s": 7.2,
+     "ms_per_row": 2.02
+    }
+   },
+   {
+    "N": 200,
+    "seconds_watched": 20.0,
+    "pendulum_params": {
+     "sign": 1,
+     "delta": 0.28,
+     "zeta": 0.02
+    },
+    "+0.5s": {
+     "tabpfn_cm": 0.054,
+     "coverage90": 0.9,
+     "trees_cm": 0.211,
+     "pendulum_cm": 0.429,
+     "fit_s": 9.2,
+     "ms_per_row": 2.05
+    },
+    "+1.0s": {
+     "tabpfn_cm": 0.043,
+     "coverage90": 0.962,
+     "trees_cm": 0.247,
+     "pendulum_cm": 0.428,
+     "fit_s": 7.2,
+     "ms_per_row": 2.05
+    }
+   }
+  ]
+ },
+ "step2_residual": {
+  "A_cable_length": {
+   "pendulum_params": {
+    "sign": 1,
+    "delta": 0.14,
+    "zeta": 0.0
+   },
+   "+0.5s": {
+    "pendulum_cm": 0.371,
+    "hybrid_cm": 0.471,
+    "coverage90": 0.993,
+    "fit_s": 7.0,
+    "ms_per_row": 2.0
+   },
+   "+1.0s": {
+    "pendulum_cm": 0.338,
+    "hybrid_cm": 0.194,
+    "coverage90": 0.991,
+    "fit_s": 6.9,
+    "ms_per_row": 2.03
+   }
+  },
+  "B_payload_beam": {
+   "pendulum_params": {
+    "sign": 1,
+    "delta": 0.14,
+    "zeta": 0.0
+   },
+   "+0.5s": {
+    "pendulum_cm": 0.437,
+    "hybrid_cm": 0.236,
+    "coverage90": 0.375,
+    "fit_s": 7.2,
+    "ms_per_row": 2.01
+   },
+   "+1.0s": {
+    "pendulum_cm": 0.569,
+    "hybrid_cm": 0.364,
+    "coverage90": 0.284,
+    "fit_s": 7.0,
+    "ms_per_row": 2.01
+   }
+  },
+  "C_hoisting": {
+   "pendulum_params": {
+    "sign": 1,
+    "delta": 0.14,
+    "zeta": 0.0
+   },
+   "+0.5s": {
+    "pendulum_cm": 0.734,
+    "hybrid_cm": 0.639,
+    "coverage90": 0.632,
+    "fit_s": 7.0,
+    "ms_per_row": 1.8
+   },
+   "+1.0s": {
+    "pendulum_cm": 0.819,
+    "hybrid_cm": 0.778,
+    "coverage90": 0.632,
+    "fit_s": 6.8,
+    "ms_per_row": 1.8
+   }
+  }
+ }
+}

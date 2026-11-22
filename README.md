@@ -4,7 +4,9 @@
 
 Four robots, one pretrained model, no training. We write each machine's own log as a table, and **TabPFN** reads its past rows as examples to predict where things are, where they are going and what happens next. To adapt to something new, it gets more rows, not retraining.
 
-**Pitch deck:** _link coming_ (local copy: open [`site/deck.html`](site/deck.html) in a browser, ← → to move) · **Website:** _hosting soon_ (local copy: [`site/index.html`](site/index.html)) · **Code:** this repo
+### 🌐 Demo website: **[priorlabberlinhack.vercel.app](https://priorlabberlinhack.vercel.app)**
+
+**Pitch deck:** [priorlabberlinhack.vercel.app/pitch](https://priorlabberlinhack.vercel.app/pitch) (← → to move, F for full screen) · **Full reports:** one page per project on the website · **Code:** this repo
 
 ![One table. Four machines: suction pick line, crane, intruder drone, fruit fly](docs/readme/overview.png)
 

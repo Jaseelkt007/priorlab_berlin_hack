@@ -9,7 +9,7 @@ One file per experiment. "Real" = the Nazarbayev University lab tower crane (CC 
 | `exp2_real.json` | adaptation curve on the unseen beam (0–20 s of its rows); physics + TabPFN residual model | real | `exp2_real.py` |
 | `mujoco_demo.json`, `mujoco_demo.mp4`, `still_a.png`, `still_b.png` | held-out load (400 kg beam, 2.6 m slings): TabPFN vs physics 1 s ahead, video and stills | MuJoCo | `mujoco_demo.py` |
 | `mujoco_frame.png` | test render of the crane scene | MuJoCo | `mujoco_crane.py --frame` |
-| `playground.json`, `fleet_rows.json` | 81-setting grid with precomputed TabPFN predictions (embedded in the report's playground); the 3,000 fleet rows it used | MuJoCo | `playground_precompute.py` |
+| `playground.json`, `fleet_rows.json` | 81-setting grid with precomputed TabPFN predictions (report 4b); the 3,000 fleet rows it used | MuJoCo | `playground_precompute.py` |
 | `clip_rope4.5_sling2.5_load0.5t_speed100.mp4` | example clip for one setting | MuJoCo | `render_clip.py` |
 | `influence.json` | effect of each slider (rope, sling, payload, speed) and permutation importance of TabPFN's inputs | real + MuJoCo | `influence.py` |
 | `ablation.json` | fewer inputs: forecast (12 → 4) and anti-sway choice (5 → 2) | real + MuJoCo | `ablation.py` |

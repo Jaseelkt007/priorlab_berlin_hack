@@ -10,7 +10,7 @@ An overhead crane's load keeps swinging after every start and stop. Anti-sway co
 
 | The crane | Live forecast | TabPFN chooses the anti-sway | It learns in a few cycles |
 |---|---|---|---|
-| ![crane](docs/img/crane_scene.jpg) | ![forecast](docs/img/forecast_live.jpg) | ![closed loop](docs/img/closed_loop.jpg) | ![cycles](docs/img/live_cycles.jpg) |
+| ![crane](docs/img/crane_scene.jpg) | ![forecast](docs/img/forecast.gif) | ![closed loop](docs/img/closed_loop.gif) | ![cycles](docs/img/live_cycles.jpg) |
 | MuJoCo overhead crane: trolley, rope, hook, slings, 2 m beam, racks beside two bays | Ghost = TabPFN's predicted load position 1 s ahead, next to the physics model | Left: industry anti-sway set for the wrong sling; right: TabPFN choosing, done in 261 s vs 403 s | Live pick and place: wrong setting in cycle 1, right setting from cycle 5, 7 of 9 OK |
 
 ## Documentation

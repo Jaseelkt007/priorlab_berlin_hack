@@ -20,3 +20,5 @@ Quick fixes taken to move fast. One line each: file, what was hacked, what the r
 - crane/real_data.py, data_tools/*: xlsx read with a regex over the sheet XML (no openpyxl). Real fix: openpyxl or pandas.
 - crane/mujoco_demo.py: TabPFN refit every 5 s and video rendered offline (7-8 s fits on a GTX 1650). Real fix: fit_with_cache on a faster GPU or KV-cache reuse for live control.
 - crane/exp*_real.py: one run per condition, one seed; the beam run has a single trolley move. Real fix: more runs and seeds, report spread.
+- `drone/intruder.py` Radar: noise grows with distance from the ground point (0, 0, 0), but the dish is drawn on the roof at about 14 m (`sim.RADAR_TOP`). Real fix: measure from `RADAR_TOP` and rebuild the data.
+- `drone/intruder.py` Flight(guard=True): the X2 defender only hovers, only in the viewer and scene video (not in the data), and at `GUARD_POS` it sits just inside the zone edge, so an intruder could bump into it there. Real fix: a defender that intercepts using the predictions, and add it to the data flights.

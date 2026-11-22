@@ -10,3 +10,6 @@ jax_tabpfn/golden/
 *.safetensors
 /data/
 /logs/
+
+# MuJoCo writes this to the current folder (drone, crane scripts run from the repo root)
+MUJOCO_LOG.TXT

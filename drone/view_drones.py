@@ -1,0 +1,175 @@
+"""Fly the drones yourself in the MuJoCo viewer.
+
+    python drone/view_drones.py              # both drones
+    python drone/view_drones.py --drone x2   # only the Skydio X2
+    python drone/view_drones.py --drone cf2  # only the Crazyflie 2
+    python drone/view_drones.py --selftest   # no window: fly a fixed course and print where each drone ends up
+
+Two windows open: the MuJoCo viewer, and a small "Drone controls" window. Click the
+controls window, then hold keys (see KEYS). The drone you are not flying holds its position.
+The flight controller is in flight.py, the world in sim.py. Setup: drone/models/README.md.
+"""
+
+import argparse
+import time
+import tkinter as tk
+
+import mujoco
+import mujoco.viewer
+import numpy as np
+
+from sim import DRONES, build, controllers
+
+# key -> (command index, value); command = forward, left, up, yaw rate
+KEYS = {
+    "Up": (0, 1), "Down": (0, -1),
+    "Left": (1, 1), "Right": (1, -1),
+    "w": (2, 1), "s": (2, -1),
+    "a": (3, 1), "d": (3, -1),
+}
+HELP = """Click this window, then hold keys:
+  Arrow keys   forward / back / left / right
+  W / S        up / down
+  A / D        turn left / right
+  Tab          switch drone
+  R            reset both drones
+Mouse in the viewer: drag to rotate, scroll to zoom."""
+
+
+def selftest(names):
+    """Each drone flies the course alone, in its own world, so they cannot crash into each other."""
+    course = [("hover", 2, [0, 0, 0, 0]), ("forward", 4, [1, 0, 0, 0]), ("stop", 4, [0, 0, 0, 0]),
+              ("up", 3, [0, 0, 1, 0]), ("turn left", 3, [0, 0, 0, 1]), ("left", 4, [0, 1, 0, 0]), ("stop", 4, [0, 0, 0, 0])]
+    for name in names:
+        model = build([name])
+        data = mujoco.MjData(model)
+        mujoco.mj_forward(model, data)
+        pilot = controllers(model, [name])[name]
+        for label, seconds, cmd in course:
+            pilot.command[:] = cmd
+            end = data.time + seconds
+            while data.time < end:
+                pilot.update(data, model.opt.timestep)
+                mujoco.mj_step(model, data)
+            pos, vel, rot, _ = pilot.state(data)
+            yaw = np.degrees(np.arctan2(rot[1, 0], rot[0, 0]))
+            print(f"{name:3s} {label:9s}: pos {np.round(pos, 2)}  speed {np.linalg.norm(vel):.2f} m/s  heading {yaw:6.1f} deg")
+
+
+class Keyboard:
+    """Held keys -> command (forward, left, up, yaw), read from a Tk window."""
+
+    def __init__(self, root, on_key=None):
+        self.held, self._presses, self._releases, self.root, self.on_key = set(), {}, {}, root, on_key
+        root.bind("<KeyPress>", self._press)
+        root.bind("<KeyRelease>", self._release)
+        root.bind("<Tab>", self._press)
+
+    def command(self):
+        command = np.zeros(4)
+        for key in self.held:
+            index, value = KEYS[key]
+            command[index] += value
+        return command
+
+    def _key(self, event):
+        return event.keysym if event.keysym in KEYS else event.keysym.lower()
+
+    def _press(self, event):
+        key = self._key(event)
+        if key in KEYS:
+            self.held.add(key)
+            self._presses[key] = self._presses.get(key, 0) + 1
+        elif self.on_key:
+            return self.on_key(key)
+
+    # Holding a key makes the system send repeated release+press pairs, so a release only
+    # counts if no new press follows within 60 ms.
+    def _release(self, event):
+        key = self._key(event)
+        if key in KEYS:
+            self._releases[key] = self._presses.get(key, 0)
+            self.root.after(60, lambda: self.held.discard(key)
+                            if self._presses.get(key, 0) == self._releases[key] else None)
+
+
+def fly(model, names):
+    data = mujoco.MjData(model)
+    mujoco.mj_forward(model, data)
+    pilots = controllers(model, names)
+    active = [0]  # index into names
+
+    viewer = mujoco.viewer.launch_passive(model, data)
+
+    def follow():
+        with viewer.lock():
+            viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
+            viewer.cam.trackbodyid = pilots[names[active[0]]].body
+            viewer.cam.distance, viewer.cam.elevation = (3.0, -20) if names[active[0]] == "x2" else (0.8, -20)
+
+    def reset():
+        with viewer.lock():
+            mujoco.mj_resetData(model, data)
+            mujoco.mj_forward(model, data)
+            for pilot in pilots.values():
+                pilot.reset_target(data)
+
+    root = tk.Tk()
+    root.title("Drone controls")
+    root.geometry("+40+40")
+    tk.Label(root, text=HELP, justify="left", font=("monospace", 11)).pack(padx=12, pady=8)
+    status = tk.Label(root, justify="left", font=("monospace", 11, "bold"), fg="#1f5fa8")
+    status.pack(padx=12, pady=(0, 10), anchor="w")
+
+    def on_key(key):
+        if key == "tab":
+            active[0] = (active[0] + 1) % len(names)
+            follow()
+            return "break"
+        if key == "r":
+            reset()
+
+    keyboard = Keyboard(root, on_key)
+
+    follow()
+    start = time.time() - data.time
+
+    def tick():
+        if not viewer.is_running():
+            root.destroy()
+            return
+        command = keyboard.command()
+        for i, name in enumerate(names):
+            pilots[name].command[:] = command if i == active[0] else 0
+        with viewer.lock():
+            steps = 0
+            while data.time < time.time() - start and steps < 50:  # real time; skip ahead if we fall behind
+                for pilot in pilots.values():
+                    pilot.update(data, model.opt.timestep)
+                mujoco.mj_step(model, data)
+                steps += 1
+        viewer.sync()
+        name = names[active[0]]
+        pos, vel, _, _ = pilots[name].state(data)
+        status.config(text=f"Flying: {DRONES[name][2]}\nheight {pos[2]:5.2f} m   speed {np.linalg.norm(vel):4.2f} m/s")
+        root.after(10, tick)
+
+    root.after(10, tick)
+    root.mainloop()
+    viewer.close()
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--drone", choices=["both", "x2", "cf2"], default="both")
+    parser.add_argument("--selftest", action="store_true", help="fly a fixed course without a window")
+    args = parser.parse_args()
+    names = ["x2", "cf2"] if args.drone == "both" else [args.drone]
+    if args.selftest:
+        selftest(names)
+    else:
+        fly(build(names), names)
+
+
+if __name__ == "__main__":
+    main()

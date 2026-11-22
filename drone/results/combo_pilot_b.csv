@@ -1,0 +1,8 @@
+manoeuvre,IMM,TabPFN B,IMM + TabPFN
+straight,1.645,1.439,1.382
+zigzag,1.816,1.589,1.562
+orbit,1.679,1.498,1.473
+hover,1.859,1.62,1.621
+dash,1.703,1.604,1.529
+dive,2.028,2.072,2.029
+climb,1.959,2.134,2.061

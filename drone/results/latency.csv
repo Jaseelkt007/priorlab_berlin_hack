@@ -1,0 +1,6 @@
+setting,examples,error_pilot_b_m,ms_1_drone,ms_10_drones,fits_100ms
+as used so far,5000,1.623,5166.0,5152.0,False
++ example cache,5000,1.622,619.6,625.3,False
+"+ cache, 2 passes",5000,1.618,320.1,360.5,False
+"+ cache, 1 pass",5000,1.625,255.6,272.2,False
+"+ cache, 1 pass, 1,000 X2 rows",2000,1.564,252.1,258.4,False

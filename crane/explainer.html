@@ -153,9 +153,47 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
     <div class="fact"><span class="v">22–64 ms</span><span class="k">one batched TabPFN-3.5 query on our RTX 4050 laptop GPU</span><a href="#m-tabpfn">team benchmark</a></div>
   </div>
   <nav class="toc" aria-label="Sections">
-    <a href="#physics">1 · Why loads swing</a><a href="#antisway">2 · Anti-sway</a><a href="#idea">3 · Inputs &amp; outputs</a><a href="#influence">3b · Parameters</a><a href="#glossary">3c · Glossary</a><a href="#realdata">4 · Real crane</a><a href="#mujoco">5 · MuJoCo</a><a href="#playground">5b · Playground</a><a href="#closedloop">6 · Closed loop</a><a href="#livepp">6b · Live pick &amp; place</a><a href="#setdown">7 · Set-down timing</a><a href="#impact">8 · Impact</a><a href="#business">8b · Business</a><a href="#run">9 · Run it</a><a href="#today">10 · Today</a><a href="#limits">11 · Limits</a><a href="#sources">Sources</a>
+    <a href="#problem">0 · Problem &amp; solution</a><a href="#physics">1 · Why loads swing</a><a href="#antisway">2 · Anti-sway</a><a href="#idea">3 · Inputs &amp; outputs</a><a href="#influence">3b · Parameters</a><a href="#glossary">3c · Glossary</a><a href="#realdata">4 · Real crane</a><a href="#mujoco">5 · MuJoCo</a><a href="#playground">5b · Playground</a><a href="#closedloop">6 · Closed loop</a><a href="#livepp">6b · Live pick &amp; place</a><a href="#setdown">7 · Set-down timing</a><a href="#impact">8 · Impact</a><a href="#business">8b · Business</a><a href="#run">9 · Run it</a><a href="#today">10 · Today</a><a href="#limits">11 · Limits</a><a href="#sources">Sources</a>
   </nav>
 </header>
+
+<section id="problem">
+  <div class="eyebrow">0 · Problem, use case, solution</div>
+  <h2>Problem statement</h2>
+  <p><b>Overhead cranes lose time and safety to load swing, because anti-sway systems depend on a pendulum model that is often wrong.</b> Every start and stop leaves the hanging load swinging. The operator must wait for it to settle before setting down, and a swinging load can hit racks or people. In the US, 154 of 297 crane-related deaths in 2011–17 were workers struck by an object or equipment (BLS). Anti-sway control cancels the swing only if it knows the pendulum length. That includes a sling length the operator types in, and it changes with every rigging, load shape and lift height. When it's wrong, the swing comes back and the time savings vanish.</p>
+  <div class="two">
+    <div class="panel">
+      <h3>Use case</h3>
+      <ul class="note" style="font-size:.92rem">
+        <li><b>Where:</b> indoor overhead (bridge) cranes in steel service centres, warehouses, machine and fabrication shops, with many different loads per shift.</li>
+        <li><b>Who:</b> crane operators (advice), maintenance and automation engineers (setup), plant managers (throughput).</li>
+        <li><b>Task:</b> pick a load at one bay, carry it 10 m, place it in another bay between racks within ±5 cm.</li>
+        <li><b>Pain today:</b> 20+ s of waiting per move when the anti-sway is mis-set, operators retyping sling lengths, near-misses with racks.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>Solution</h3>
+      <ul class="note" style="font-size:.92rem">
+        <li><b>TabPFN reads a table of the crane's own recent motion</b> (12 sensor and plan values every 0.1 s) and predicts where the load will be 1 s later, with a 90% range.</li>
+        <li><b>Before each move it chooses the anti-sway setting</b> by predicting swing left and settle wait for every setting from 3 values (sway period, speed, tuning error).</li>
+        <li><b>No training loop:</b> each finished move is one more row, so it adapts to new loads within a few cycles.</li>
+        <li><b>Fits existing cranes:</b> it keeps the certified anti-sway mechanism and only replaces the typed-in guess. It can start in manual (advisory) mode.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="box"><table class="ptab"><thead><tr><th>Why TabPFN</th><th>What it gives here</th></tr></thead><tbody>
+    <tr><td>In-context learning, no training</td><td>a new load or rigging is handled by adding rows; nothing to retrain or redeploy</td></tr>
+    <tr><td>Works on small tables</td><td>useful from about 120 commissioning moves plus a few of its own</td></tr>
+    <tr><td>Calibrated uncertainty</td><td>the 90% and 99% ranges become safety rules (stay clear of the racks)</td></tr>
+    <tr><td>Fast batched prediction</td><td>about 130 ms on a laptop GPU; all anti-sway settings scored in one call</td></tr>
+  </tbody></table></div>
+  <div class="box"><table class="ptab"><thead><tr><th>Success measure</th><th>Target</th><th>Achieved (simulation / lab crane)</th></tr></thead><tbody>
+    <tr><td>Swing forecast error, 1 s ahead</td><td>better than the physics model</td><td>0.8 vs 2.2 cm (MuJoCo, 81 settings); 3× lower after 5 s of a new load (lab crane)</td></tr>
+    <tr><td>Cycle time</td><td>shorter than mis-set anti-sway</td><td>−35% (closed loop, 12 loads); −29% live (35 cycles)</td></tr>
+    <tr><td>Placement</td><td>within ±5 cm</td><td>mostly within ±3 cm once tuned</td></tr>
+    <tr><td>Collisions</td><td>none</td><td>none (no strategy collided, so not yet a safety proof)</td></tr>
+  </tbody></table></div>
+</section>
 
 <section id="physics">
   <div class="eyebrow">1 · Why loads swing</div>
@@ -309,6 +347,53 @@ impulses 1/(1+K) at t=0  and  K/(1+K) at t = π/ω_d   (ζ≈0: ½ and ½, half 
 <section id="glossary">
   <div class="eyebrow">3c · Glossary: every input and output</div>
   <h2>Each term, what it means, its unit, an example and where it comes from</h2>
+  <div class="card" style="padding:12px 10px 6px"><svg viewBox="0 0 820 470" role="img" aria-label="Crane side view showing where every input is measured and the predicted output, with example values" style="width:100%;height:auto;display:block">
+<style>.t{font:11px 'IBM Plex Sans',sans-serif;fill:var(--ink)} .m{font:10.5px 'IBM Plex Mono',monospace;fill:var(--ink)} .mu{font:10px 'IBM Plex Sans',sans-serif;fill:var(--muted)} .h{font:600 11.5px 'IBM Plex Sans',sans-serif}</style>
+<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--steel-dark)"/></marker>
+<marker id="arT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--tab)"/></marker></defs>
+<rect x="47.599999999999994" y="38" width="716.8" height="8" fill="var(--rail)"/>
+<rect x="36.4" y="44" width="8" height="356" fill="var(--steel)"/><rect x="767.1999999999999" y="44" width="8" height="356" fill="var(--steel)"/>
+<line x1="36.4" x2="775.6" y1="400" y2="400" stroke="var(--line)" stroke-width="2"/>
+<rect x="98.0" y="396" width="56" height="4" fill="var(--warn)"/><text x="126.0" y="416" text-anchor="middle" class="mu">bay 1 · x = 1 m</text><rect x="82.0" y="360" width="5" height="40" fill="var(--steel)"/><rect x="165.0" y="360" width="5" height="40" fill="var(--steel)"/><rect x="658.0" y="396" width="56" height="4" fill="var(--warn)"/><text x="686.0" y="416" text-anchor="middle" class="mu">bay 2 · x = 11 m</text><rect x="642.0" y="360" width="5" height="40" fill="var(--steel)"/><rect x="725.0" y="360" width="5" height="40" fill="var(--steel)"/>
+<text x="686.0" y="354" text-anchor="middle" class="mu">racks: 0.45 m clearance</text>
+<rect x="277.59999999999997" y="42" width="44" height="16" rx="2" fill="var(--ink)"/>
+<circle cx="299.59999999999997" cy="60" r="5" fill="var(--steel-dark)"/>
+<line x1="299.59999999999997" y1="60" x2="327.2" y2="200" stroke="var(--steel-dark)" stroke-width="2"/>
+<rect x="320.2" y="200" width="14" height="14" fill="var(--warn)"/>
+<line x1="327.2" y1="214" x2="311.59999999999997" y2="300" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="5 3"/><line x1="327.2" y1="214" x2="379.59999999999997" y2="300" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="5 3"/>
+<rect x="303.59999999999997" y="300" width="84" height="16" fill="var(--tab)"/>
+<rect x="322.4" y="294" width="120" height="28" fill="var(--tab)" opacity="0.12"/>
+<rect x="340.4" y="300" width="84" height="16" fill="none" stroke="var(--tab)" stroke-width="2" stroke-dasharray="4 3"/>
+<line x1="299.59999999999997" y1="60" x2="299.59999999999997" y2="330" stroke="var(--steel)" stroke-dasharray="2 3"/>
+<line x1="299.59999999999997" y1="326" x2="345.59999999999997" y2="326" stroke="var(--steel-dark)" marker-end="url(#ar)"/>
+<line x1="323.59999999999997" y1="72" x2="419.59999999999997" y2="72" stroke="var(--steel-dark)" stroke-width="1.5" marker-end="url(#ar)"/>
+<!-- callouts -->
+<text x="300" y="14" text-anchor="middle" class="h" fill="var(--rail)">Trolley · rail encoder</text>
+<text x="300" y="29" text-anchor="middle" class="m">x = 4.1 m · dx = 1.2 m/s · ddx = 0.0 m/s²</text>
+<text x="425.59999999999997" y="68" class="h" fill="var(--rail)">Controller plan</text>
+<text x="425.59999999999997" y="82" class="m">plan_dx05 = +0.6 m · plan_dx10 = +1.1 m</text>
+<text x="285.59999999999997" y="130.0" text-anchor="end" class="h" fill="var(--steel-dark)">Rope · hoist encoder</text>
+<text x="285.59999999999997" y="144.0" text-anchor="end" class="m">L1 = 4.5 m</text>
+<text x="375.2" y="244" class="h" fill="var(--bad)">Sling · HIDDEN (never an input)</text>
+<text x="375.2" y="258" class="mu">L2 = 2.0 m; the anti-sway uses a typed-in guess</text>
+<text x="286" y="306" text-anchor="end" class="h" fill="var(--tab)">Load · load cell</text>
+<text x="286" y="320" text-anchor="end" class="m">payload_t = 0.5 t</text>
+<text x="303.59999999999997" y="344" class="h" fill="var(--ink)">Swing · rope-angle sensor</text>
+<text x="303.59999999999997" y="358" class="m">off = +0.21 m · doff = +0.30 m/s</text>
+<text x="303.59999999999997" y="371" class="m">off_m02 = +0.15 · off_m05 = −0.02 · amp2s = 0.25 m</text>
+<text x="448.4" y="304" class="h" fill="var(--tab)">OUTPUT · TabPFN, 1 s ahead</text>
+<text x="448.4" y="318" class="m">offset = +0.38 m (median)</text>
+<text x="448.4" y="331" class="m">90% range +0.35 … +0.41 m</text>
+<!-- model 2 box -->
+<rect x="520" y="90" width="290" height="92" rx="8" fill="var(--panel)" stroke="var(--line)"/>
+<text x="532" y="108" class="h" fill="var(--phys)">Model 2 · once per move, at lift-off</text>
+<text x="532" y="124" class="m">IN  sway period = 5.3 s · speed = 1.0</text>
+<text x="532" y="138" class="m">IN  tuning error, per anti-sway setting</text>
+<text x="532" y="154" class="m">OUT swing left = 0.06 m (99%: 0.12)</text>
+<text x="532" y="168" class="m">OUT settle wait = 1.0 s → pick setting</text>
+<text x="810" y="464" text-anchor="end" class="mu">example moment halfway through a move · offsets exaggerated for visibility</text>
+</svg></div>
+  <p class="note">Every model-1 input is drawn where it is measured: trolley encoder (blue), hoist encoder (grey), rope-angle sensor and load cell (teal), the controller's plan (arrow). The <b style="color:var(--bad)">red dashed sling</b> is never measured. The dashed teal outline is the output: where TabPFN says the load will be 1 s from now, with its 90% band.</p>
   <p>Inputs are what TabPFN reads; outputs are what it answers. Example values are one illustrative moment halfway through a move. Model 1 answers "where will the load be in 1 s?"; model 2 answers "which anti-sway setting gives the shortest safe cycle?".</p>
   <div class="box"><table class="cols"><thead><tr><th>Role</th><th>Term</th><th>In code</th><th>Definition</th><th>Unit</th><th>Example</th><th>Where it comes from</th></tr></thead><tbody><tr class='g'><td colspan='7'>Model 1: the forecast (a new row every 0.1 s)</td></tr><tr><td><span class="chip in">input</span></td><td><b>Load offset</b></td><td class='v'>off</td><td>Horizontal distance from the trolley to the load's centre right now. 0 = hanging straight down, + = ahead of the trolley in the travel direction.</td><td class='v'>m</td><td class='v'>+0.21</td><td>rope-angle sensor (sim: MuJoCo)</td></tr><tr><td><span class="chip in">input</span></td><td><b>Offset rate</b></td><td class='v'>doff</td><td>How fast the offset is changing: the load's sideways speed relative to the trolley.</td><td class='v'>m/s</td><td class='v'>+0.30</td><td>(offset now − offset 0.1 s ago) / 0.1 s</td></tr><tr><td><span class="chip in">input</span></td><td><b>Offset 0.2 s ago</b></td><td class='v'>off_m02</td><td>The offset one-fifth of a second earlier. With the current offset it shows which way and how fast the swing turns.</td><td class='v'>m</td><td class='v'>+0.15</td><td>sensor history</td></tr><tr><td><span class="chip in">input</span></td><td><b>Offset 0.5 s ago</b></td><td class='v'>off_m05</td><td>The offset half a second earlier, roughly a tenth of a swing. Lets TabPFN infer the swing period, and from it the hidden sling.</td><td class='v'>m</td><td class='v'>−0.02</td><td>sensor history</td></tr><tr><td><span class="chip in">input</span></td><td><b>Swing size</b></td><td class='v'>amp2s</td><td>Largest |offset| in the last 2 s: how much energy the swing has, even when the load is passing through the centre.</td><td class='v'>m</td><td class='v'>0.25</td><td>sensor history</td></tr><tr><td><span class="chip in">input</span></td><td><b>Trolley position</b></td><td class='v'>x</td><td>Where the trolley is on the rail. Bays at 1 m and 11 m; used to tell the phase of the move.</td><td class='v'>m</td><td class='v'>4.1</td><td>rail encoder</td></tr><tr><td><span class="chip in">input</span></td><td><b>Trolley speed</b></td><td class='v'>dx</td><td>How fast the trolley is moving.</td><td class='v'>m/s</td><td class='v'>1.2</td><td>change of position over 0.1 s</td></tr><tr><td><span class="chip in">input</span></td><td><b>Trolley acceleration</b></td><td class='v'>ddx</td><td>How hard the trolley is speeding up (+) or braking (−) now. This is the push that makes the load swing: lag angle ≈ acceleration / g.</td><td class='v'>m/s²</td><td class='v'>0.0</td><td>second difference of position</td></tr><tr><td><span class="chip in">input</span></td><td><b>Rope length</b></td><td class='v'>L1</td><td>Hoist rope from the drum to the hook. Fixed during a move. The sling below the hook is <b>not</b> an input.</td><td class='v'>m</td><td class='v'>4.5</td><td>hoist encoder</td></tr><tr><td><span class="chip in">input</span></td><td><b>Payload</b></td><td class='v'>payload_t</td><td>Mass of the load.</td><td class='v'>t</td><td class='v'>0.5</td><td>load cell</td></tr><tr><td><span class="chip in">input</span></td><td><b>Planned move, 0.5 s</b></td><td class='v'>plan_dx05</td><td>How far the controller will move the trolley in the next 0.5 s. Shows a coming start or brake.</td><td class='v'>m</td><td class='v'>+0.6</td><td>controller's own plan</td></tr><tr><td><span class="chip in">input</span></td><td><b>Planned move, 1 s</b></td><td class='v'>plan_dx10</td><td>How far the trolley will move in the next 1 s.</td><td class='v'>m</td><td class='v'>+1.1</td><td>controller's own plan</td></tr><tr><td><span class="chip out">output</span></td><td><b>Offset in 1 s (median)</b></td><td class='v'>y, 50%</td><td>TabPFN's best estimate of the load offset 1 s from now. Drawn as the teal ghost.</td><td class='v'>m</td><td class='v'>+0.38</td><td>TabPFN prediction</td></tr><tr><td><span class="chip out">output</span></td><td><b>90% range</b></td><td class='v'>5% … 95%</td><td>The interval TabPFN is 90% sure the offset will fall in. Drawn as the light band; used for safety decisions.</td><td class='v'>m</td><td class='v'>+0.35 … +0.41</td><td>TabPFN prediction</td></tr><tr class='g'><td colspan='7'>Model 2: the anti-sway choice (one row per candidate, once per move)</td></tr><tr><td><span class="chip in">input</span></td><td><b>Sway period</b></td><td class='v'>meas</td><td>Time for one full swing of the hooked load, measured when it lifts off. Encodes rope + hidden sling + load shape in one number.</td><td class='v'>s</td><td class='v'>5.3</td><td>rope-angle sensor at lift-off</td></tr><tr><td><span class="chip in">input</span></td><td><b>Speed setting</b></td><td class='v'>speed</td><td>Trolley speed and acceleration as a fraction of rated (1.0 = 1.2 m/s, 0.4 m/s²).</td><td class='v'>–</td><td class='v'>1.0</td><td>set by the operator</td></tr><tr><td><span class="chip in">input</span></td><td><b>Tuning error (the candidate)</b></td><td class='v'>tune_err</td><td>How far off the anti-sway's timing is: anti-sway period ÷ measured period − 1. 0 = perfect; empty = anti-sway off. One row per setting (off, 0.5 … 3.0 m).</td><td class='v'>–</td><td class='v'>−0.05</td><td>computed per candidate</td></tr><tr><td><span class="chip out">output</span></td><td><b>Swing left (median and 99%)</b></td><td class='v'>amp</td><td>Largest |offset| after the trolley stops, until the load settles. The 99% value must stay under the 0.45 m rack clearance.</td><td class='v'>m</td><td class='v'>0.06 (99%: 0.12)</td><td>TabPFN prediction</td></tr><tr><td><span class="chip out">output</span></td><td><b>Settle wait</b></td><td class='v'>settle</td><td>Time from arrival until the load stays within ±5 cm for 1 s, so set-down can start.</td><td class='v'>s</td><td class='v'>1.0</td><td>TabPFN prediction</td></tr><tr class='g'><td colspan='7'>Terms used with the outputs</td></tr><tr><td><span class="chip act">term</span></td><td><b>Quantile</b></td><td class='v'>5% / 50% / 95%</td><td>A value the outcome stays below with that probability. 50% = median (best guess).</td><td class='v'></td><td class='v'> </td><td></td></tr><tr><td><span class="chip act">term</span></td><td><b>Coverage</b></td><td class='v'>coverage₉₀</td><td>Share of moments when the real outcome fell inside the 90% range. Should be about 90%; lower means overconfident.</td><td class='v'>%</td><td class='v'>85%</td><td>measured after the fact</td></tr><tr><td><span class="chip act">term</span></td><td><b>Error</b></td><td class='v'>mean |error|</td><td>Average distance between TabPFN's median and what really happened 1 s later.</td><td class='v'>cm</td><td class='v'>0.8</td><td>measured after the fact</td></tr><tr><td><span class="chip act">term</span></td><td><b>Hidden sling</b></td><td class='v'>L2</td><td>Sling length from hook to load. It shapes the swing but is never given to TabPFN or measured; the operator types a guess into the anti-sway.</td><td class='v'>m</td><td class='v'>2.0</td><td>not an input</td></tr></tbody></table></div>
 </section>

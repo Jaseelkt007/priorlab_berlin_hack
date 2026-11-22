@@ -141,21 +141,23 @@ def style_model(m, W: int, H: int, fovy: float, ortho: bool):
     m.vis.quality.numslices = 64                      # smooth cylinders/ellipsoids at 4K
     m.vis.quality.numstacks = 48
     m.vis.headlight.active = 1
-    m.vis.headlight.ambient[:] = [0.17, 0.17, 0.18]
-    m.vis.headlight.diffuse[:] = [0.05, 0.05, 0.05]
+    m.vis.headlight.ambient[:] = np.array([0.08, 0.08, 0.085]) * EXPOSURE
+    m.vis.headlight.diffuse[:] = np.array([0.05, 0.05, 0.05]) * EXPOSURE
     m.vis.headlight.specular[:] = [0.0, 0.0, 0.0]
 
 
 # look (clip-studio): dark studio, satin light-grey robot, carbon rods, charcoal belts, product colour the only colour
-ALU = dict(rgba=[0.851, 0.8627, 0.8784, 1.0], specular=0.4, shininess=0.5)          # housing, upper arms, platform: satin grey
+ALU = dict(rgba=[0.851, 0.8627, 0.8784, 1.0], specular=0.5, shininess=0.55)          # housing, upper arms, platform: satin grey
 CARBON = dict(rgba=[0.1059, 0.1137, 0.1255, 1.0], specular=0.25, shininess=0.4)      # parallel rods
-SILICONE = dict(rgba=[0.0784, 0.0824, 0.0863, 1.0], specular=0.08, shininess=0.15)   # cup rubber (matte)
+SILICONE = dict(rgba=[0.2275, 0.2392, 0.2588, 1.0], specular=0.12, shininess=0.2)   # cup rubber (matte)
 BELT = dict(rgba=[0.1647, 0.1765, 0.1922, 1.0], specular=0.05, shininess=0.05)       # matte charcoal, lighter than the floor
 RAIL = dict(rgba=[0.2902, 0.3059, 0.3294, 1.0], specular=0.3, shininess=0.4)         # belt side rails: thin edge highlight
 FLOOR = dict(rgba=[0.0392, 0.0431, 0.051, 1.0], specular=0.35, shininess=0.6)       # near-black glossy floor (reflectance below)
 FLOOR_REFLECTANCE = 0.3
 BG_TOP, BG_BOTTOM = np.array([0.0863, 0.098, 0.1176]), np.array([0.0431, 0.051, 0.0627])   # background gradient (sRGB)
 WHITE_CAP = 240.0                                                        # no clipped highlights
+EXPOSURE = 0.6       # lights render at 0.6x so OpenGL never clamps; post restores it with a highlight shoulder
+KNEE = 0.75          # display level above which highlights roll off smoothly toward white (below: unchanged)
 
 
 def _style(g, s, rgba=None):
@@ -183,6 +185,7 @@ def restyle_scene(m, scn, sku_rgba):
             _style(g, ALU)
         elif body.startswith("s") and body[1:].isdigit():
             _style(g, CARBON)
+            g.size[0] = 0.011                     # visual only: the real carbon rods are ~22 mm (model capsule 12 mm)
         elif body == "tool" and m.geom_type[g.objid] == mujoco.mjtGeom.mjGEOM_CYLINDER:
             g.rgba[3] = 0.0                       # the fitting stand-in: replaced by the drawn suction cup
         elif body.startswith("lip"):
@@ -192,8 +195,8 @@ def restyle_scene(m, scn, sku_rgba):
 
 
 HOUSING = ALU
-WRAP = dict(specular=0.3, shininess=0.6)                                 # satin foil-wrap sheen
-METAL = dict(rgba=[0.55, 0.56, 0.58, 1], specular=0.8, shininess=0.7)
+WRAP = dict(specular=0.7, shininess=0.8)                                 # foil-wrap highlight
+METAL = dict(rgba=[0.7216, 0.7373, 0.7608, 1.0], specular=1.0, shininess=0.9)
 KINDS = ["housing", "belt", "cup", "queue", "outfeed", "wrap_seal"]
 
 
@@ -273,35 +276,49 @@ LIGHT_AZ = 150.0            # the rig is placed relative to the hero (A) camera'
 
 
 def add_lights(scn):
-    """One rig for all angles. Key: soft spot from upper front-left (as seen from the hero camera), neutral-warm,
-    the only shadow caster. Rim: behind/above, cool white, no shadows. Fill: low, from the hero camera's side."""
+    """One rig for all angles. Key: soft spot, low and to the side (as seen from the hero camera), neutral-warm, the
+    only shadow caster. Rim: behind/above, cool white, strong, no shadows. Fill: very low. Pool: a narrow downward
+    spot under the robot (no shadows) that pools on the glossy floor and belts and falls off into the dark."""
     import mujoco
     phi = np.radians(LIGHT_AZ)
     fwd = np.array([np.cos(phi), np.sin(phi), 0.0])     # hero camera's horizontal viewing direction
     right = np.array([np.sin(phi), -np.cos(phi), 0.0])
     z = np.array([0.0, 0.0, 1.0])
     tgt = np.array([0.0, 0.0, -0.85])
-    spec = [  # pos, colour, specular, castshadow, cutoff
-        (tgt - 2.0 * fwd - 1.5 * right + 1.7 * z, [0.95, 0.90, 0.83], 0.30, 1, 38.0),   # key
-        (tgt + 2.2 * fwd + 0.4 * right + 1.4 * z, [0.62, 0.68, 0.78], 0.45, 0, 40.0),   # rim
-        (tgt - 2.6 * fwd + 0.8 * right - 0.1 * z, [0.16, 0.16, 0.17], 0.0, 0, 70.0),    # fill
+    spec = [  # pos, colour, specular, castshadow, cutoff, exponent, target
+        (tgt - 1.2 * fwd - 2.3 * right + 1.1 * z, [0.95, 0.90, 0.83], 0.35, 1, 38.0, 4.0, tgt),    # key: low, to the side
+        (tgt + 2.2 * fwd + 0.4 * right + 1.4 * z, [1.25, 1.36, 1.56], 0.5, 0, 40.0, 4.0, tgt),     # rim: doubled
+        (tgt - 2.6 * fwd + 0.8 * right - 0.1 * z, [0.08, 0.08, 0.085], 0.0, 0, 70.0, 4.0, tgt),    # fill: halved
+        (np.array([0.0, 0.0, 0.6]), [0.24, 0.235, 0.225], 0.0, 0, 24.0, 12.0,                       # pool under the robot
+         np.array([0.0, 0.0, -1.3])),
     ]
     scn.nlight = 0
-    for pos, col, spc, sh, cut in spec:
+    for pos, col, spc, sh, cut, ex, aim in spec:
         L = scn.lights[scn.nlight]
         L.type = mujoco.mjtLightType.mjLIGHT_SPOT
         L.pos[:] = pos
-        dvec = tgt - np.asarray(pos)
+        dvec = aim - np.asarray(pos)
         L.dir[:] = dvec / np.linalg.norm(dvec)
         L.ambient[:] = [0.0, 0.0, 0.0]
-        L.diffuse[:] = col
-        L.specular[:] = [spc] * 3
+        L.diffuse[:] = np.asarray(col) * EXPOSURE
+        L.specular[:] = [spc * EXPOSURE] * 3
         L.castshadow = sh
-        L.cutoff, L.exponent = cut, 4.0
+        L.cutoff, L.exponent = cut, ex
         L.attenuation[:] = [1.0, 0.0, 0.0]
         L.headlight = 0
         L.softness = 0.6 if sh else 0.0
         scn.nlight += 1
+
+
+def tonemap(lin: np.ndarray) -> np.ndarray:
+    """lin: the motion-blur average in linear light (gamma 2.2 decode of the rendered frames). Back to display values,
+    then the exposure is restored in DISPLAY space (MuJoCo writes its lighting result directly as display values,
+    so the lights at EXPOSURE scale those values), then a soft knee above KNEE (slope 1 at the knee, asymptote
+    1). Mid-tones match a render at full exposure; highlights roll off instead of clipping."""
+    x = (lin ** (1 / 2.2)) / EXPOSURE
+    hi = x > KNEE
+    x[hi] = KNEE + (1 - KNEE) * (1 - np.exp(-(x[hi] - KNEE) / (1 - KNEE)))
+    return np.clip(x * 255.0 + 0.5, 0, 255).astype(np.uint8)
 
 
 def composite(img: np.ndarray, depth: np.ndarray, fog_start: float, fog_end: float) -> np.ndarray:
@@ -322,15 +339,17 @@ def ease(u):
 
 CAMERAS = {  # lookat (None: tracked), distance, azimuth, elevation, fovy (deg; view height in m if ortho)
     # A: low, close, long lens; robot + belts fill ~60 % of the frame; no support frame (its legs would sit in front)
-    "A-wide": dict(lookat=[0.0, 0.0, -0.50], dist=3.0, az=150, el=-4, fovy=22, orbit=0.0, depth=True),
-    "A-wide-orbit": dict(lookat=[0.0, 0.0, -0.50], dist=3.0, az=143, el=-4, fovy=22, orbit=14.0, depth=True),
+    # A: the whole robot (housing to belts, ~1.14 m) fills ~70 % of the frame height, with headroom
+    "A-wide": dict(lookat=[0.0, 0.0, -0.42], dist=4.2, az=150, el=-4, fovy=22, orbit=0.0, depth=True),
+    "A-wide-orbit": dict(lookat=[0.0, 0.0, -0.42], dist=4.2, az=143, el=-4, fovy=22, orbit=14.0, depth=True),
     "B-top": dict(lookat=[0.0, 0.0, -1.0], dist=0.95, az=0.0, el=-89.9, fovy=55, orbit=0.0),
     # C: follows the cup (Gaussian-smoothed, sigma 40 ms): cup in the upper third, the bar in the lower third
     "C-close": dict(lookat=None, track="cup", offset=[0.0, 0.0, -0.016], sigma=0.04, dist=0.30, az=158, el=-3,
                     fovy=18, orbit=0.0, depth=True),
     "D-track": dict(lookat=None, track="tool", offset=[0.0, 0.0, 0.0], sigma=0.12, dist=0.75, az=150, el=-12, fovy=24,
                     orbit=0.0),
-    "E-side": dict(lookat=[0.0, 0.0, -0.965], dist=3.0, az=90, el=-1.0, fovy=0.52, orbit=0.0, ortho=True, ghosts=False),
+    # E: pick point to place point (0.305 m) spans ~70 % of the width: view height 0.245 m (orthographic)
+    "E-side": dict(lookat=[0.0, 0.0, -0.975], dist=3.0, az=90, el=-1.0, fovy=0.245, orbit=0.0, ortho=True, ghosts=False),
 }
 
 
@@ -397,7 +416,8 @@ def render_clip(job: dict) -> dict:
         pad = np.pad(pts, ((len(ker) // 2, len(ker) // 2), (0, 0)), mode="edge")
         track = np.stack([np.convolve(pad[:, j], ker, mode="valid") for j in range(3)], axis=1)
     path = job["path"]
-    ff = subprocess.Popen(
+    stills = job.get("still_frames")          # stills mode: only these frames, PNG, no video or sidecars
+    ff = None if stills else subprocess.Popen(
         ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", "60",
          "-i", "-", "-vf", "scale=out_color_matrix=bt709:out_range=tv", "-c:v", "libx264", "-profile:v", "high",
          "-preset", "slow", "-crf", "14", "-pix_fmt", "yuv420p", "-g", "60", "-keyint_min", "60",
@@ -413,7 +433,7 @@ def render_clip(job: dict) -> dict:
     lut = ((np.arange(256) / 255.0) ** 2.2).astype(np.float32)   # sRGB-ish -> linear for the average
     fog_start = camd.get("fog", (camd["dist"] + 0.6, camd["dist"] + 3.5))[0]
     fog_end = camd.get("fog", (camd["dist"] + 0.6, camd["dist"] + 3.5))[1]
-    for f in range(n_frames):
+    for f in (stills or range(n_frames)):
         t = t0 + f / fps_sim
         u = ease(f / max(n_frames - 1, 1))
         acc = None
@@ -446,12 +466,16 @@ def render_clip(job: dict) -> dict:
             add_lights(scn)
             img = r.render()
             acc = lut[img] if acc is None else acc + lut[img]
-        img = img if nsub == 1 else np.clip(((acc / nsub) ** (1 / 2.2)) * 255.0 + 0.5, 0, 255).astype(np.uint8)
+        img = tonemap(acc / nsub)
         # depth of the frame-time state: haze + background, and the depth pass for A and C
         r.enable_depth_rendering()
         dep = r.render()
         r.disable_depth_rendering()
         img = composite(img, dep, fog_start, fog_end)
+        if stills:
+            from PIL import Image
+            Image.fromarray(img).save(f"{path[:-4]}_f{f}.png")
+            continue
         ff.stdin.write(img.tobytes())
         if camd.get("depth") and job.get("depth", True):     # 16-bit PNG in mm, half resolution
             mm = np.clip(dep[::2, ::2] * 1000.0, 0, 65535).astype(np.uint16)
@@ -504,6 +528,8 @@ def render_clip(job: dict) -> dict:
         cams.append(dict(frame=f, pos=[round(float(x), 5) for x in gl.pos], forward=[round(float(x), 5) for x in gl.forward],
                          up=[round(float(x), 5) for x in gl.up], lookat=[round(float(x), 5) for x in cam.lookat],
                          fovy=camd["fovy"], orthographic=bool(camd.get("ortho", False))))
+    if stills:
+        return dict(file=Path(path).name, frames=len(stills), sim_t0=t0, sim_t1=t1, stills=True)
     ff.stdin.close()
     ff.wait()
     base = path[:-4]
@@ -715,6 +741,7 @@ def main():
     ap.add_argument("--out", default=None, help="override the plan's output folder")
     ap.add_argument("--only", default="", help="comma-separated cameras to render (default: all in the plan)")
     ap.add_argument("--only-plan", dest="only_plan", default="", help="comma-separated sub-plan names (full plan)")
+    ap.add_argument("--stills", action="store_true", help="render one look frame per clip (PNG in <out>/look/)")
     a = ap.parse_args()
     plans = {"test": lambda: [make_plan_test()], "full": make_plan_full}[a.plan]() if a.plan in ("test", "full") \
         else json.loads(Path(a.plan).read_text())
@@ -748,10 +775,22 @@ def run_plan(plan, a):
     for c in plan["clips"]:
         t0, t1 = clip_window(picks, c)
         name = f"{c['scene']}_{c['label']}_{c['camera']}_{label}_{c['sim_fps']}.mp4"
-        jobs.append(dict(picks=picks, pitch=pitch, policy=label, story=story, path=str(out / name),
-                         clip=dict(camera=c["camera"], t0=t0, t1=t1, sim_fps=c["sim_fps"], W=a.W, H=a.H)))
+        job = dict(picks=picks, pitch=pitch, policy=label, story=story, path=str(out / name),
+                   clip=dict(camera=c["camera"], t0=t0, t1=t1, sim_fps=c["sim_fps"], W=a.W, H=a.H))
+        if a.stills:      # one look frame: C 8 frames after touch, the others at the acceleration reversal
+            by = {p["idx"]: p for p in picks}
+            pk = by[c["pick"]] if "pick" in c else next(p for p in picks if p["idx"] >= c["picks"][0] + 1)
+            ev, off = ("touch", 8) if c["camera"].startswith("C") else ("accel_reversal", 0)
+            job["still_frames"] = [int(round((pk["events_g"][ev] - t0) * c["sim_fps"])) + off]
+            job["path"] = str(out / "look" / name)
+            (out / "look").mkdir(exist_ok=True)
+        jobs.append(job)
     with ProcessPoolExecutor(min(a.workers, len(jobs)), mp_context=mp.get_context("spawn")) as ex:
         results = list(ex.map(render_clip, jobs))
+    if a.stills:
+        for rres in results:
+            print(f"still {rres['file'][:-4]}: written", flush=True)
+        return
     man_p = out / "manifest.json"
     man = json.loads(man_p.read_text()) if man_p.exists() else []
     commit = git_commit()
